@@ -10,5 +10,5 @@ export GITHUB_TOKEN="YOUR_TOKEN_HERE"
 export BRANCH="mvick/test-agent-gh-action"
 
 # Build and run
-go build -o agent-metadata-action
+go build -o agent-metadata-action ./cmd/agent-metadata-action
 ./agent-metadata-action

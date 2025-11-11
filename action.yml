@@ -25,5 +25,5 @@ runs:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       run: |
         cd ${{ github.action_path }}
-        go build -o agent-metadata-action
+        go build -o agent-metadata-action ./cmd/agent-metadata-action
         ./agent-metadata-action
