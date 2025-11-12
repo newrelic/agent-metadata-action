@@ -149,6 +149,7 @@ func convertToConfigJson(yamlConfigs []ConfigYaml) []ConfigJson {
 	return configs
 }
 
+// @todo update to fetch from tagged release
 func fetchFromGitHub(repo, token, branch string) ([]byte, error) {
 	client := NewGitHubClient(token)
 	return client.FetchFile(repo, ".fleetControl/configs.yml", branch)
