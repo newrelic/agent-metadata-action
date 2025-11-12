@@ -1,0 +1,15 @@
+configs:
+  - name: New relic myagent config for k8s
+    slug: myagent-config
+    platform: kubernetes
+    description: myagent agent configuration, provided by the user
+    type: myagent-config
+    version: 1.0.0
+    schema: ./schema/myagent-config.json
+  - name: New relic myagent agent config for host
+    slug: myagent-config
+    platform: host
+    description: myagent agent configuration, provided by the user
+    type: myagent-config
+    version: 1.0.0
+    schema: ./schema/myagent-config.json
