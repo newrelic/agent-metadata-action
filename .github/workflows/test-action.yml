@@ -1,6 +1,9 @@
-name: Test Action Locally
+name: Test Action
 
 on: [push]
+
+permissions:
+  contents: read
 
 jobs:
   test:
