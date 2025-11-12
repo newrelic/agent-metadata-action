@@ -20,5 +20,6 @@ jobs:
         with:
           agent-repo: ${{ github.repository }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: false
         env:
           BRANCH: ${{ github.ref_name }}
