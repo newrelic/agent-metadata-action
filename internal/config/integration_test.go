@@ -15,7 +15,7 @@ func TestReadConfigsWithMockedGitHub(t *testing.T) {
 	// Reset GitHub client singleton before test
 	github.ResetClient()
 	// Create mock configs.yaml content
-	mockYAML := `configs:
+	mockYAML := `configurationDefinitions:
   - name: "Test Config"
     slug: "test-config"
     platform: "linux"
@@ -38,7 +38,7 @@ func TestReadConfigsWithMockedGitHub(t *testing.T) {
 	err := yaml.Unmarshal([]byte(mockYAML), &configFile)
 	assert.NoError(t, err)
 
-	configs := models.ConvertToConfigJson(configFile.Configs)
+	configs := configFile.Configs
 
 	// Verify results
 	assert.NotNil(t, configs)

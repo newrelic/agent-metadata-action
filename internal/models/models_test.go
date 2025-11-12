@@ -7,7 +7,7 @@ import (
 )
 
 func TestConvertToConfigJson(t *testing.T) {
-	yamlConfigs := []ConfigYaml{
+	configs := []ConfigurationDefinition{
 		{
 			Name:        "Test Config",
 			Slug:        "test-config",
@@ -28,32 +28,22 @@ func TestConvertToConfigJson(t *testing.T) {
 		},
 	}
 
-	jsonConfigs := ConvertToConfigJson(yamlConfigs)
-
-	assert.NotNil(t, jsonConfigs)
-	assert.Equal(t, 2, len(jsonConfigs))
+	assert.NotNil(t, configs)
+	assert.Equal(t, 2, len(configs))
 
 	// Verify first config
-	assert.Equal(t, "Test Config", jsonConfigs[0].Name)
-	assert.Equal(t, "test-config", jsonConfigs[0].Slug)
-	assert.Equal(t, "linux", jsonConfigs[0].Platform)
-	assert.Equal(t, "A test configuration", jsonConfigs[0].Description)
-	assert.Equal(t, "agent", jsonConfigs[0].Type)
-	assert.Equal(t, "1.0.0", jsonConfigs[0].Version)
+	assert.Equal(t, "Test Config", configs[0].Name)
+	assert.Equal(t, "test-config", configs[0].Slug)
+	assert.Equal(t, "linux", configs[0].Platform)
+	assert.Equal(t, "A test configuration", configs[0].Description)
+	assert.Equal(t, "agent", configs[0].Type)
+	assert.Equal(t, "1.0.0", configs[0].Version)
 
 	// Verify second config
-	assert.Equal(t, "Another Config", jsonConfigs[1].Name)
-	assert.Equal(t, "another-config", jsonConfigs[1].Slug)
-	assert.Equal(t, "windows", jsonConfigs[1].Platform)
-	assert.Equal(t, "Another test configuration", jsonConfigs[1].Description)
-	assert.Equal(t, "integration", jsonConfigs[1].Type)
-	assert.Equal(t, "2.0.0", jsonConfigs[1].Version)
-}
-
-func TestConvertToConfigJsonEmptyArray(t *testing.T) {
-	yamlConfigs := []ConfigYaml{}
-	jsonConfigs := ConvertToConfigJson(yamlConfigs)
-
-	assert.NotNil(t, jsonConfigs)
-	assert.Equal(t, 0, len(jsonConfigs))
+	assert.Equal(t, "Another Config", configs[1].Name)
+	assert.Equal(t, "another-config", configs[1].Slug)
+	assert.Equal(t, "windows", configs[1].Platform)
+	assert.Equal(t, "Another test configuration", configs[1].Description)
+	assert.Equal(t, "integration", configs[1].Type)
+	assert.Equal(t, "2.0.0", configs[1].Version)
 }

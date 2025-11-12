@@ -14,19 +14,20 @@ func main() {
 		fmt.Fprintf(os.Stderr, "::error::Error loading config: %v\n", err)
 		os.Exit(1)
 	}
+	fmt.Printf("::debug::Loaded config - Repo: %s, Branch: %s\n", cfg.AgentRepo, cfg.Branch)
 
-	configs, err := config.ReadConfigs(cfg)
+	configs, err := config.ReadConfigurationDefinitions(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "::error::Error reading configs: %v\n", err)
 		os.Exit(1)
 	}
 
 	fmt.Println("::notice::Successfully fetched configs file")
+	fmt.Printf("::debug::Found %d configs\n", len(configs))
 	printConfigs(configs)
-
 }
 
-func printConfigs(configs []models.ConfigJson) {
+func printConfigs(configs []models.ConfigurationDefinition) {
 	for i, configJson := range configs {
 		fmt.Printf("Config %d:\n", i+1)
 		fmt.Printf("  Name: %s\n", configJson.Name)

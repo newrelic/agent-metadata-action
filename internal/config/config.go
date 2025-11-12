@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const CONFIG_FILE_PATH = ".fleetControl/configs.yml"
+const CONFIG_FILE_PATH = ".fleetControl/configurationDefinitions.yml"
 
 // Config represents the GitHub configuration
 // @todo update to fetch from tagged release
@@ -42,8 +42,8 @@ func LoadEnv() (*Config, error) {
 	}, nil
 }
 
-// ReadConfigs reads and parses the configs file from GitHub
-func ReadConfigs(cfg *Config) ([]models.ConfigJson, error) {
+// ReadConfigurationDefinitions reads and parses the configurationDefinitions file from GitHub
+func ReadConfigurationDefinitions(cfg *Config) ([]models.ConfigurationDefinition, error) {
 	client := github.GetClient(cfg.GitHubToken)
 
 	data, err := client.FetchFile(cfg.AgentRepo, CONFIG_FILE_PATH, cfg.Branch)
@@ -56,5 +56,5 @@ func ReadConfigs(cfg *Config) ([]models.ConfigJson, error) {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
-	return models.ConvertToConfigJson(configFile.Configs), nil
+	return configFile.Configs, nil
 }
