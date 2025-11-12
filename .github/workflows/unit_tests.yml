@@ -1,4 +1,4 @@
-name: Go Tests
+name: Go Unit Tests
 
 permissions:
   contents: read
@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    name: Run Go Tests
+    name: Run Go Unit Tests
     runs-on: ubuntu-latest
 
     steps:

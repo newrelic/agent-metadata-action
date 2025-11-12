@@ -1,34 +1,25 @@
 name: 'Agent Metadata Action'
-description: 'Fetches and validates agent configuration metadata'
-
+description: 'Fetches agent configuration metadata from a checked-out repository'
 inputs:
-  agent-repo:
-    description: 'Repository containing agent metadata (format: owner/repo)'
-    required: true
-  github-token:
-    description: 'GitHub token for API access'
-    required: true
   cache:
-    description: 'Enable caching for Go modules'
+    description: 'Enable Go build cache'
     required: false
     default: 'true'
-
 runs:
   using: 'composite'
   steps:
     - name: Setup Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21'
+        go-version-file: '${{ github.action_path }}/go.mod'
         cache: ${{ inputs.cache }}
     
     - name: Build and Run
       id: run-action
       shell: bash
-      env:
-        AGENT_REPO: ${{ inputs.agent-repo }}
-        GITHUB_TOKEN: ${{ inputs.github-token }}
       run: |
+        set -e
         cd ${{ github.action_path }}
+        # todo - look at using a built image instead
         go build -o agent-metadata-action ./cmd/agent-metadata-action
         ./agent-metadata-action

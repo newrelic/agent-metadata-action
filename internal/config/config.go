@@ -3,8 +3,8 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
-	"agent-metadata-action/internal/github"
 	"agent-metadata-action/internal/models"
 
 	"gopkg.in/yaml.v3"
@@ -12,43 +12,22 @@ import (
 
 const CONFIG_FILE_PATH = ".fleetControl/configurationDefinitions.yml"
 
-// Config represents the GitHub configuration
-// @todo update to fetch from tagged release
-type Config struct {
-	AgentRepo   string
-	GitHubToken string
-	Branch      string
+// LoadEnv loads the workspace path from environment variables
+func LoadEnv() (string, error) {
+	workspace := os.Getenv("GITHUB_WORKSPACE")
+	if workspace == "" {
+		return "", fmt.Errorf("GITHUB_WORKSPACE environment variable not set")
+	}
+	return workspace, nil
 }
 
-// LoadEnv loads environment variables
-func LoadEnv() (*Config, error) {
-	agentRepo := os.Getenv("AGENT_REPO")
-	if agentRepo == "" {
-		return nil, fmt.Errorf("AGENT_REPO environment variable not set")
-	}
+// ReadConfigurationDefinitions reads and parses the configurationDefinitions file
+func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationDefinition, error) {
+	fullPath := filepath.Join(workspacePath, CONFIG_FILE_PATH)
 
-	githubToken := os.Getenv("GITHUB_TOKEN")
-	if githubToken == "" {
-		return nil, fmt.Errorf("GITHUB_TOKEN environment variable not set")
-	}
-
-	// Branch is optional, defaults to empty (uses default branch)
-	branch := os.Getenv("BRANCH")
-
-	return &Config{
-		AgentRepo:   agentRepo,
-		GitHubToken: githubToken,
-		Branch:      branch,
-	}, nil
-}
-
-// ReadConfigurationDefinitions reads and parses the configurationDefinitions file from GitHub
-func ReadConfigurationDefinitions(cfg *Config) ([]models.ConfigurationDefinition, error) {
-	client := github.GetClient(cfg.GitHubToken)
-
-	data, err := client.FetchFile(cfg.AgentRepo, CONFIG_FILE_PATH, cfg.Branch)
+	data, err := os.ReadFile(fullPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch from GitHub: %w", err)
+		return nil, fmt.Errorf("failed to read config file at %s: %w", fullPath, err)
 	}
 
 	var configFile models.ConfigFile

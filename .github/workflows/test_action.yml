@@ -1,4 +1,4 @@
-name: Test Action
+name: Action Test
 
 permissions:
   contents: read
@@ -9,7 +9,7 @@ on:
       - '**'
 
 jobs:
-  test:
+  action-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -18,8 +18,4 @@ jobs:
       - name: Run Agent Metadata Action
         uses: ./
         with:
-          agent-repo: ${{ github.repository }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           cache: false
-        env:
-          BRANCH: ${{ github.ref_name }}

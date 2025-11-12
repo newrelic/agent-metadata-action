@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a GitHub Action written in Go that fetches and validates agent configuration metadata from a specified repository. The action reads a YAML configuration file (`.fleetControl/configs.yml`) from a target repository via the GitHub API and converts it to JSON format for processing.
+This is a GitHub Action written in Go that reads agent configuration metadata from a checked-out repository. The action reads a YAML configuration file (`.fleetControl/configurationDefinitions.yml`) from the local filesystem after the repository has been checked out by `actions/checkout`.
+
+**Future Direction**: This action will eventually use the data read in to call a service.
 
 ## Project Structure
 
@@ -15,16 +17,16 @@ The project follows standard Go conventions:
 │   └── agent-metadata-action/    # Main application entry point
 │       └── main.go
 ├── internal/                      # Private application code
-│   ├── config/                    # Configuration loading and management
+│   ├── config/                    # Configuration loading and file I/O
 │   │   ├── config.go
 │   │   ├── config_test.go
 │   │   └── integration_test.go
-│   ├── github/                    # GitHub API client
-│   │   ├── client.go
-│   │   └── client_test.go
-│   └── models/                    # Data structures and transformations
-│       ├── models.go
-│       └── models_test.go
+│   └── models/                    # Data structures
+│       └── models.go
+├── .fleetControl/                 # Configuration files
+│   ├── configurationDefinitions.yml
+│   └── schemas/
+│       └── myagent-config.json
 ├── action.yml                     # GitHub Action definition
 ├── go.mod
 └── run_local.sh                   # Local testing script
@@ -46,72 +48,62 @@ go test -v ./...
 go test -v ./internal/config
 
 # Run a specific test
-go test -v -run TestLoadSuccess ./internal/config
+go test -v -run TestLoadEnv_Success ./internal/config
 
-# Local development with environment variables
-export AGENT_REPO="owner/repo"
-export GITHUB_TOKEN="your_token"
-export BRANCH="branch_name"  # Optional, defaults to default branch
+# Local development (requires GITHUB_WORKSPACE to be set)
+export GITHUB_WORKSPACE=/path/to/repo
 ./agent-metadata-action
-```
 
-The `run_local.sh` script provides a convenient way to test locally with environment variables.
+# Or use run_local.sh for testing
+./run_local.sh
+```
 
 ## Architecture
 
 ### Package Organization
 
 **cmd/agent-metadata-action/main.go**: Application entry point
-- Loads configuration via `config.Load()`
-- Calls `config.ReadConfigs()` to fetch and parse data
-- Handles errors and prints results
+- Loads workspace path via `config.LoadEnv()`
+- Calls `config.ReadConfigurationDefinitions()` to read and parse YAML
+- Marshals results to JSON for output
+- Uses GitHub Actions annotation format for logging (`::error::`, `::notice::`, `::debug::`)
 
-**internal/config**: Configuration management
-- `Load()`: Reads environment variables (`AGENT_REPO`, `GITHUB_TOKEN`, `BRANCH`)
-- `ReadConfigs()`: Orchestrates fetching from GitHub and parsing YAML
-- Tests cover environment variable validation and YAML parsing
+**internal/config**: Configuration file I/O
+- `LoadEnv()`: Reads `GITHUB_WORKSPACE` environment variable
+- `ReadConfigurationDefinitions()`: Reads YAML file from local filesystem and parses it
+- Tests cover environment variable validation, file reading, and YAML parsing errors
 
-**internal/github**: GitHub API client
-- `Client`: HTTP client wrapper with 30-second timeout
-- `GetClient()`: Returns singleton client instance (thread-safe with sync.Once)
-- `NewClient()`: Creates new client instance (deprecated, use GetClient)
-- `ResetClient()`: Resets singleton for testing
-- `FetchFile()`: Fetches file from GitHub Contents API with optional branch
-- Handles Bearer token authentication
-- Decodes base64-encoded responses
-- Singleton pattern ensures connection reuse across multiple API calls
-- Tests use httptest to mock API responses and reset singleton between tests
-
-**internal/models**: Data structures and conversions
-- `ConfigYaml`: Structure matching YAML file format (includes `schema` field)
-- `ConfigJson`: Output structure (excludes `schema` field)
-- `ConfigFile`: Root YAML structure containing configs array
-- `ConvertToConfigJson()`: Transforms YAML configs to JSON format
-- Tests verify struct conversions and field mappings
+**internal/models**: Data structures
+- `ConfigurationDefinition`: Represents a single configuration with fields like name, slug, platform, description, type, version, format, and schema
+- `ConfigFile`: Root YAML structure containing `configurationDefinitions` array
+- `AgentMetadata`: (Currently unused - may be used for future service integration)
 
 ### Data Flow
 
-1. `config.LoadEnv()` reads environment variables
-2. `config.ReadConfigs()` gets singleton GitHub client via `github.GetClient()`
-3. GitHub client fetches `.fleetControl/configs.yml` from target repo
-4. YAML is unmarshaled into `models.ConfigFile`
-5. `models.ConvertToConfigJson()` strips `schema` field
-6. Main prints formatted output to stdout
-
-**Note**: The GitHub client uses a singleton pattern, so the first call to `GetClient()` initializes the client with the token, and subsequent calls return the same instance for connection reuse.
+1. `config.LoadEnv()` reads `GITHUB_WORKSPACE` environment variable
+2. `config.ReadConfigurationDefinitions()` constructs file path: `{workspace}/.fleetControl/configurationDefinitions.yml`
+3. `os.ReadFile()` reads the YAML file from local filesystem
+4. YAML is unmarshaled into `models.ConfigFile` structure
+5. Array of `ConfigurationDefinition` is returned
+6. Main function marshals each config to JSON and prints with `::debug::` annotations
 
 ### GitHub Action Integration
 
 **action.yml** defines the composite action:
-- Sets up Go 1.21
+- Sets up Go using version from `go.mod` (currently Go 1.25.3)
 - Builds binary from source: `go build -o agent-metadata-action ./cmd/agent-metadata-action`
-- Passes inputs as environment variables
+- Executes the built binary in the workspace
 - The action builds and runs on every invocation (no pre-built binary)
+- Supports optional `cache` input to control Go build caching (defaults to `true`)
+
+The action expects to run after `actions/checkout` which sets the `GITHUB_WORKSPACE` environment variable and checks out the repository containing the configuration file.
 
 ## Key Behaviors
 
-- GitHub API calls include optional branch via `?ref=` query parameter
-- Error output uses GitHub Actions annotation format: `::error::` and `::notice::`
-- HTTP client has 30-second timeout
+- Reads from **local filesystem** only (no network calls)
+- Requires `GITHUB_WORKSPACE` environment variable to be set
+- Error output uses GitHub Actions annotation format: `::error::`, `::notice::`, `::debug::`
 - All errors result in exit code 1
-- Target file path is hardcoded: `.fleetControl/configs.yml`
+- Target file path is hardcoded: `.fleetControl/configurationDefinitions.yml`
+- YAML structure maps directly to JSON output (no transformation/filtering)
+- The `schema` field in configurations contains relative paths to JSON schema files

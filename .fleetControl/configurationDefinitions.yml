@@ -5,13 +5,13 @@ configurationDefinitions:
     description: myagent agent configuration, provided by the user
     type: myagent-config
     version: 1.0.0
-    format: yml
-    schema: ./schema/myagent-config.json
+    format: json
+    schema: ./schemas/myagent-config.json
   - name: New relic myagent agent config for host
     slug: myagent-config
     platform: host
     description: myagent agent configuration, provided by the user
     type: myagent-config
     version: 1.0.0
-    format: yml
-    schema: ./schema/myagent-config.json
+    format: json
+    schema: ./schemas/myagent-config.json

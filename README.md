@@ -1,27 +1,92 @@
 <a href="https://opensource.newrelic.com/oss-category/#community-project"><picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/newrelic/opensource-website/raw/main/src/images/categories/dark/Community_Project.png"><source media="(prefers-color-scheme: light)" srcset="https://github.com/newrelic/opensource-website/raw/main/src/images/categories/Community_Project.png"><img alt="New Relic Open Source community project banner." src="https://github.com/newrelic/opensource-website/raw/main/src/images/categories/Community_Project.png"></picture></a>
 
-# [Name of Project] [build badges go here when available]
+# Agent Metadata Action
 
->[Brief description - what is the project and value does it provide? How often should users expect to get releases? How is versioning set up? Where does this project want to go?]
+A GitHub Action that reads agent configuration metadata from a checked-out repository. This action parses the `.fleetControl/configurationDefinitions.yml` file and makes the configuration data available for downstream workflow steps.
 
 ## Installation
 
-> [Include a step-by-step procedure on how to get your code installed. Be sure to include any third-party dependencies that need to be installed separately]
+Add this action to your workflow after checking out your repository:
 
-## Getting Started
->[Simple steps to start working with the software similar to a "Hello World"]
+```yaml
+- name: Checkout repository
+  uses: actions/checkout@v4
+
+- name: Read agent metadata
+  uses: newrelic/agent-metadata-action@v1
+```
 
 ## Usage
->[**Optional** - Include more thorough instructions on how to use the software. This section might not be needed if the Getting Started section is enough. Remove this section if it's not needed.]
 
+This action reads the `.fleetControl/configurationDefinitions.yml` file from your repository and outputs the configuration definitions. The action expects the file to be present after the repository has been checked out.
+
+### Example Workflow
+
+```yaml
+name: Process Agent Metadata
+on:
+  push:
+    branches: [main]
+
+jobs:
+  read-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read agent metadata
+        uses: newrelic/agent-metadata-action@v1
+        with:
+          cache: true  # Optional: Enable Go build cache (default: true)
+```
+
+### Configuration File Format
+
+The action expects a YAML file at `.fleetControl/configurationDefinitions.yml` with the following structure:
+
+```yaml
+configurationDefinitions:
+  - name: "Configuration Name"
+    slug: "config-slug"
+    platform: "kubernetes"  # or "host"
+    description: "Description of the configuration"
+    type: "config-type"
+    version: "1.0.0"
+    format: "json"
+    schema: "./schemas/config-schema.json"
+```
 
 ## Building
 
->[**Optional** - Include this section if users will need to follow specific instructions to build the software from source. Be sure to include any third party build dependencies that need to be installed separately. Remove this section if it's not needed.]
+To build the action locally:
+
+```bash
+# Build the binary
+go build -o agent-metadata-action ./cmd/agent-metadata-action
+
+# Run locally (requires GITHUB_WORKSPACE environment variable)
+export GITHUB_WORKSPACE=/path/to/your/repo
+./agent-metadata-action
+```
 
 ## Testing
 
->[**Optional** - Include instructions on how to run tests if we include tests with the codebase. Remove this section if it's not needed.]
+Run the test suite:
+
+```bash
+# Run all tests
+go test ./...
+
+# Run tests with verbose output
+go test -v ./...
+
+# Run tests for a specific package
+go test -v ./internal/config
+
+# Run a specific test
+go test -v -run TestLoadEnv_Success ./internal/config
+```
 
 ## Support
 
@@ -31,7 +96,7 @@ New Relic hosts and moderates an online forum where you can interact with New Re
 
 ## Contribute
 
-We encourage your contributions to improve [project name]! Keep in mind that when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project.
+We encourage your contributions to improve Agent Metadata Action! Keep in mind that when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project.
 
 If you have any questions, or to execute our corporate CLA (which is required if your contribution is on behalf of a company), drop us an email at opensource@newrelic.com.
 
@@ -43,8 +108,8 @@ If you believe you have found a security vulnerability in this project or any of
 
 If you would like to contribute to this project, review [these guidelines](./CONTRIBUTING.md).
 
-To all contributors, we thank you!  Without your contribution, this project would not be what it is today.  We also host a community project page dedicated to [Project Name](<LINK TO https://opensource.newrelic.com/projects/... PAGE>).
+To all contributors, we thank you! Without your contribution, this project would not be what it is today.
 
 ## License
-[Project Name] is licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
->[If applicable: The [project name] also uses source code from third-party libraries. You can find full details on which libraries are used and the terms under which they are licensed in the third-party notices document.]
+
+Agent Metadata Action is licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
