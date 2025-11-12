@@ -1,0 +1,29 @@
+name: 'Agent Metadata Action'
+description: 'Fetches and validates agent configuration metadata'
+
+inputs:
+  agent-repo:
+    description: 'Repository containing agent configurations'
+    required: true
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Build and Run
+      id: run-action
+      shell: bash
+      env:
+        AGENT_REPO: ${{ inputs.agent-repo }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        cd ${{ github.action_path }}
+        go build -o agent-metadata-action
+        ./agent-metadata-action
