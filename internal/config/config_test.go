@@ -20,6 +20,7 @@ func TestLoadEnv_Success(t *testing.T) {
 
 func TestLoadEnv_MissingWorkspace(t *testing.T) {
 	// Don't set up environment (mimics what would NOT be set from calling workflow if checkout does NOT precede this action)
+	t.Setenv("GITHUB_WORKSPACE", "")
 
 	cfg, err := LoadEnv()
 	assert.Error(t, err)
