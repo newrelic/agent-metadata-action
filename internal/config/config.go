@@ -13,6 +13,7 @@ import (
 const CONFIG_FILE_PATH = ".fleetControl/configs.yml"
 
 // Config represents the GitHub configuration
+// @todo update to fetch from tagged release
 type Config struct {
 	AgentRepo   string
 	GitHubToken string
