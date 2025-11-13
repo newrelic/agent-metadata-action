@@ -1,0 +1,21 @@
+name: Action Test
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  action-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Run Agent Metadata Action
+        uses: ./
+        with:
+          cache: false

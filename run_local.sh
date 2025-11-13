@@ -1,14 +1,17 @@
 #!/bin/bash
 
-# Set your repository (format: owner/repo)
-export AGENT_REPO="newrelic-experimental/k8s-apm-agent-health-sidecar"
+# Build the action
+echo "Building agent-metadata-action..."
+go build -o agent-metadata-action ./cmd/agent-metadata-action
 
-# Set your GitHub token
-export GITHUB_TOKEN="YOUR_TOKEN_HERE"
+if [ $? -ne 0 ]; then
+    echo "::error::Build failed"
+    exit 1
+fi
 
-# Set the branch you want to fetch from
-export BRANCH="mvick/test-agent-gh-action"
+# Set GITHUB_WORKSPACE to current directory (simulates GitHub Actions environment)
+export GITHUB_WORKSPACE="$(pwd)"
 
-# Build and run
-go build -o agent-metadata-action
+# Run the action (it will read from the current directory)
+echo "Running agent-metadata-action in: $GITHUB_WORKSPACE"
 ./agent-metadata-action

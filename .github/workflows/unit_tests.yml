@@ -1,0 +1,39 @@
+name: Go Unit Tests
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  test:
+    name: Run Go Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run tests
+      run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+    - name: Display coverage
+      run: go tool cover -func=coverage.out
