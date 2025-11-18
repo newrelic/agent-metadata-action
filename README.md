@@ -20,7 +20,7 @@ Add this action to your workflow after checking out your repository:
 
 This action reads the `.fleetControl/configurationDefinitions.yml` file from your repository and outputs the configuration definitions. The action expects the file to be present after the repository has been checked out.
 
-### Example Workflow
+### Example Workflow For Releasing a New Agent Version
 
 ```yaml
 name: Process Agent Metadata
@@ -34,10 +34,35 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: v1.0.0 # the release tag for the version being released
 
       - name: Read agent metadata
         uses: newrelic/agent-metadata-action@v1
         with:
+          version: 1.0.0 # only required if different from ref tag
+          cache: true  # Optional: Enable Go build cache (default: true)
+```
+
+### Example Workflow For Updating Docs Metadata on an Existing Agent Version
+
+The docs header contains things like a bug fix list, a list of features, etc for the given agent version. These
+will be updated after the initial agent version has been created so checking out the agent repo is not required.
+
+```yaml
+name: Process Agent Metadata
+on:
+  push:
+    branches: [main]
+
+jobs:
+  read-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read agent metadata
+        uses: newrelic/agent-metadata-action@v1
+        with:
+          version: 1.0.0 # required in the docs case
           cache: true  # Optional: Enable Go build cache (default: true)
 ```
 
@@ -56,6 +81,10 @@ configurationDefinitions:
     format: "json"
     schema: "./schemas/config-schema.json"
 ```
+
+**All fields are required.** The action validates each configuration entry and will fail with a clear error message if any required field is missing.
+
+**Schema files** are automatically base64-encoded and embedded in the output. Schema paths must be relative to the `.fleetControl` directory and cannot use directory traversal (`..`) for security.
 
 ## Building
 
