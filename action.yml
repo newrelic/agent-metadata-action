@@ -37,6 +37,12 @@ runs:
     - name: Build and Run
       id: run-action
       shell: bash
+      env:
+        INPUT_AGENT_TYPE: ${{ inputs.agent-type }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_FEATURES: ${{ inputs.features }}
+        INPUT_BUGS: ${{ inputs.bugs }}
+        INPUT_SECURITY: ${{ inputs.security }}
       run: |
         set -e
         cd ${{ github.action_path }}
