@@ -13,7 +13,8 @@ echo "Running from agent repo with GITHUB_REF (version parsed from git tag)"
 echo "=========================================="
 export GITHUB_WORKSPACE="$(pwd)"
 export GITHUB_REF="refs/tags/v2.0.0"
-unset INPUT_VERSION
+export INPUT_AGENT_TYPE="myagent"
+export INPUT_VERSION="1.2.3"
 unset INPUT_FEATURES
 unset INPUT_BUGS
 unset INPUT_SECURITY
@@ -30,6 +31,7 @@ echo "Test 2: Docs Workflow Example"
 echo "Running from docs workflow with explicit inputs (no workspace)"
 echo "=========================================="
 unset GITHUB_WORKSPACE
+export INPUT_AGENT_TYPE="myagent"
 export INPUT_VERSION="1.2.3"
 export INPUT_FEATURES="feature1,feature2"
 export INPUT_BUGS="bug-123,bug-456"

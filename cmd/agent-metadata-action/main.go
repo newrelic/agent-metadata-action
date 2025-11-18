@@ -10,6 +10,12 @@ import (
 )
 
 func main() {
+	// Validate agent type here for now - may move once there is code to call InstrumentationMetadata service
+	if err := validateAgentType(); err != nil {
+		fmt.Fprintf(os.Stderr, "::error::%v\n", err)
+		os.Exit(1)
+	}
+
 	workspace := config.LoadEnv()
 
 	metadata, err := config.LoadMetadata()
@@ -55,6 +61,14 @@ func main() {
 		// @todo use the INPUT_AGENT_TYPE along with the metadata to call the InstrumentationMetadata service for updating the agent in NGEP with extra metadata
 		printJSON("Metadata", metadata)
 	}
+}
+
+func validateAgentType() error {
+	agentType := os.Getenv("INPUT_AGENT_TYPE")
+	if agentType == "" {
+		return fmt.Errorf("agent-type is required: INPUT_AGENT_TYPE not set")
+	}
+	return nil
 }
 
 func printJSON(label string, data any) {
