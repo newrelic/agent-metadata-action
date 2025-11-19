@@ -18,4 +18,6 @@ jobs:
       - name: Run Agent Metadata Action
         uses: ./
         with:
+          agent-type: 'myagent'
+          version: '1.0.0'
           cache: false
