@@ -21,6 +21,18 @@ inputs:
     description: 'Comma-separated list of security fixes (ex. fix1,fix2)'
     required: false
     default: ''
+  deprecations:
+    description: 'Comma-separated list of deprecations (ex. deprecation1,deprecation2)'
+    required: false
+    default: ''
+  supportedOperatingSystems:
+    description: 'Comma-separated list of supported operating systems (ex. linux,windows,darwin)'
+    required: false
+    default: ''
+  eol:
+    description: 'End of life date (ex. 2025-12-31)'
+    required: false
+    default: ''
   cache:
     description: 'Enable Go build cache'
     required: false
@@ -43,6 +55,9 @@ runs:
         INPUT_FEATURES: ${{ inputs.features }}
         INPUT_BUGS: ${{ inputs.bugs }}
         INPUT_SECURITY: ${{ inputs.security }}
+        INPUT_DEPRECATIONS: ${{ inputs.deprecations }}
+        INPUT_SUPPORTEDOPERATINGSYSTEMS: ${{ inputs.supportedOperatingSystems }}
+        INPUT_EOL: ${{ inputs.eol }}
       run: |
         set -e
         cd ${{ github.action_path }}

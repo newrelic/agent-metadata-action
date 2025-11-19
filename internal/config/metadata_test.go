@@ -127,6 +127,9 @@ func TestLoadMetadata_AllInputs(t *testing.T) {
 	t.Setenv("INPUT_FEATURES", "feature1,feature2")
 	t.Setenv("INPUT_BUGS", "bug1,bug2,bug3")
 	t.Setenv("INPUT_SECURITY", "CVE-2024-1234")
+	t.Setenv("INPUT_DEPRECATIONS", "deprecated1,deprecated2")
+	t.Setenv("INPUT_SUPPORTEDOPERATINGSYSTEMS", "linux,windows,darwin")
+	t.Setenv("INPUT_EOL", "2025-12-31")
 
 	metadata, err := LoadMetadata()
 	require.NoError(t, err)
@@ -134,6 +137,9 @@ func TestLoadMetadata_AllInputs(t *testing.T) {
 	assert.Equal(t, []string{"feature1", "feature2"}, metadata.Features)
 	assert.Equal(t, []string{"bug1", "bug2", "bug3"}, metadata.Bugs)
 	assert.Equal(t, []string{"CVE-2024-1234"}, metadata.Security)
+	assert.Equal(t, []string{"deprecated1", "deprecated2"}, metadata.Deprecations)
+	assert.Equal(t, []string{"linux", "windows", "darwin"}, metadata.SupportedOperatingSystems)
+	assert.Equal(t, "2025-12-31", metadata.EOL)
 }
 
 func TestLoadMetadata_VersionOnly(t *testing.T) {
@@ -141,6 +147,9 @@ func TestLoadMetadata_VersionOnly(t *testing.T) {
 	t.Setenv("INPUT_FEATURES", "")
 	t.Setenv("INPUT_BUGS", "")
 	t.Setenv("INPUT_SECURITY", "")
+	t.Setenv("INPUT_DEPRECATIONS", "")
+	t.Setenv("INPUT_SUPPORTEDOPERATINGSYSTEMS", "")
+	t.Setenv("INPUT_EOL", "")
 
 	metadata, err := LoadMetadata()
 	require.NoError(t, err)
@@ -148,6 +157,9 @@ func TestLoadMetadata_VersionOnly(t *testing.T) {
 	assert.Empty(t, metadata.Features)
 	assert.Empty(t, metadata.Bugs)
 	assert.Empty(t, metadata.Security)
+	assert.Empty(t, metadata.Deprecations)
+	assert.Empty(t, metadata.SupportedOperatingSystems)
+	assert.Empty(t, metadata.EOL)
 }
 
 func TestLoadMetadata_NoVersion_Error(t *testing.T) {

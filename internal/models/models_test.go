@@ -11,8 +11,6 @@ import (
 
 func TestConfigurationDefinition_UnmarshalYAML_Success(t *testing.T) {
 	yamlData := `
-slug: test-config
-name: Test Configuration
 version: 1.0.0
 platform: kubernetes
 description: A test configuration
@@ -24,8 +22,6 @@ schema: ./schema.json
 	err := yaml.Unmarshal([]byte(yamlData), &config)
 
 	require.NoError(t, err)
-	assert.Equal(t, "test-config", config.Slug)
-	assert.Equal(t, "Test Configuration", config.Name)
 	assert.Equal(t, "1.0.0", config.Version)
 	assert.Equal(t, "kubernetes", config.Platform)
 	assert.Equal(t, "A test configuration", config.Description)
@@ -41,36 +37,8 @@ func TestConfigurationDefinition_UnmarshalYAML_MissingFields(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name: "missing slug",
-			yamlData: `
-name: Test Configuration
-version: 1.0.0
-platform: kubernetes
-description: A test configuration
-type: test-type
-format: json
-schema: ./schema.json
-`,
-			expectedError: "slug is required",
-		},
-		{
-			name: "missing name",
-			yamlData: `
-slug: test-config
-version: 1.0.0
-platform: kubernetes
-description: A test configuration
-type: test-type
-format: json
-schema: ./schema.json
-`,
-			expectedError: "name is required",
-		},
-		{
 			name: "missing version",
 			yamlData: `
-slug: test-config
-name: Test Configuration
 platform: kubernetes
 description: A test configuration
 type: test-type
@@ -82,8 +50,6 @@ schema: ./schema.json
 		{
 			name: "missing platform",
 			yamlData: `
-slug: test-config
-name: Test Configuration
 version: 1.0.0
 description: A test configuration
 type: test-type
@@ -95,8 +61,6 @@ schema: ./schema.json
 		{
 			name: "missing description",
 			yamlData: `
-slug: test-config
-name: Test Configuration
 version: 1.0.0
 platform: kubernetes
 type: test-type
@@ -108,8 +72,6 @@ schema: ./schema.json
 		{
 			name: "missing type",
 			yamlData: `
-slug: test-config
-name: Test Configuration
 version: 1.0.0
 platform: kubernetes
 description: A test configuration
@@ -121,8 +83,6 @@ schema: ./schema.json
 		{
 			name: "missing format",
 			yamlData: `
-slug: test-config
-name: Test Configuration
 version: 1.0.0
 platform: kubernetes
 description: A test configuration
@@ -134,8 +94,6 @@ schema: ./schema.json
 		{
 			name: "missing schema",
 			yamlData: `
-slug: test-config
-name: Test Configuration
 version: 1.0.0
 platform: kubernetes
 description: A test configuration
@@ -157,13 +115,11 @@ format: json
 }
 
 func TestConfigurationDefinition_UnmarshalYAML_ErrorContext(t *testing.T) {
-	// When name is provided, error messages should include the config name
+	// When type and version are provided, error messages should include context
 	yamlData := `
-slug: test-config
-name: MyConfig
 version: 1.0.0
 description: A test configuration
-type: test-type
+type: mytype
 format: json
 schema: ./schema.json
 `
@@ -171,7 +127,7 @@ schema: ./schema.json
 	err := yaml.Unmarshal([]byte(yamlData), &config)
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "platform is required for config 'MyConfig'")
+	assert.Contains(t, err.Error(), "platform is required for config with type 'mytype' and version '1.0.0'")
 }
 
 func TestMetadata_UnmarshalYAML_Success(t *testing.T) {
@@ -273,17 +229,13 @@ func TestAgentControl_UnmarshalJSON_InvalidJSON(t *testing.T) {
 func TestConfigFile_UnmarshalYAML_Success(t *testing.T) {
 	yamlData := `
 configurationDefinitions:
-  - slug: config-1
-    name: Config 1
-    version: 1.0.0
+  - version: 1.0.0
     platform: kubernetes
     description: First config
     type: type-1
     format: json
     schema: ./schema1.json
-  - slug: config-2
-    name: Config 2
-    version: 2.0.0
+  - version: 2.0.0
     platform: host
     description: Second config
     type: type-2
@@ -296,10 +248,10 @@ configurationDefinitions:
 
 	require.NoError(t, err)
 	assert.Len(t, configFile.Configs, 2)
-	assert.Equal(t, "config-1", configFile.Configs[0].Slug)
-	assert.Equal(t, "Config 1", configFile.Configs[0].Name)
-	assert.Equal(t, "config-2", configFile.Configs[1].Slug)
-	assert.Equal(t, "Config 2", configFile.Configs[1].Name)
+	assert.Equal(t, "1.0.0", configFile.Configs[0].Version)
+	assert.Equal(t, "kubernetes", configFile.Configs[0].Platform)
+	assert.Equal(t, "2.0.0", configFile.Configs[1].Version)
+	assert.Equal(t, "host", configFile.Configs[1].Platform)
 }
 
 func TestConfigFile_UnmarshalYAML_EmptyConfigs(t *testing.T) {
@@ -317,9 +269,7 @@ configurationDefinitions: []
 func TestConfigFile_UnmarshalYAML_ValidationFailure(t *testing.T) {
 	yamlData := `
 configurationDefinitions:
-  - slug: config-1
-    name: Config 1
-    version: 1.0.0
+  - version: 1.0.0
     platform: kubernetes
     description: First config
     type: type-1
@@ -356,8 +306,6 @@ func TestAgentMetadata_JSONMarshaling(t *testing.T) {
 	agentMetadata := AgentMetadata{
 		ConfigurationDefinitions: []ConfigurationDefinition{
 			{
-				Slug:        "test-config",
-				Name:        "Test",
 				Version:     "1.0.0",
 				Platform:    "k8s",
 				Description: "Test config",
@@ -382,7 +330,7 @@ func TestAgentMetadata_JSONMarshaling(t *testing.T) {
 
 	jsonData, err := json.Marshal(agentMetadata)
 	require.NoError(t, err)
-	assert.Contains(t, string(jsonData), "test-config")
+	assert.Contains(t, string(jsonData), "1.0.0")
 	assert.Contains(t, string(jsonData), "1.2.3")
 	assert.Contains(t, string(jsonData), "base64content")
 
@@ -390,7 +338,7 @@ func TestAgentMetadata_JSONMarshaling(t *testing.T) {
 	var unmarshaled AgentMetadata
 	err = json.Unmarshal(jsonData, &unmarshaled)
 	require.NoError(t, err)
-	assert.Equal(t, "test-config", unmarshaled.ConfigurationDefinitions[0].Slug)
+	assert.Equal(t, "1.0.0", unmarshaled.ConfigurationDefinitions[0].Version)
 	assert.Equal(t, "1.2.3", unmarshaled.Metadata.Version)
 	assert.Equal(t, "all", unmarshaled.AgentControl[0].Platform)
 }

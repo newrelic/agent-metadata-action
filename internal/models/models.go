@@ -16,8 +16,6 @@ type AgentMetadata struct {
 
 // ConfigurationDefinition represents a configuration that can be read from YAML and sent as JSON
 type ConfigurationDefinition struct {
-	Slug        string `yaml:"slug" json:"slug"`
-	Name        string `yaml:"name" json:"name"`
 	Version     string `yaml:"version" json:"version"` // schema version, not agent version
 	Platform    string `yaml:"platform" json:"platform"`
 	Description string `yaml:"description" json:"description"`
@@ -38,8 +36,8 @@ func (c *ConfigurationDefinition) UnmarshalYAML(node *yaml.Node) error {
 
 	// Build context string for better error messages
 	context := ""
-	if raw.Name != "" {
-		context = fmt.Sprintf("config '%s'", raw.Name)
+	if raw.Type != "" && raw.Version != "" {
+		context = fmt.Sprintf("config with type '%s' and version '%s'", raw.Type, raw.Version)
 	}
 
 	// Validate all required fields
@@ -47,8 +45,6 @@ func (c *ConfigurationDefinition) UnmarshalYAML(node *yaml.Node) error {
 		value string
 		field string
 	}{
-		{raw.Slug, "slug"},
-		{raw.Name, "name"},
 		{raw.Version, "version"},
 		{raw.Platform, "platform"},
 		{raw.Description, "description"},
@@ -68,10 +64,13 @@ func (c *ConfigurationDefinition) UnmarshalYAML(node *yaml.Node) error {
 
 // Metadata represents version and changelog information
 type Metadata struct {
-	Version  string   `json:"version"` // agent version
-	Features []string `json:"features"`
-	Bugs     []string `json:"bugs"`
-	Security []string `json:"security"`
+	Version                   string   `json:"version"` // agent version
+	Features                  []string `json:"features"`
+	Bugs                      []string `json:"bugs"`
+	Security                  []string `json:"security"`
+	Deprecations              []string `json:"deprecations"`
+	SupportedOperatingSystems []string `json:"supportedOperatingSystems"`
+	EOL                       string   `json:"eol"`
 }
 
 // UnmarshalYAML implements custom unmarshaling with validation

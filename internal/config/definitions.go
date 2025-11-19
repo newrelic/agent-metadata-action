@@ -41,7 +41,7 @@ func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationD
 		// @todo at some point, we may want to do this concurrently if there are any agents with a large number of files
 		encoded, err := loadAndEncodeSchema(workspacePath, configFile.Configs[i].Schema)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load schema for config %s: %w", configFile.Configs[i].Name, err)
+			return nil, fmt.Errorf("failed to load schema for config %s and version %s: %w", configFile.Configs[i].Type, configFile.Configs[i].Version, err)
 		}
 		configFile.Configs[i].Schema = encoded
 	}

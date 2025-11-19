@@ -23,12 +23,18 @@ func LoadMetadata() (models.Metadata, error) {
 	features := parseCommaSeparated(os.Getenv("INPUT_FEATURES"))
 	bugs := parseCommaSeparated(os.Getenv("INPUT_BUGS"))
 	security := parseCommaSeparated(os.Getenv("INPUT_SECURITY"))
+	deprecations := parseCommaSeparated(os.Getenv("INPUT_DEPRECATIONS"))
+	supportedOperatingSystems := parseCommaSeparated(os.Getenv("INPUT_SUPPORTEDOPERATINGSYSTEMS"))
+	eol := os.Getenv("INPUT_EOL")
 
 	return models.Metadata{
-		Version:  version,
-		Features: features,
-		Bugs:     bugs,
-		Security: security,
+		Version:                   version,
+		Features:                  features,
+		Bugs:                      bugs,
+		Security:                  security,
+		Deprecations:              deprecations,
+		SupportedOperatingSystems: supportedOperatingSystems,
+		EOL:                       eol,
 	}, nil
 }
 

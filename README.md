@@ -41,6 +41,12 @@ jobs:
         uses: newrelic/agent-metadata-action@v1
         with:
           version: 1.0.0 # only required if different from ref tag
+          features: feature1,feature2 # Optional: Comma-separated list of features
+          bugs: bug-123,bug-456 # Optional: Comma-separated list of bug fixes
+          security: CVE-2024-1234 # Optional: Comma-separated list of security fixes
+          deprecations: deprecated-feature1 # Optional: Comma-separated list of deprecations
+          supportedOperatingSystems: linux,windows,darwin # Optional: Comma-separated list of supported OSes
+          eol: 2025-12-31 # Optional: End of life date
           cache: true  # Optional: Enable Go build cache (default: true)
 ```
 
@@ -63,6 +69,12 @@ jobs:
         uses: newrelic/agent-metadata-action@v1
         with:
           version: 1.0.0 # required in the docs case
+          features: feature1,feature2 # Optional: Comma-separated list of features
+          bugs: bug-123,bug-456 # Optional: Comma-separated list of bug fixes
+          security: CVE-2024-1234 # Optional: Comma-separated list of security fixes
+          deprecations: deprecated-feature1 # Optional: Comma-separated list of deprecations
+          supportedOperatingSystems: linux,windows,darwin # Optional: Comma-separated list of supported OSes
+          eol: 2025-12-31 # Optional: End of life date
           cache: true  # Optional: Enable Go build cache (default: true)
 ```
 
@@ -72,9 +84,7 @@ The action expects a YAML file at `.fleetControl/configurationDefinitions.yml` w
 
 ```yaml
 configurationDefinitions:
-  - name: "Configuration Name"
-    slug: "config-slug"
-    platform: "kubernetes"  # or "host"
+  - platform: "kubernetes"  # or "host"
     description: "Description of the configuration"
     type: "config-type"
     version: "1.0.0"
@@ -82,7 +92,7 @@ configurationDefinitions:
     schema: "./schemas/config-schema.json"
 ```
 
-**All fields are required.** The action validates each configuration entry and will fail with a clear error message if any required field is missing.
+**All fields are required.** The action validates each configuration entry and will fail with a clear error message if any required field is missing (version, platform, description, type, format, schema).
 
 **Schema files** are automatically base64-encoded and embedded in the output. Schema paths must be relative to the `.fleetControl` directory and cannot use directory traversal (`..`) for security.
 
