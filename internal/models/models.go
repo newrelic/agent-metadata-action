@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"gopkg.in/yaml.v3"
@@ -73,53 +72,10 @@ type Metadata struct {
 	EOL                       string   `json:"eol"`
 }
 
-// UnmarshalYAML implements custom unmarshaling with validation
-func (m *Metadata) UnmarshalYAML(node *yaml.Node) error {
-	// Use type alias to avoid infinite recursion when decoding
-	type rawMetadata Metadata
-	var raw rawMetadata
-
-	if err := node.Decode(&raw); err != nil {
-		return err
-	}
-
-	// Validate version is required
-	if err := requireField(raw.Version, "version", ""); err != nil {
-		return err
-	}
-
-	// Copy validated values
-	*m = Metadata(raw)
-	return nil
-}
-
 // AgentControl represents agent control content for a platform
 type AgentControl struct {
 	Platform string `json:"platform"`
 	Content  string `json:"content"` // base64 encoded
-}
-
-// UnmarshalJSON implements custom unmarshaling with validation for AgentControl
-func (a *AgentControl) UnmarshalJSON(data []byte) error {
-	// Use type alias to avoid infinite recursion when decoding
-	type rawAgentControl AgentControl
-	var raw rawAgentControl
-
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-
-	// Validate required fields
-	if err := requireField(raw.Platform, "platform", "agentControl"); err != nil {
-		return err
-	}
-	if err := requireField(raw.Content, "content", "agentControl"); err != nil {
-		return err
-	}
-
-	// Copy validated values
-	*a = AgentControl(raw)
-	return nil
 }
 
 // ConfigFile represents the YAML file structure containing multiple configs

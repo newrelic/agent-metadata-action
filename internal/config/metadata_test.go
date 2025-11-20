@@ -7,85 +7,84 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadVersion_FromInput(t *testing.T) {
-	// Set INPUT_VERSION (mimics GitHub Actions input)
-	t.Setenv("INPUT_VERSION", "1.2.3")
+func TestLoadVersion_ValidFormats(t *testing.T) {
+	tests := []struct {
+		name    string
+		version string
+	}{
+		{
+			name:    "standard version",
+			version: "1.2.3",
+		},
+		{
+			name:    "simple version",
+			version: "1.0.0",
+		},
+		{
+			name:    "large numbers",
+			version: "100.200.300",
+		},
+		{
+			name:    "zero version",
+			version: "0.0.0",
+		},
+	}
 
-	version, err := LoadVersion()
-	require.NoError(t, err)
-	assert.Equal(t, "1.2.3", version)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("INPUT_VERSION", tt.version)
+
+			version, err := LoadVersion()
+			require.NoError(t, err)
+			assert.Equal(t, tt.version, version)
+		})
+	}
 }
 
-func TestLoadVersion_ValidFormat_Simple(t *testing.T) {
-	t.Setenv("INPUT_VERSION", "1.0.0")
+func TestLoadVersion_InvalidFormats(t *testing.T) {
+	tests := []struct {
+		name    string
+		version string
+	}{
+		{
+			name:    "with v prefix",
+			version: "v1.2.3",
+		},
+		{
+			name:    "with prerelease",
+			version: "1.2.3-alpha",
+		},
+		{
+			name:    "with build metadata",
+			version: "1.2.3+build",
+		},
+		{
+			name:    "two components",
+			version: "1.2",
+		},
+		{
+			name:    "four components",
+			version: "1.2.3.4",
+		},
+		{
+			name:    "leading zero",
+			version: "01.2.3",
+		},
+		{
+			name:    "non-numeric",
+			version: "abc",
+		},
+	}
 
-	version, err := LoadVersion()
-	require.NoError(t, err)
-	assert.Equal(t, "1.0.0", version)
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("INPUT_VERSION", tt.version)
 
-func TestLoadVersion_ValidFormat_LargeNumbers(t *testing.T) {
-	t.Setenv("INPUT_VERSION", "100.200.300")
-
-	version, err := LoadVersion()
-	require.NoError(t, err)
-	assert.Equal(t, "100.200.300", version)
-}
-
-func TestLoadVersion_InvalidFormat_WithV(t *testing.T) {
-	t.Setenv("INPUT_VERSION", "v1.2.3")
-
-	_, err := LoadVersion()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid version format")
-}
-
-func TestLoadVersion_InvalidFormat_Prerelease(t *testing.T) {
-	t.Setenv("INPUT_VERSION", "1.2.3-alpha")
-
-	_, err := LoadVersion()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid version format")
-}
-
-func TestLoadVersion_InvalidFormat_BuildMetadata(t *testing.T) {
-	t.Setenv("INPUT_VERSION", "1.2.3+build")
-
-	_, err := LoadVersion()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid version format")
-}
-
-func TestLoadVersion_InvalidFormat_TwoComponents(t *testing.T) {
-	t.Setenv("INPUT_VERSION", "1.2")
-
-	_, err := LoadVersion()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid version format")
-}
-
-func TestLoadVersion_InvalidFormat_FourComponents(t *testing.T) {
-	t.Setenv("INPUT_VERSION", "1.2.3.4")
-
-	_, err := LoadVersion()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid version format")
-}
-
-func TestLoadVersion_InvalidFormat_LeadingZero(t *testing.T) {
-	t.Setenv("INPUT_VERSION", "01.2.3")
-
-	_, err := LoadVersion()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid version format")
-}
-
-func TestLoadVersion_InvalidFormat_NonNumeric(t *testing.T) {
-	t.Setenv("INPUT_VERSION", "abc")
-
-	_, err := LoadVersion()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid version format")
+			_, err := LoadVersion()
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "invalid version format")
+		})
+	}
 }
 
 func TestLoadVersion_NotSet_Error(t *testing.T) {
@@ -97,29 +96,45 @@ func TestLoadVersion_NotSet_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "INPUT_VERSION not set")
 }
 
-func TestParseCommaSeparated_Empty(t *testing.T) {
-	result := parseCommaSeparated("")
-	assert.Empty(t, result)
-}
+func TestParseCommaSeparated(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "empty string",
+			input:    "",
+			expected: []string{},
+		},
+		{
+			name:     "single item",
+			input:    "feature1",
+			expected: []string{"feature1"},
+		},
+		{
+			name:     "multiple items",
+			input:    "feature1,feature2,feature3",
+			expected: []string{"feature1", "feature2", "feature3"},
+		},
+		{
+			name:     "with spaces",
+			input:    "feature1, feature2 , feature3",
+			expected: []string{"feature1", "feature2", "feature3"},
+		},
+		{
+			name:     "with empty elements",
+			input:    "feature1,,feature2,",
+			expected: []string{"feature1", "feature2"},
+		},
+	}
 
-func TestParseCommaSeparated_Single(t *testing.T) {
-	result := parseCommaSeparated("feature1")
-	assert.Equal(t, []string{"feature1"}, result)
-}
-
-func TestParseCommaSeparated_Multiple(t *testing.T) {
-	result := parseCommaSeparated("feature1,feature2,feature3")
-	assert.Equal(t, []string{"feature1", "feature2", "feature3"}, result)
-}
-
-func TestParseCommaSeparated_WithSpaces(t *testing.T) {
-	result := parseCommaSeparated("feature1, feature2 , feature3")
-	assert.Equal(t, []string{"feature1", "feature2", "feature3"}, result)
-}
-
-func TestParseCommaSeparated_WithEmptyElements(t *testing.T) {
-	result := parseCommaSeparated("feature1,,feature2,")
-	assert.Equal(t, []string{"feature1", "feature2"}, result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseCommaSeparated(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
 
 func TestLoadMetadata_AllInputs(t *testing.T) {

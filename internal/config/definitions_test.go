@@ -143,6 +143,40 @@ func TestReadConfigurationDefinitions_EmptySchemaFile(t *testing.T) {
 	assert.Contains(t, err.Error(), "is empty")
 }
 
+func TestReadConfigurationDefinitions_InvalidJSONSchema(t *testing.T) {
+	// Create temporary directory structure with invalid JSON schema file
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".fleetControl")
+	schemasDir := filepath.Join(configDir, "schemas")
+	err := os.MkdirAll(schemasDir, 0755)
+	require.NoError(t, err)
+
+	// Create schema file with invalid JSON
+	schemaFile := filepath.Join(schemasDir, "invalid.json")
+	err = os.WriteFile(schemaFile, []byte(`{invalid json content`), 0644)
+	require.NoError(t, err)
+
+	// Create test config file that references invalid schema
+	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	testYAML := `configurationDefinitions:
+  - platform: linux
+    description: Test configuration
+    type: test-config
+    version: 1.0.0
+    format: yaml
+    schema: ./schemas/invalid.json`
+
+	err = os.WriteFile(configFile, []byte(testYAML), 0644)
+	require.NoError(t, err)
+
+	// Test reading the config - should fail
+	configs, err := ReadConfigurationDefinitions(tmpDir)
+	assert.Error(t, err)
+	assert.Nil(t, configs)
+	assert.Contains(t, err.Error(), "failed to load schema")
+	assert.Contains(t, err.Error(), "is not valid JSON")
+}
+
 func TestReadConfigurationDefinitions_MultipleConfigs(t *testing.T) {
 	// Create temporary directory structure
 	tmpDir := t.TempDir()
@@ -378,4 +412,25 @@ func TestReadAgentControl_EmptyFile(t *testing.T) {
 	assert.Nil(t, agentControl)
 	assert.Contains(t, err.Error(), "agent control file")
 	assert.Contains(t, err.Error(), "is empty")
+}
+
+func TestReadAgentControl_InvalidYAML(t *testing.T) {
+	// Create temporary directory structure with invalid YAML agent control file
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".fleetControl")
+	agentControlDir := filepath.Join(configDir, "agentControl")
+	err := os.MkdirAll(agentControlDir, 0755)
+	require.NoError(t, err)
+
+	// Create agent control file with invalid YAML
+	agentControlFile := filepath.Join(agentControlDir, "agent-schema-for-agent-control.yml")
+	err = os.WriteFile(agentControlFile, []byte(`invalid: yaml: [unclosed`), 0644)
+	require.NoError(t, err)
+
+	// Test reading the agent control - should fail
+	agentControl, err := LoadAndEncodeAgentControl(tmpDir)
+	assert.Error(t, err)
+	assert.Nil(t, agentControl)
+	assert.Contains(t, err.Error(), "agent control file")
+	assert.Contains(t, err.Error(), "is not valid YAML")
 }
