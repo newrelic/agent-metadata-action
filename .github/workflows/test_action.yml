@@ -20,4 +20,9 @@ jobs:
         with:
           agent-type: 'myagent'
           version: '1.0.0'
+          features: 'feature1, feature2'
+          bugs: 'bug1, bug2'
+          security: 'CVE-2022-1234'
+          deprecations: 'deprecation1, deprecation2'
+          supportedOperatingSystems: 'linux, windows'
           cache: false
