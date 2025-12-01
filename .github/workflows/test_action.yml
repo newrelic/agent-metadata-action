@@ -9,20 +9,40 @@ on:
       - '**'
 
 jobs:
-  action-test:
+  test-agent-flow:
+    name: Test Agent Repository Flow
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Run Agent Metadata Action
+      - name: Run Agent Metadata Action (with configs)
         uses: ./
         with:
           agent-type: 'myagent'
           version: '1.0.0'
-          features: 'feature1, feature2'
-          bugs: 'bug1, bug2'
-          security: 'CVE-2022-1234'
-          deprecations: 'deprecation1, deprecation2'
-          supportedOperatingSystems: 'linux, windows'
           cache: false
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}/integration-test/agent-flow
+
+  test-docs-flow:
+    name: Test Documentation Flow
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Run Agent Metadata Action (metadata only)
+        uses: ./
+        with:
+          agent-type: 'myagent'
+          version: '2.3.4'
+          features: 'docs-feature1, docs-feature2'
+          bugs: 'docs-bug1'
+          security: 'CVE-2024-5678'
+          deprecations: 'docs-deprecated1'
+          supportedOperatingSystems: 'linux, darwin'
+          eol: '2025-12-31'
+          cache: false
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}/integration-test/docs-flow
