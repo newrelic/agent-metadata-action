@@ -16,7 +16,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	workspace := config.LoadEnv()
+	workspace := config.GetWorkspace()
 
 	metadata, err := config.LoadMetadata()
 	if err != nil {
