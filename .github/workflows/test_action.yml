@@ -16,14 +16,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Setup test files
+        run: ln -s integration-test/agent-flow/.fleetControl .fleetControl
+
       - name: Run Agent Metadata Action (with configs)
         uses: ./
         with:
           agent-type: 'myagent'
           version: '1.0.0'
           cache: false
-        env:
-          GITHUB_WORKSPACE: ${{ github.workspace }}/integration-test/agent-flow
 
   test-docs-flow:
     name: Test Documentation Flow
@@ -45,4 +46,4 @@ jobs:
           eol: '2025-12-31'
           cache: false
         env:
-          GITHUB_WORKSPACE: ${{ github.workspace }}/integration-test/docs-flow
+          GITHUB_WORKSPACE: ''
