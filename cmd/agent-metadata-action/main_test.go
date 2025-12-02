@@ -158,10 +158,16 @@ func TestRun_AgentRepoFlow(t *testing.T) {
 }
 
 func TestRun_DocsFlow(t *testing.T) {
-	// Set environment variables (no workspace)
+	// Get project root
+	projectRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+
+	workspace := filepath.Join(projectRoot, "integration-test", "docs-flow")
+
+	// Set environment variables (workspace with no .fleetControl)
 	t.Setenv("INPUT_AGENT_TYPE", "java")
 	t.Setenv("INPUT_VERSION", "2.0.0")
-	os.Unsetenv("GITHUB_WORKSPACE")
+	t.Setenv("GITHUB_WORKSPACE", workspace)
 
 	// Capture stdout and stderr
 	oldStdout := os.Stdout
@@ -172,7 +178,7 @@ func TestRun_DocsFlow(t *testing.T) {
 	os.Stderr = wErr
 
 	// Call run
-	err := run()
+	err = run()
 
 	// Restore stdout/stderr and read captured output
 	wOut.Close()
@@ -214,10 +220,17 @@ func TestRun_MissingAgentType(t *testing.T) {
 }
 
 func TestRun_MissingVersion(t *testing.T) {
+	// Get project root
+	projectRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+
+	workspace := filepath.Join(projectRoot, "integration-test", "docs-flow")
+
 	// Don't set INPUT_VERSION
 	t.Setenv("INPUT_AGENT_TYPE", "java")
+	t.Setenv("GITHUB_WORKSPACE", workspace)
 
-	err := run()
+	err = run()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Error loading metadata")
 	assert.Contains(t, err.Error(), "unable to determine version")
@@ -287,11 +300,18 @@ func TestMain_DocsFlow(t *testing.T) {
 	err := buildCmd.Run()
 	require.NoError(t, err, "Failed to build binary")
 
-	// Run without GITHUB_WORKSPACE (docs flow)
+	// Get project root (two levels up from cmd/agent-metadata-action)
+	projectRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+
+	workspace := filepath.Join(projectRoot, "integration-test", "docs-flow")
+
+	// Run with docs-flow workspace (no .fleetControl)
 	cmd := exec.Command(binaryPath)
 	cmd.Env = []string{
 		"INPUT_AGENT_TYPE=java",
 		"INPUT_VERSION=2.0.0",
+		"GITHUB_WORKSPACE=" + workspace,
 	}
 
 	output, err := cmd.CombinedOutput()
@@ -345,10 +365,17 @@ func TestMain_MissingVersion(t *testing.T) {
 	err := buildCmd.Run()
 	require.NoError(t, err, "Failed to build binary")
 
+	// Get project root (two levels up from cmd/agent-metadata-action)
+	projectRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+
+	workspace := filepath.Join(projectRoot, "integration-test", "docs-flow")
+
 	// Run without INPUT_VERSION
 	cmd := exec.Command(binaryPath)
 	cmd.Env = []string{
 		"INPUT_AGENT_TYPE=java",
+		"GITHUB_WORKSPACE=" + workspace,
 	}
 
 	output, err := cmd.CombinedOutput()

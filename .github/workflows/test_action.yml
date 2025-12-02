@@ -55,4 +55,3 @@ jobs:
           cache: false
         env:
           GITHUB_EVENT_PATH: '/tmp/pr-event.json'
-          GITHUB_WORKSPACE: ''

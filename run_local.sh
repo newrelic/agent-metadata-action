@@ -36,10 +36,11 @@ cat > /tmp/pr-event.json <<EOF
 EOF
 
 export GITHUB_EVENT_PATH="/tmp/pr-event.json"
-unset GITHUB_WORKSPACE
+export GITHUB_WORKSPACE="$(pwd)"
 export INPUT_AGENT_TYPE="myagent"
 export INPUT_VERSION="1.3.0"
 
+echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
 echo "GITHUB_EVENT_PATH: $GITHUB_EVENT_PATH"
 echo "Testing MDX file parsing from changed files in PR"
 echo ""
