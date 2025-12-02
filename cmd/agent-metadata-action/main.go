@@ -33,8 +33,10 @@ func run() error {
 	fmt.Printf("::debug::Bugs: %v\n", metadata.Bugs)
 	fmt.Printf("::debug::Security: %v\n", metadata.Security)
 
-	// If GITHUB_WORKSPACE is set, read configuration definitions (agent repo flow)
-	if workspace != "" {
+	// Check if .fleetControl directory exists to determine flow (agent repo vs docs)
+	fleetControlPath := workspace + "/.fleetControl"
+	if _, err := os.Stat(fleetControlPath); err == nil {
+		// Agent repo flow: .fleetControl directory exists
 		fmt.Printf("::debug::Reading config from workspace: %s\n", workspace)
 
 		configs, err := config.ReadConfigurationDefinitions(workspace)
@@ -59,8 +61,8 @@ func run() error {
 		// @todo use the AgentMetadata object to call the InstrumentationMetadata service to add/update the agent in NGEP
 		printJSON("Agent Metadata", agentMetadata)
 	} else {
-		// Docs workflow: only output metadata
-		fmt.Println("::notice::Running in metadata-only mode (no workspace provided)")
+		// Docs workflow: .fleetControl directory doesn't exist
+		fmt.Println("::notice::Running in metadata-only mode (.fleetControl not found but not needed) ")
 		// @todo use the INPUT_AGENT_TYPE along with the metadata to call the InstrumentationMetadata service for updating the agent in NGEP with extra metadata
 		printJSON("Metadata", metadata)
 	}
