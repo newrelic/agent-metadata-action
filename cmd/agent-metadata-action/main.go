@@ -10,18 +10,23 @@ import (
 )
 
 func main() {
-	// Validate agent type here for now - may move once there is code to call InstrumentationMetadata service
-	if err := validateAgentType(); err != nil {
+	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "::error::%v\n", err)
 		os.Exit(1)
+	}
+}
+
+func run() error {
+	// Validate agent type here for now - may move once there is code to call InstrumentationMetadata service
+	if err := validateAgentType(); err != nil {
+		return err
 	}
 
 	workspace := config.GetWorkspace()
 
 	metadata, err := config.LoadMetadata()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "::error::Error loading metadata: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("Error loading metadata: %w", err)
 	}
 	fmt.Printf("::debug::Agent version: %s\n", metadata.Version)
 	fmt.Printf("::debug::Features: %v\n", metadata.Features)
@@ -34,14 +39,12 @@ func main() {
 
 		configs, err := config.ReadConfigurationDefinitions(workspace)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "::error::Error reading configs: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("Error reading configs: %w", err)
 		}
 
 		agentControl, err := config.LoadAndEncodeAgentControl(workspace)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "::error::Error reading agent control: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("Error reading agent control: %w", err)
 		}
 
 		fmt.Println("::notice::Successfully read configs file")
@@ -61,6 +64,8 @@ func main() {
 		// @todo use the INPUT_AGENT_TYPE along with the metadata to call the InstrumentationMetadata service for updating the agent in NGEP with extra metadata
 		printJSON("Metadata", metadata)
 	}
+
+	return nil
 }
 
 func validateAgentType() error {

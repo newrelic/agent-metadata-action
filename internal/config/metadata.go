@@ -4,28 +4,39 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"strings"
 
+	"agent-metadata-action/internal/github"
 	"agent-metadata-action/internal/models"
+	"agent-metadata-action/internal/parser"
 )
 
 // semverPattern validates strict semantic versioning format: MAJOR.MINOR.PATCH (e.g., 1.2.3)
 // Does not allow prerelease identifiers or build metadata
 var semverPattern = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
 
-// LoadMetadata loads metadata from INPUT_* environment variables
+// LoadMetadata loads metadata from changed MDX files in a PR
 func LoadMetadata() (models.Metadata, error) {
 	version, err := LoadVersion()
 	if err != nil {
 		return models.Metadata{}, err
 	}
 
-	features := parseCommaSeparated(os.Getenv("INPUT_FEATURES"))
-	bugs := parseCommaSeparated(os.Getenv("INPUT_BUGS"))
-	security := parseCommaSeparated(os.Getenv("INPUT_SECURITY"))
-	deprecations := parseCommaSeparated(os.Getenv("INPUT_DEPRECATIONS"))
-	supportedOperatingSystems := parseCommaSeparated(os.Getenv("INPUT_SUPPORTEDOPERATINGSYSTEMS"))
-	eol := os.Getenv("INPUT_EOL")
+	var features, bugs, security, deprecations, supportedOperatingSystems []string
+	var eol string
+
+	// Get changed MDX files (for PR context)
+	changedFiles, err := github.GetChangedMDXFiles()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "::debug::Could not get changed files: %v\n", err)
+	} else if len(changedFiles) > 0 {
+		// Parse MDX files and extract metadata
+		workspace := GetWorkspace()
+		features, bugs, security, deprecations, supportedOperatingSystems, eol, err = parser.ParseMDXFiles(changedFiles, workspace)
+		if err != nil {
+			return models.Metadata{}, fmt.Errorf("failed to parse MDX files: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "::notice::Loaded metadata from %d changed MDX files\n", len(changedFiles))
+	}
 
 	return models.Metadata{
 		Version:                   version,
@@ -52,22 +63,4 @@ func LoadVersion() (string, error) {
 	}
 
 	return version, nil
-}
-
-// parseCommaSeparated parses a comma-separated string into a slice
-// Empty strings and whitespace are trimmed
-func parseCommaSeparated(value string) []string {
-	if value == "" {
-		return []string{}
-	}
-
-	parts := strings.Split(value, ",")
-	result := make([]string, 0, len(parts))
-	for _, part := range parts {
-		trimmed := strings.TrimSpace(part)
-		if trimmed != "" {
-			result = append(result, trimmed)
-		}
-	}
-	return result
 }

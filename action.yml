@@ -9,30 +9,6 @@ inputs:
     description: 'Agent version in strict semver format MAJOR.MINOR.PATCH (ex. 1.2.3)'
     required: true
     default: ''
-  features:
-    description: 'Comma-separated list of features to include in the agent (ex. feature1,feature2)'
-    required: false
-    default: ''
-  bugs:
-    description: 'Comma-separated list of bugs to exclude from the agent (ex. bug1,bug2)'
-    required: false
-    default: ''
-  security:
-    description: 'Comma-separated list of security fixes (ex. fix1,fix2)'
-    required: false
-    default: ''
-  deprecations:
-    description: 'Comma-separated list of deprecations (ex. deprecation1,deprecation2)'
-    required: false
-    default: ''
-  supportedOperatingSystems:
-    description: 'Comma-separated list of supported operating systems (ex. linux,windows,darwin)'
-    required: false
-    default: ''
-  eol:
-    description: 'End of life date (ex. 2025-12-31)'
-    required: false
-    default: ''
   cache:
     description: 'Enable Go build cache'
     required: false
@@ -52,12 +28,6 @@ runs:
       env:
         INPUT_AGENT_TYPE: ${{ inputs.agent-type }}
         INPUT_VERSION: ${{ inputs.version }}
-        INPUT_FEATURES: ${{ inputs.features }}
-        INPUT_BUGS: ${{ inputs.bugs }}
-        INPUT_SECURITY: ${{ inputs.security }}
-        INPUT_DEPRECATIONS: ${{ inputs.deprecations }}
-        INPUT_SUPPORTEDOPERATINGSYSTEMS: ${{ inputs.supportedOperatingSystems }}
-        INPUT_EOL: ${{ inputs.eol }}
       run: |
         set -e
         cd ${{ github.action_path }}

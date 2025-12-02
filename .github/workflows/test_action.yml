@@ -25,3 +25,34 @@ jobs:
           agent-type: 'myagent'
           version: '1.0.0'
           cache: false
+
+  test-docs-flow:
+    name: Test Documentation Flow (MDX Parsing)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history for git diff
+
+      - name: Create mock PR event
+        run: |
+          BASE_SHA=$(git rev-parse origin/main 2>/dev/null || git rev-parse main)
+          cat > /tmp/pr-event.json <<EOF
+          {
+            "pull_request": {
+              "base": {"sha": "${BASE_SHA}"},
+              "head": {"sha": "${{ github.sha }}"}
+            }
+          }
+          EOF
+
+      - name: Run Agent Metadata Action (metadata from MDX)
+        uses: ./
+        with:
+          agent-type: 'myagent'
+          version: '1.3.0'
+          cache: false
+        env:
+          GITHUB_EVENT_PATH: '/tmp/pr-event.json'
+          GITHUB_WORKSPACE: ''
