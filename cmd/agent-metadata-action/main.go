@@ -10,38 +10,53 @@ import (
 )
 
 func main() {
-	// Validate agent type here for now - may move once there is code to call InstrumentationMetadata service
-	if err := validateAgentType(); err != nil {
+	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "::error::%v\n", err)
 		os.Exit(1)
 	}
+}
 
-	workspace := config.LoadEnv()
+func run() error {
+	// Validate agent type here for now - may move once there is code to call InstrumentationMetadata service
+	if err := validateAgentType(); err != nil {
+		return err
+	}
+
+	workspace := config.GetWorkspace()
+
+	// Workspace is required
+	if workspace == "" {
+		return fmt.Errorf("Error: GITHUB_WORKSPACE is required but not set")
+	}
+
+	// Validate workspace directory exists
+	if _, err := os.Stat(workspace); err != nil {
+		return fmt.Errorf("Error reading configs: workspace directory does not exist: %s", workspace)
+	}
 
 	metadata, err := config.LoadMetadata()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "::error::Error loading metadata: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("Error loading metadata: %w", err)
 	}
 	fmt.Printf("::debug::Agent version: %s\n", metadata.Version)
 	fmt.Printf("::debug::Features: %v\n", metadata.Features)
 	fmt.Printf("::debug::Bugs: %v\n", metadata.Bugs)
 	fmt.Printf("::debug::Security: %v\n", metadata.Security)
 
-	// If GITHUB_WORKSPACE is set, read configuration definitions (agent repo flow)
-	if workspace != "" {
+	// Check if .fleetControl directory exists to determine flow (agent repo vs docs)
+	fleetControlPath := workspace + "/.fleetControl"
+	if _, err := os.Stat(fleetControlPath); err == nil {
+		// Scenario 1: Agent repo flow - .fleetControl directory exists
 		fmt.Printf("::debug::Reading config from workspace: %s\n", workspace)
 
 		configs, err := config.ReadConfigurationDefinitions(workspace)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "::error::Error reading configs: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("Error reading configs: %w", err)
 		}
 
 		agentControl, err := config.LoadAndEncodeAgentControl(workspace)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "::error::Error reading agent control: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("Error reading agent control: %w", err)
 		}
 
 		fmt.Println("::notice::Successfully read configs file")
@@ -56,11 +71,13 @@ func main() {
 		// @todo use the AgentMetadata object to call the InstrumentationMetadata service to add/update the agent in NGEP
 		printJSON("Agent Metadata", agentMetadata)
 	} else {
-		// Docs workflow: only output metadata
-		fmt.Println("::notice::Running in metadata-only mode (no workspace provided)")
+		// Scenario 2: Docs workflow
+		fmt.Println("::notice::Running in metadata-only mode (.fleetControl not found, using MDX files)")
 		// @todo use the INPUT_AGENT_TYPE along with the metadata to call the InstrumentationMetadata service for updating the agent in NGEP with extra metadata
 		printJSON("Metadata", metadata)
 	}
+
+	return nil
 }
 
 func validateAgentType() error {

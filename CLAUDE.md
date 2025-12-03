@@ -70,7 +70,7 @@ export GITHUB_WORKSPACE=/path/to/repo
 
 **cmd/agent-metadata-action/main.go**: Application entry point
 - Loads workspace path via `config.LoadEnv()` (returns empty string if not set)
-- Loads metadata via `config.LoadMetadata()` (version, features, bugs, security)
+- Loads metadata via `config.LoadMetadata()` (version, features, bugs, security, deprecations, supportedOperatingSystems, eol)
 - If workspace is set (agent repo flow):
   - Reads configuration definitions via `config.ReadConfigurationDefinitions()`
   - Reads agent control via `config.LoadAndEncodeAgentControl()`
@@ -96,13 +96,16 @@ export GITHUB_WORKSPACE=/path/to/repo
 3. **metadata.go**: Version and changelog metadata
    - `LoadMetadata()`: Loads version and changelog info from environment variables
    - `LoadVersion()`: Reads `INPUT_VERSION` with validation (format: X.Y.Z)
-   - `parseCommaSeparated()`: Parses comma-separated lists (features, bugs, security)
+   - `parseCommaSeparated()`: Parses comma-separated lists (features, bugs, security, deprecations, supportedOperatingSystems)
+   - Reads `INPUT_EOL` for end-of-life date
 
 **internal/models**: Data structures with validation
-- `ConfigurationDefinition`: Configuration with 8 required fields (validated via custom `UnmarshalYAML`)
-  - Fields: slug, name, version, platform, description, type, format, schema
+- `ConfigurationDefinition`: Configuration with 6 required fields (validated via custom `UnmarshalYAML`)
+  - Fields: version, platform, description, type, format, schema
   - Custom unmarshaler validates all fields are present before accepting
 - `Metadata`: Version and changelog info (version required, validated via custom `UnmarshalYAML`)
+  - Required: version
+  - Optional: features, bugs, security, deprecations, supportedOperatingSystems, eol
 - `AgentControl`: Agent control content (platform and content required, validated via custom `UnmarshalJSON`)
 - `ConfigFile`: Root YAML structure containing `configurationDefinitions` array
 - `AgentMetadata`: Complete metadata structure (configurationDefinitions + metadata + agentControl)
@@ -160,11 +163,11 @@ The action expects to run after `actions/checkout` which sets the `GITHUB_WORKSP
 - Multiple layers of validation prevent escaping the designated directory
 
 ### Validation
-- **All configuration fields are required**: name, slug, version, platform, description, type, format, schema
+- **All configuration fields are required**: version, platform, description, type, format, schema
 - **Version format validation**: Must match `X.Y.Z` (three numeric components)
 - **Empty array rejection**: `configurationDefinitions` cannot be an empty array
 - **Validation timing**: All validation happens during YAML/JSON unmarshaling via custom unmarshalers
-- **Error messages**: Clear, contextual errors (e.g., "platform is required for config 'MyConfig'")
+- **Error messages**: Clear, contextual errors (e.g., "platform is required for config with type 'mytype' and version '1.0.0'")
 
 ### Schema Handling
 - Schema files are automatically loaded and **base64-encoded**

@@ -28,9 +28,7 @@ func TestReadConfigurationDefinitions_Success(t *testing.T) {
 	// Create test config file
 	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
 	testYAML := `configurationDefinitions:
-  - name: test-config
-    slug: test-config
-    platform: linux
+  - platform: linux
     description: Test configuration
     type: test-config
     version: 1.0.0
@@ -44,7 +42,7 @@ func TestReadConfigurationDefinitions_Success(t *testing.T) {
 	configs, err := ReadConfigurationDefinitions(tmpDir)
 	require.NoError(t, err)
 	assert.Len(t, configs, 1)
-	assert.Equal(t, "test-config", configs[0].Slug)
+	assert.Equal(t, "linux", configs[0].Platform)
 	assert.Equal(t, "Test configuration", configs[0].Description)
 
 	// Verify schema was base64 encoded
@@ -93,9 +91,7 @@ func TestReadConfigurationDefinitions_SchemaFileNotFound(t *testing.T) {
 	// Create test config file that references non-existent schema
 	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
 	testYAML := `configurationDefinitions:
-  - name: test-config
-    slug: test-config
-    platform: linux
+  - platform: linux
     description: Test configuration
     type: test-config
     version: 1.0.0
@@ -129,9 +125,7 @@ func TestReadConfigurationDefinitions_EmptySchemaFile(t *testing.T) {
 	// Create test config file that references empty schema
 	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
 	testYAML := `configurationDefinitions:
-  - name: test-config
-    slug: test-config
-    platform: linux
+  - platform: linux
     description: Test configuration
     type: test-config
     version: 1.0.0
@@ -147,6 +141,40 @@ func TestReadConfigurationDefinitions_EmptySchemaFile(t *testing.T) {
 	assert.Nil(t, configs)
 	assert.Contains(t, err.Error(), "failed to load schema")
 	assert.Contains(t, err.Error(), "is empty")
+}
+
+func TestReadConfigurationDefinitions_InvalidJSONSchema(t *testing.T) {
+	// Create temporary directory structure with invalid JSON schema file
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".fleetControl")
+	schemasDir := filepath.Join(configDir, "schemas")
+	err := os.MkdirAll(schemasDir, 0755)
+	require.NoError(t, err)
+
+	// Create schema file with invalid JSON
+	schemaFile := filepath.Join(schemasDir, "invalid.json")
+	err = os.WriteFile(schemaFile, []byte(`{invalid json content`), 0644)
+	require.NoError(t, err)
+
+	// Create test config file that references invalid schema
+	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	testYAML := `configurationDefinitions:
+  - platform: linux
+    description: Test configuration
+    type: test-config
+    version: 1.0.0
+    format: yaml
+    schema: ./schemas/invalid.json`
+
+	err = os.WriteFile(configFile, []byte(testYAML), 0644)
+	require.NoError(t, err)
+
+	// Test reading the config - should fail
+	configs, err := ReadConfigurationDefinitions(tmpDir)
+	assert.Error(t, err)
+	assert.Nil(t, configs)
+	assert.Contains(t, err.Error(), "failed to load schema")
+	assert.Contains(t, err.Error(), "is not valid JSON")
 }
 
 func TestReadConfigurationDefinitions_MultipleConfigs(t *testing.T) {
@@ -176,25 +204,19 @@ func TestReadConfigurationDefinitions_MultipleConfigs(t *testing.T) {
 	// Create test config file with multiple configs
 	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
 	testYAML := `configurationDefinitions:
-  - name: config-1
-    slug: config-1
-    platform: linux
+  - platform: linux
     description: First configuration
     type: config-1
     version: 1.0.0
     format: json
     schema: ./schemas/schema1.json
-  - name: config-2
-    slug: config-2
-    platform: kubernetes
+  - platform: kubernetes
     description: Second configuration
     type: config-2
     version: 2.0.0
     format: json
     schema: ./schemas/schema2.json
-  - name: config-3
-    slug: config-3
-    platform: host
+  - platform: host
     description: Third configuration
     type: config-3
     version: 3.0.0
@@ -210,17 +232,17 @@ func TestReadConfigurationDefinitions_MultipleConfigs(t *testing.T) {
 	assert.Len(t, configs, 3)
 
 	// Verify first config
-	assert.Equal(t, "config-1", configs[0].Slug)
+	assert.Equal(t, "linux", configs[0].Platform)
 	expectedEncoded1 := base64.StdEncoding.EncodeToString([]byte(schema1Content))
 	assert.Equal(t, expectedEncoded1, configs[0].Schema)
 
 	// Verify second config
-	assert.Equal(t, "config-2", configs[1].Slug)
+	assert.Equal(t, "kubernetes", configs[1].Platform)
 	expectedEncoded2 := base64.StdEncoding.EncodeToString([]byte(schema2Content))
 	assert.Equal(t, expectedEncoded2, configs[1].Schema)
 
 	// Verify third config
-	assert.Equal(t, "config-3", configs[2].Slug)
+	assert.Equal(t, "host", configs[2].Platform)
 	expectedEncoded3 := base64.StdEncoding.EncodeToString([]byte(schema3Content))
 	assert.Equal(t, expectedEncoded3, configs[2].Schema)
 }
@@ -237,13 +259,11 @@ func TestReadConfigurationDefinitions_ValidationIntegration(t *testing.T) {
 	// Test one example to verify validation works end-to-end
 	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
 	yamlContent := `configurationDefinitions:
-  - slug: test-config
-    version: 1.2.3
+  - version: 1.2.3
     platform: linux
     description: Test configuration
     type: test-config
-    format: yaml
-    schema: ./schemas/test.json`
+    format: yaml`
 
 	err = os.WriteFile(configFile, []byte(yamlContent), 0644)
 	require.NoError(t, err)
@@ -251,7 +271,7 @@ func TestReadConfigurationDefinitions_ValidationIntegration(t *testing.T) {
 	configs, err := ReadConfigurationDefinitions(tmpDir)
 	assert.Error(t, err)
 	assert.Nil(t, configs)
-	assert.Contains(t, err.Error(), "name is required")
+	assert.Contains(t, err.Error(), "schema is required")
 }
 
 func TestReadConfigurationDefinitions_EmptyArray(t *testing.T) {
@@ -308,9 +328,7 @@ func TestReadConfigurationDefinitions_DirectoryTraversal(t *testing.T) {
 			// Create config file with malicious schema path
 			configFile := filepath.Join(configDir, "configurationDefinitions.yml")
 			testYAML := fmt.Sprintf(`configurationDefinitions:
-  - name: test-config
-    slug: test-config
-    version: 1.0.0
+  - version: 1.0.0
     platform: linux
     description: Test configuration
     type: test-config
@@ -394,4 +412,25 @@ func TestReadAgentControl_EmptyFile(t *testing.T) {
 	assert.Nil(t, agentControl)
 	assert.Contains(t, err.Error(), "agent control file")
 	assert.Contains(t, err.Error(), "is empty")
+}
+
+func TestReadAgentControl_InvalidYAML(t *testing.T) {
+	// Create temporary directory structure with invalid YAML agent control file
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".fleetControl")
+	agentControlDir := filepath.Join(configDir, "agentControl")
+	err := os.MkdirAll(agentControlDir, 0755)
+	require.NoError(t, err)
+
+	// Create agent control file with invalid YAML
+	agentControlFile := filepath.Join(agentControlDir, "agent-schema-for-agent-control.yml")
+	err = os.WriteFile(agentControlFile, []byte(`invalid: yaml: [unclosed`), 0644)
+	require.NoError(t, err)
+
+	// Test reading the agent control - should fail
+	agentControl, err := LoadAndEncodeAgentControl(tmpDir)
+	assert.Error(t, err)
+	assert.Nil(t, agentControl)
+	assert.Contains(t, err.Error(), "agent control file")
+	assert.Contains(t, err.Error(), "is not valid YAML")
 }

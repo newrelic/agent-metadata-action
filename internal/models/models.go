@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"gopkg.in/yaml.v3"
@@ -16,8 +15,6 @@ type AgentMetadata struct {
 
 // ConfigurationDefinition represents a configuration that can be read from YAML and sent as JSON
 type ConfigurationDefinition struct {
-	Slug        string `yaml:"slug" json:"slug"`
-	Name        string `yaml:"name" json:"name"`
 	Version     string `yaml:"version" json:"version"` // schema version, not agent version
 	Platform    string `yaml:"platform" json:"platform"`
 	Description string `yaml:"description" json:"description"`
@@ -38,8 +35,8 @@ func (c *ConfigurationDefinition) UnmarshalYAML(node *yaml.Node) error {
 
 	// Build context string for better error messages
 	context := ""
-	if raw.Name != "" {
-		context = fmt.Sprintf("config '%s'", raw.Name)
+	if raw.Type != "" && raw.Version != "" {
+		context = fmt.Sprintf("config with type '%s' and version '%s'", raw.Type, raw.Version)
 	}
 
 	// Validate all required fields
@@ -47,8 +44,6 @@ func (c *ConfigurationDefinition) UnmarshalYAML(node *yaml.Node) error {
 		value string
 		field string
 	}{
-		{raw.Slug, "slug"},
-		{raw.Name, "name"},
 		{raw.Version, "version"},
 		{raw.Platform, "platform"},
 		{raw.Description, "description"},
@@ -68,59 +63,19 @@ func (c *ConfigurationDefinition) UnmarshalYAML(node *yaml.Node) error {
 
 // Metadata represents version and changelog information
 type Metadata struct {
-	Version  string   `json:"version"` // agent version
-	Features []string `json:"features"`
-	Bugs     []string `json:"bugs"`
-	Security []string `json:"security"`
-}
-
-// UnmarshalYAML implements custom unmarshaling with validation
-func (m *Metadata) UnmarshalYAML(node *yaml.Node) error {
-	// Use type alias to avoid infinite recursion when decoding
-	type rawMetadata Metadata
-	var raw rawMetadata
-
-	if err := node.Decode(&raw); err != nil {
-		return err
-	}
-
-	// Validate version is required
-	if err := requireField(raw.Version, "version", ""); err != nil {
-		return err
-	}
-
-	// Copy validated values
-	*m = Metadata(raw)
-	return nil
+	Version                   string   `json:"version"` // agent version
+	Features                  []string `json:"features"`
+	Bugs                      []string `json:"bugs"`
+	Security                  []string `json:"security"`
+	Deprecations              []string `json:"deprecations"`
+	SupportedOperatingSystems []string `json:"supportedOperatingSystems"`
+	EOL                       string   `json:"eol"`
 }
 
 // AgentControl represents agent control content for a platform
 type AgentControl struct {
 	Platform string `json:"platform"`
 	Content  string `json:"content"` // base64 encoded
-}
-
-// UnmarshalJSON implements custom unmarshaling with validation for AgentControl
-func (a *AgentControl) UnmarshalJSON(data []byte) error {
-	// Use type alias to avoid infinite recursion when decoding
-	type rawAgentControl AgentControl
-	var raw rawAgentControl
-
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-
-	// Validate required fields
-	if err := requireField(raw.Platform, "platform", "agentControl"); err != nil {
-		return err
-	}
-	if err := requireField(raw.Content, "content", "agentControl"); err != nil {
-		return err
-	}
-
-	// Copy validated values
-	*a = AgentControl(raw)
-	return nil
 }
 
 // ConfigFile represents the YAML file structure containing multiple configs
