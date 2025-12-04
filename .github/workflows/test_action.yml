@@ -16,17 +16,11 @@ jobs:
       - name: Checkout action repository
         uses: actions/checkout@v4
 
-      - name: Setup test files
-        run: ln -s integration-test/agent-flow/.fleetControl .fleetControl
-
-      - name: Create test tag
-        run: git tag 1.0.0
-
       - name: Run Agent Metadata Action (with configs)
         uses: ./
         with:
           agent-type: 'myagent'
-          version: '1.0.0'
+          version: '0.0.0'
           cache: false
 
   test-docs-flow:
