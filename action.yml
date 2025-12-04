@@ -3,11 +3,11 @@ description: 'Fetches agent configuration metadata to create/update NEGP entitie
 inputs:
   agent-type:
     description: 'The type of agent in all lowercase eg. dotnet'
-    required: true
+    required: false
     default: ''
   version:
     description: 'Agent version in strict semver format MAJOR.MINOR.PATCH (ex. 1.2.3)'
-    required: true
+    required: false
     default: ''
   cache:
     description: 'Enable Go build cache'
@@ -18,6 +18,8 @@ runs:
   steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.version }} # When ref is empty (as in docs scenario), this will default to checking out the commit that triggered the action
 
     - name: Setup Go
       uses: actions/setup-go@v4

@@ -2,27 +2,21 @@
 
 # Agent Metadata Action
 
-A GitHub Action that reads agent configuration metadata from a checked-out repository. This action parses the `.fleetControl/configurationDefinitions.yml` file and makes the configuration data available for downstream workflow steps.
+A GitHub Action that reads agent configuration metadata from the calling repository. This action parses the `.fleetControl/configurationDefinitions.yml` file and makes the configuration data available for downstream workflow steps.
 
 ## Installation
 
-Add this action to your workflow after checking out your repository:
+Add this action to your workflow:
 
 ```yaml
-- name: Checkout repository
-  uses: actions/checkout@v4
-
 - name: Read agent metadata
   uses: newrelic/agent-metadata-action@v1
 ```
 
 ## Usage
 
-This action reads the `.fleetControl/configurationDefinitions.yml` file from your repository and saves the agent information in New Relic. 
-The action expects the file to be present after the repository has been checked out. If you do not want to use this action,
-you can call New Relic directly to add the agent information.
-
 ### Example Workflow For Releasing a New Agent Version
+This action automatically checks out your repository at the specified version tag, then reads the `.fleetControl/configurationDefinitions.yml` file and other associated files in `/fleetControl` and saves the agent information in New Relic. The action handles the checkout internally, so you don't need to include a separate `actions/checkout` step. If you do not want to use this action, you can call New Relic directly to add the agent information.
 
 ```yaml
 name: Process Agent Metadata
@@ -34,23 +28,17 @@ jobs:
   read-metadata:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: v1.0.0 # the release tag for the version being released
-
       - name: Read agent metadata
         uses: newrelic/agent-metadata-action@v1
         with:
           agent-type: dotnet # Required: The type of agent (e.g., dotnet, java, python)
-          version: 1.0.0 # Required
+          version: 1.0.0 # Required: will be used to check out appropriate release tag
           cache: true  # Optional: Enable Go build cache (default: true)
 ```
 
 ### Example Workflow For Updating Docs Metadata on an Existing Agent Version
+This action automatically checks out the calling repo's commit, detects the changed release notes and saves the agent metadata in New Relic. The action handles the checkout internally, so you don't need to include a separate `actions/checkout` step. If you do not want to use this action, you can call New Relic directly to add the agent metadata.
 
-The docs header contains things like a bug fix list, a list of features, etc for the given agent version. These
-will be updated after the initial agent version has been created so checking out the agent repo is not required.
 
 ```yaml
 name: Process Agent Metadata
@@ -65,20 +53,12 @@ jobs:
       - name: Read agent metadata
         uses: newrelic/agent-metadata-action@v1
         with:
-          agent-type: java # Required: The type of agent (e.g., dotnet, java, python)
-          version: 1.0.0 # required
-          features: feature1,feature2 # Optional: Comma-separated list of features
-          bugs: bug-123,bug-456 # Optional: Comma-separated list of bug fixes
-          security: CVE-2024-1234 # Optional: Comma-separated list of security fixes
-          deprecations: deprecated-feature1 # Optional: Comma-separated list of deprecations
-          supportedOperatingSystems: linux,windows,darwin # Optional: Comma-separated list of supported OSes
-          eol: 2025-12-31 # Optional: End of life date
           cache: true  # Optional: Enable Go build cache (default: true)
 ```
 
-### Configuration File Format
+### Configuration File Format (Agent Scenario)
 
-The action expects a YAML file at `.fleetControl/configurationDefinitions.yml` with the following structure:
+For the agent scenario, the action expects a YAML file at `.fleetControl/configurationDefinitions.yml` with the following structure:
 
 ```yaml
 configurationDefinitions:
@@ -102,9 +82,8 @@ To build the action locally:
 # Build the binary
 go build -o agent-metadata-action ./cmd/agent-metadata-action
 
-# Run locally (requires GITHUB_WORKSPACE environment variable)
-export GITHUB_WORKSPACE=/path/to/your/repo
-./agent-metadata-action
+# Run locally
+/bin/bash /Users/mvick/IdeaProjects/agent-metadata-action/run_local.sh 
 ```
 
 ## Testing

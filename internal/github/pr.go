@@ -29,6 +29,25 @@ type PREvent struct {
 
 // GetChangedMDXFiles returns RELEASE_NOTES_FILE_EXTENSION type files changed in the PR under ROOT_RELEASE_NOTES_DIR, excluding IGNORED_FILENAMES
 func GetChangedMDXFiles() ([]string, error) {
+	return GetChangedMDXFilesFunc()
+}
+
+// isIgnoredFilename checks if the filename should be ignored
+func isIgnoredFilename(filename string) bool {
+	for _, ignored := range IGNORED_FILENAMES {
+		if filename == ignored {
+			return true
+		}
+	}
+	return false
+}
+
+// GetChangedMDXFilesFunc is a variable that holds the function to get changed MDX files
+// This allows tests to override the implementation
+var GetChangedMDXFilesFunc = getChangedMDXFilesImpl
+
+// getChangedMDXFilesImpl is the actual implementation
+func getChangedMDXFilesImpl() ([]string, error) {
 	eventPath := os.Getenv("GITHUB_EVENT_PATH")
 	if eventPath == "" {
 		return nil, fmt.Errorf("GITHUB_EVENT_PATH not set")
@@ -46,6 +65,12 @@ func GetChangedMDXFiles() ([]string, error) {
 
 	cmd := exec.Command("git", "diff", "--diff-filter=ACMR", "--name-only",
 		fmt.Sprintf("%s...%s", event.PullRequest.Base.SHA, event.PullRequest.Head.SHA))
+
+	// Set working directory to GITHUB_WORKSPACE so git can find the repository
+	if workspace := os.Getenv("GITHUB_WORKSPACE"); workspace != "" {
+		cmd.Dir = workspace
+	}
+
 	var out bytes.Buffer
 	cmd.Stdout = &out
 
@@ -53,6 +78,7 @@ func GetChangedMDXFiles() ([]string, error) {
 		return nil, fmt.Errorf("git diff failed: %w", err)
 	}
 
+	workspace := os.Getenv("GITHUB_WORKSPACE")
 	var mdxFiles []string
 	for _, line := range strings.Split(out.String(), "\n") {
 		line = strings.TrimSpace(line)
@@ -63,19 +89,13 @@ func GetChangedMDXFiles() ([]string, error) {
 			continue
 		}
 		if strings.Contains(line, ROOT_RELEASE_NOTES_DIR) {
+			// Convert to absolute path if workspace is set
+			if workspace != "" {
+				line = filepath.Join(workspace, line)
+			}
 			mdxFiles = append(mdxFiles, line)
 		}
 	}
 
 	return mdxFiles, nil
-}
-
-// isIgnoredFilename checks if the filename should be ignored
-func isIgnoredFilename(filename string) bool {
-	for _, ignored := range IGNORED_FILENAMES {
-		if filename == ignored {
-			return true
-		}
-	}
-	return false
 }

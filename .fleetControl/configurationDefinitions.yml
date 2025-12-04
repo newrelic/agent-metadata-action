@@ -1,0 +1,13 @@
+configurationDefinitions:
+  - platform: kubernetes
+    description: myagent agent configuration, provided by the user
+    type: myagent-config
+    version: 1.0.0
+    format: json
+    schema: ./schemas/myagent-config.json
+  - platform: host
+    description: myagent agent configuration, provided by the user
+    type: myagent-config
+    version: 1.0.0
+    format: json
+    schema: ./schemas/myagent-config.json

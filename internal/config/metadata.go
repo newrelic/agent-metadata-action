@@ -12,53 +12,56 @@ import (
 
 // semverPattern validates strict semantic versioning format: MAJOR.MINOR.PATCH (e.g., 1.2.3)
 // Does not allow prerelease identifiers or build metadata
+// @todo may need to revisit if tags used by teams don't match semver
 var semverPattern = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
 
-// LoadMetadata loads metadata from changed MDX files in a PR
-func LoadMetadata() (models.Metadata, error) {
-	version, err := LoadVersion()
-	if err != nil {
-		return models.Metadata{}, err
+// LoadMetadataForAgents loads metadata with only version populated
+func LoadMetadataForAgents(version string) models.Metadata {
+	return models.Metadata{
+		Version: version,
 	}
+}
 
-	var features, bugs, security, deprecations, supportedOperatingSystems []string
-	var eol string
+// LoadMetadataForDocs loads metadata from changed MDX files in a PR
+func LoadMetadataForDocs() ([]models.Metadata, error) {
+
+	var metadataArray []models.Metadata
 
 	// Get changed MDX files (for PR context)
-	changedFiles, err := github.GetChangedMDXFiles()
+	changedFilepaths, err := github.GetChangedMDXFiles()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "::debug::Could not get changed files: %v\n", err)
-	} else if len(changedFiles) > 0 {
-		// Parse MDX files and extract metadata
-		workspace := GetWorkspace()
-		features, bugs, security, deprecations, supportedOperatingSystems, eol, err = parser.ParseMDXFiles(changedFiles, workspace)
-		if err != nil {
-			return models.Metadata{}, fmt.Errorf("failed to parse MDX files: %w", err)
-		}
-		fmt.Fprintf(os.Stderr, "::notice::Loaded metadata from %d changed MDX files\n", len(changedFiles))
-	}
+	} else if len(changedFilepaths) > 0 {
+		for _, filepath := range changedFilepaths {
+			frontMatter, err := parser.ParseMDXFile(filepath)
+			if err != nil {
+				// @todo should we try to load what we can or fail if we hit one bad file?
+				return nil, fmt.Errorf("failed to parse MDX file %s: %w", filepath, err)
+			}
 
-	return models.Metadata{
-		Version:                   version,
-		Features:                  features,
-		Bugs:                      bugs,
-		Security:                  security,
-		Deprecations:              deprecations,
-		SupportedOperatingSystems: supportedOperatingSystems,
-		EOL:                       eol,
-	}, nil
+			metadataArray = append(metadataArray, models.Metadata{
+				Version:                   frontMatter.Version,
+				Features:                  frontMatter.Features,
+				Bugs:                      frontMatter.Bugs,
+				Security:                  frontMatter.Security,
+				Deprecations:              frontMatter.Deprecations,
+				SupportedOperatingSystems: frontMatter.SupportedOperatingSystems,
+				EOL:                       frontMatter.EOL,
+			})
+		}
+
+		fmt.Fprintf(os.Stderr, "::notice::Loaded metadata from %d changed MDX files\n", len(changedFilepaths))
+	}
+	return metadataArray, nil
 }
 
 // LoadVersion loads the version from INPUT_VERSION
-// Returns an error if no version can be determined or if version is not in valid X.Y.Z format
+// Returns an error if a version is provided and it is not in valid X.Y.Z format
 func LoadVersion() (string, error) {
 	version := os.Getenv("INPUT_VERSION")
-	if version == "" {
-		return "", fmt.Errorf("unable to determine version: INPUT_VERSION not set")
-	}
 
 	// Validate strict semver format (X.Y.Z only)
-	if !semverPattern.MatchString(version) {
+	if version != "" && !semverPattern.MatchString(version) {
 		return "", fmt.Errorf("invalid version format: %s (must be X.Y.Z format, e.g., 1.2.3)", version)
 	}
 

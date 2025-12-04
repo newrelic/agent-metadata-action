@@ -17,11 +17,6 @@ func main() {
 }
 
 func run() error {
-	// Validate agent type here for now - may move once there is code to call InstrumentationMetadata service
-	if err := validateAgentType(); err != nil {
-		return err
-	}
-
 	workspace := config.GetWorkspace()
 
 	// Workspace is required
@@ -34,57 +29,56 @@ func run() error {
 		return fmt.Errorf("Error reading configs: workspace directory does not exist: %s", workspace)
 	}
 
-	metadata, err := config.LoadMetadata()
-	if err != nil {
-		return fmt.Errorf("Error loading metadata: %w", err)
-	}
-	fmt.Printf("::debug::Agent version: %s\n", metadata.Version)
-	fmt.Printf("::debug::Features: %v\n", metadata.Features)
-	fmt.Printf("::debug::Bugs: %v\n", metadata.Bugs)
-	fmt.Printf("::debug::Security: %v\n", metadata.Security)
-
-	// Check if .fleetControl directory exists to determine flow (agent repo vs docs)
-	fleetControlPath := workspace + "/.fleetControl"
-	if _, err := os.Stat(fleetControlPath); err == nil {
-		// Scenario 1: Agent repo flow - .fleetControl directory exists
-		fmt.Printf("::debug::Reading config from workspace: %s\n", workspace)
-
-		configs, err := config.ReadConfigurationDefinitions(workspace)
-		if err != nil {
-			return fmt.Errorf("Error reading configs: %w", err)
-		}
-
-		agentControl, err := config.LoadAndEncodeAgentControl(workspace)
-		if err != nil {
-			return fmt.Errorf("Error reading agent control: %w", err)
-		}
-
-		fmt.Println("::notice::Successfully read configs file")
-		fmt.Printf("::debug::Found %d configs\n", len(configs))
-
-		agentMetadata := models.AgentMetadata{
-			ConfigurationDefinitions: configs,
-			Metadata:                 metadata,
-			AgentControl:             agentControl,
-		}
-
-		// @todo use the AgentMetadata object to call the InstrumentationMetadata service to add/update the agent in NGEP
-		printJSON("Agent Metadata", agentMetadata)
-	} else {
-		// Scenario 2: Docs workflow
-		fmt.Println("::notice::Running in metadata-only mode (.fleetControl not found, using MDX files)")
-		// @todo use the INPUT_AGENT_TYPE along with the metadata to call the InstrumentationMetadata service for updating the agent in NGEP with extra metadata
-		printJSON("Metadata", metadata)
-	}
-
-	return nil
-}
-
-func validateAgentType() error {
 	agentType := os.Getenv("INPUT_AGENT_TYPE")
-	if agentType == "" {
-		return fmt.Errorf("agent-type is required: INPUT_AGENT_TYPE not set")
+	agentVersion, err := config.LoadVersion()
+	if err != nil {
+		return err
 	}
+
+	if agentType != "" && agentVersion != "" { // Scenario 1: Agent repo flow
+		fmt.Println("::debug::Agent scenario")
+		fleetControlPath := workspace + "/.fleetControl"
+		if _, err := os.Stat(fleetControlPath); err == nil {
+			fmt.Printf("::debug::Reading config from workspace: %s\n", workspace)
+
+			configs, err := config.ReadConfigurationDefinitions(workspace)
+			if err != nil {
+				return fmt.Errorf("Error reading configs: %w", err)
+			}
+
+			agentControl, err := config.LoadAndEncodeAgentControl(workspace)
+			if err != nil {
+				return fmt.Errorf("Error reading agent control: %w", err)
+			}
+
+			fmt.Println("::notice::Successfully read configs file")
+			fmt.Printf("::debug::Found %d configs\n", len(configs))
+
+			metadata := config.LoadMetadataForAgents(agentVersion)
+
+			agentMetadata := models.AgentMetadata{
+				ConfigurationDefinitions: configs,
+				Metadata:                 metadata,
+				AgentControl:             agentControl,
+			}
+
+			// @todo use the AgentMetadata object to call the InstrumentationMetadata service to add/update the agent in NGEP
+			printJSON("Agent Metadata", agentMetadata)
+		}
+	} else { // Scenario 2: Docs repo flow
+		fmt.Println("::debug::Docs scenario")
+		metadata, err := config.LoadMetadataForDocs()
+		if err != nil {
+			return fmt.Errorf("Error reading metadata: %w", err)
+		}
+		for _, currMetadata := range metadata {
+			agentMetadata := models.AgentMetadata{
+				Metadata: currMetadata,
+			}
+			printJSON("Agent Metadata", agentMetadata)
+		}
+	}
+
 	return nil
 }
 
