@@ -19,6 +19,9 @@ jobs:
       - name: Setup test files
         run: ln -s integration-test/agent-flow/.fleetControl .fleetControl
 
+      - name: Create test tag
+        run: git tag 1.0.0
+
       - name: Run Agent Metadata Action (with configs)
         uses: ./
         with:
