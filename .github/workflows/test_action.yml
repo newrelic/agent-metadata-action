@@ -13,8 +13,8 @@ jobs:
     name: Test Agent Repository Flow
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Checkout action repository
+        uses: actions/checkout@v4
 
       - name: Setup test files
         run: ln -s integration-test/agent-flow/.fleetControl .fleetControl
@@ -30,28 +30,59 @@ jobs:
     name: Test Documentation Flow (MDX Parsing)
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0  # Fetch all history for git diff
+      - name: Checkout action repository
+        uses: actions/checkout@v4
 
-      - name: Create mock PR event
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Build action
+        run: go build -o agent-metadata-action ./cmd/agent-metadata-action
+
+      - name: Setup temporary workspace with MDX files
         run: |
-          BASE_SHA=$(git rev-parse origin/main 2>/dev/null || git rev-parse main)
+          # Create a temporary directory for the test workspace
+          TEMP_WORKSPACE="${{ runner.temp }}/test-workspace"
+          mkdir -p "$TEMP_WORKSPACE"
+
+          # Initialize git repo in temp workspace
+          cd "$TEMP_WORKSPACE"
+          git init
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+
+          # Create base commit (without MDX files)
+          mkdir -p src/content/docs/release-notes
+          git commit --allow-empty -m "Initial commit"
+          BASE_SHA=$(git rev-parse HEAD)
+
+          # Copy integration-test MDX files and commit them
+          cp -r "${{ github.workspace }}/integration-test/docs-flow/"* .
+          git add .
+          git commit -m "Add release notes"
+          HEAD_SHA=$(git rev-parse HEAD)
+
+          # Create mock PR event
           cat > /tmp/pr-event.json <<EOF
           {
             "pull_request": {
               "base": {"sha": "${BASE_SHA}"},
-              "head": {"sha": "${{ github.sha }}"}
+              "head": {"sha": "${HEAD_SHA}"}
             }
           }
           EOF
 
+          echo "BASE_SHA: $BASE_SHA"
+          echo "HEAD_SHA: $HEAD_SHA"
+          echo "TEMP_WORKSPACE=$TEMP_WORKSPACE" >> $GITHUB_ENV
+
       - name: Run Agent Metadata Action (metadata from MDX)
-        uses: ./
-        with:
-          agent-type: 'myagent'
-          version: '1.3.0'
-          cache: false
         env:
           GITHUB_EVENT_PATH: '/tmp/pr-event.json'
+          GITHUB_WORKSPACE: ${{ env.TEMP_WORKSPACE }}
+        run: |
+          cd ${{ env.TEMP_WORKSPACE }}
+          ${{ github.workspace }}/agent-metadata-action

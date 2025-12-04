@@ -2,7 +2,6 @@ package github
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,32 +10,98 @@ import (
 )
 
 func TestGetChangedMDXFiles(t *testing.T) {
-	// Get actual git SHAs for testing
-	baseCmd := exec.Command("git", "rev-parse", "main")
-	baseOut, err := baseCmd.Output()
-	if err != nil {
-		t.Skip("Skipping test: not in a git repository or main branch doesn't exist")
-	}
-	baseSHA := string(baseOut[:len(baseOut)-1]) // Remove trailing newline
+	// Create a temporary workspace with git repository
+	workspace := t.TempDir()
 
-	headCmd := exec.Command("git", "rev-parse", "HEAD")
-	headOut, err := headCmd.Output()
-	if err != nil {
-		t.Skip("Skipping test: not in a git repository")
-	}
-	headSHA := string(headOut[:len(headOut)-1])
-
-	// Check if there are any committed changes between main and HEAD
-	diffCmd := exec.Command("git", "diff", "--name-only", fmt.Sprintf("%s...%s", baseSHA, headSHA))
-	diffOut, err := diffCmd.Output()
-	if err != nil {
-		t.Fatalf("Failed to check for changes: %v", err)
-	}
-	if len(strings.TrimSpace(string(diffOut))) == 0 {
-		t.Skip("Skipping test: no committed changes between main and HEAD (commit your changes to test)")
+	// Initialize git repo
+	gitInit := exec.Command("git", "init")
+	gitInit.Dir = workspace
+	if err := gitInit.Run(); err != nil {
+		t.Fatalf("Failed to initialize git repo: %v", err)
 	}
 
-	// Create mock event payload
+	// Configure git user
+	gitConfig := exec.Command("git", "config", "user.email", "test@example.com")
+	gitConfig.Dir = workspace
+	if err := gitConfig.Run(); err != nil {
+		t.Fatalf("Failed to configure git: %v", err)
+	}
+
+	gitConfig = exec.Command("git", "config", "user.name", "Test User")
+	gitConfig.Dir = workspace
+	if err := gitConfig.Run(); err != nil {
+		t.Fatalf("Failed to configure git: %v", err)
+	}
+
+	// Create initial commit (without MDX files)
+	releaseNotesDir := filepath.Join(workspace, ROOT_RELEASE_NOTES_DIR, "agent-release-notes", "java-release-notes")
+	if err := os.MkdirAll(releaseNotesDir, 0755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+
+	gitCommit := exec.Command("git", "commit", "--allow-empty", "-m", "Initial commit")
+	gitCommit.Dir = workspace
+	if err := gitCommit.Run(); err != nil {
+		t.Fatalf("Failed to create initial commit: %v", err)
+	}
+
+	// Get base SHA
+	baseSHACmd := exec.Command("git", "rev-parse", "HEAD")
+	baseSHACmd.Dir = workspace
+	baseSHAOut, err := baseSHACmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to get base SHA: %v", err)
+	}
+	baseSHA := strings.TrimSpace(string(baseSHAOut))
+
+	// Create MDX files
+	mdxContent := `---
+subject: Java Agent
+releaseDate: '2024-01-15'
+version: 1.3.0
+features:
+  - New feature
+bugs:
+  - Bug fix
+---
+
+# Release Notes
+`
+
+	mdxFile := filepath.Join(releaseNotesDir, "java-agent-130.mdx")
+	if err := os.WriteFile(mdxFile, []byte(mdxContent), 0644); err != nil {
+		t.Fatalf("Failed to write MDX file: %v", err)
+	}
+
+	// Also create an index.mdx that should be ignored
+	indexFile := filepath.Join(releaseNotesDir, "index.mdx")
+	if err := os.WriteFile(indexFile, []byte("# Index"), 0644); err != nil {
+		t.Fatalf("Failed to write index file: %v", err)
+	}
+
+	// Add and commit MDX files
+	gitAdd := exec.Command("git", "add", ".")
+	gitAdd.Dir = workspace
+	if err := gitAdd.Run(); err != nil {
+		t.Fatalf("Failed to git add: %v", err)
+	}
+
+	gitCommit = exec.Command("git", "commit", "-m", "Add release notes")
+	gitCommit.Dir = workspace
+	if err := gitCommit.Run(); err != nil {
+		t.Fatalf("Failed to commit MDX files: %v", err)
+	}
+
+	// Get head SHA
+	headSHACmd := exec.Command("git", "rev-parse", "HEAD")
+	headSHACmd.Dir = workspace
+	headSHAOut, err := headSHACmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to get head SHA: %v", err)
+	}
+	headSHA := strings.TrimSpace(string(headSHAOut))
+
+	// Create PR event
 	event := PREvent{}
 	event.PullRequest.Base.SHA = baseSHA
 	event.PullRequest.Head.SHA = headSHA
@@ -51,16 +116,9 @@ func TestGetChangedMDXFiles(t *testing.T) {
 		t.Fatalf("Failed to write event file: %v", err)
 	}
 
-	// Set environment variable
-	oldEventPath := os.Getenv("GITHUB_EVENT_PATH")
-	os.Setenv("GITHUB_EVENT_PATH", tmpFile)
-	defer func() {
-		if oldEventPath != "" {
-			os.Setenv("GITHUB_EVENT_PATH", oldEventPath)
-		} else {
-			os.Unsetenv("GITHUB_EVENT_PATH")
-		}
-	}()
+	// Set environment variables
+	t.Setenv("GITHUB_EVENT_PATH", tmpFile)
+	t.Setenv("GITHUB_WORKSPACE", workspace)
 
 	// Run the function
 	files, err := GetChangedMDXFiles()
@@ -69,9 +127,13 @@ func TestGetChangedMDXFiles(t *testing.T) {
 	}
 
 	// Verify results
-	t.Logf("Found %d changed RELEASE_NOTES_FILE_EXTENSION files in ROOT_RELEASE_NOTES_DIR (excluding IGNORED_FILENAMES)", len(files))
-	for _, file := range files {
-		t.Logf("  - %s", file)
+	if len(files) != 1 {
+		t.Errorf("Expected 1 changed MDX file, got %d", len(files))
+	}
+
+	if len(files) > 0 {
+		file := files[0]
+		t.Logf("Found changed file: %s", file)
 
 		// Verify it's under ROOT_RELEASE_NOTES_DIR
 		if !strings.Contains(file, ROOT_RELEASE_NOTES_DIR) {
@@ -86,6 +148,11 @@ func TestGetChangedMDXFiles(t *testing.T) {
 		// Verify it's not in the ignored list
 		if isIgnoredFilename(filepath.Base(file)) {
 			t.Errorf("File %s is in IGNORED_FILENAMES but should be excluded", file)
+		}
+
+		// Verify it's the java-agent file, not index.mdx
+		if !strings.Contains(file, "java-agent-130.mdx") {
+			t.Errorf("Expected java-agent-130.mdx, got %s", file)
 		}
 	}
 }

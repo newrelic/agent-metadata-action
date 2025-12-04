@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://newrelic.com/schemas/myagent-configuration.json",
   "title": "New Relic My Agent Configuration Schema",
+  "version": "1.0.0",
   "description": "Schema for New Relic My Agent configuration",
   "type": "object",
   "properties": {

@@ -1,13 +1,11 @@
 package config
 
 import (
-	"encoding/json"
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"agent-metadata-action/internal/github"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -93,21 +91,12 @@ func TestLoadVersion_InvalidFormats(t *testing.T) {
 	}
 }
 
-func TestLoadVersion_NotSet_Error(t *testing.T) {
-	t.Setenv("INPUT_VERSION", "")
+func TestLoadMetadataForAgents(t *testing.T) {
+	t.Setenv("INPUT_AGENT_TYPE", "myagenttype")
+	t.Setenv("INPUT_VERSION", "1.2.3")
 
-	_, err := LoadVersion()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to determine version")
-	assert.Contains(t, err.Error(), "INPUT_VERSION not set")
-}
-
-func TestLoadMetadata_VersionOnly(t *testing.T) {
-	t.Setenv("INPUT_VERSION", "2.0.0")
-
-	metadata, err := LoadMetadata()
-	require.NoError(t, err)
-	assert.Equal(t, "2.0.0", metadata.Version)
+	metadata := LoadMetadataForAgents("1.2.3")
+	assert.Equal(t, "1.2.3", metadata.Version)
 	assert.Empty(t, metadata.Features)
 	assert.Empty(t, metadata.Bugs)
 	assert.Empty(t, metadata.Security)
@@ -116,113 +105,105 @@ func TestLoadMetadata_VersionOnly(t *testing.T) {
 	assert.Empty(t, metadata.EOL)
 }
 
-func TestLoadMetadata_NoVersion_Error(t *testing.T) {
-	t.Setenv("INPUT_VERSION", "")
-
-	_, err := LoadMetadata()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to determine version")
-}
-
 func TestLoadMetadata_WithMDXFiles_Success(t *testing.T) {
-	// Skip if not in a git repository
-	if _, err := exec.Command("git", "rev-parse", "HEAD").Output(); err != nil {
-		t.Skip("Skipping test: not in a git repository")
-	}
+	// Create a temporary workspace
+	tmpWorkspace := t.TempDir()
 
-	// Get the main branch SHA and current HEAD SHA
-	baseCmd := exec.Command("git", "rev-parse", "main")
-	baseOut, err := baseCmd.Output()
-	if err != nil {
-		t.Skip("Skipping test: main branch doesn't exist")
-	}
-	baseSHA := strings.TrimSpace(string(baseOut))
-
-	headCmd := exec.Command("git", "rev-parse", "HEAD")
-	headOut, err := headCmd.Output()
-	if err != nil {
-		t.Skip("Skipping test: not in a git repository")
-	}
-	headSHA := strings.TrimSpace(string(headOut))
-
-	// Check if we're on a branch with committed MDX changes
-	diffCmd := exec.Command("git", "diff", "--name-only", fmt.Sprintf("%s...%s", baseSHA, headSHA))
-	diffOut, err := diffCmd.Output()
-	if err != nil {
-		t.Skip("Skipping test: git diff failed")
-	}
-
-	hasMDXChanges := false
-	for _, line := range strings.Split(string(diffOut), "\n") {
-		if strings.HasSuffix(strings.TrimSpace(line), ".mdx") &&
-			strings.Contains(line, "src/content/docs/release-notes") {
-			hasMDXChanges = true
-			break
-		}
-	}
-	if !hasMDXChanges {
-		t.Skip("Skipping test: no committed MDX changes found (commit integration test files to test)")
-	}
-
-	// Create mock PR event with real git SHAs
-	event := struct {
-		PullRequest struct {
-			Base struct {
-				SHA string `json:"sha"`
-			} `json:"base"`
-			Head struct {
-				SHA string `json:"sha"`
-			} `json:"head"`
-		} `json:"pull_request"`
-	}{}
-	event.PullRequest.Base.SHA = baseSHA
-	event.PullRequest.Head.SHA = headSHA
-
-	eventData, err := json.Marshal(event)
+	// Create the release notes directory structure
+	releaseNotesDir := filepath.Join(tmpWorkspace, "src/content/docs/release-notes/agent-release-notes")
+	err := os.MkdirAll(releaseNotesDir, 0755)
 	require.NoError(t, err)
 
-	tmpEventFile := filepath.Join(t.TempDir(), "event.json")
-	err = os.WriteFile(tmpEventFile, eventData, 0644)
+	// Create test MDX files with known content
+	mdxContent1 := `---
+subject: Test Agent
+releaseDate: '2024-01-15'
+version: 1.5.0
+features:
+  - Added new monitoring capability
+  - Improved performance
+bugs:
+  - Fixed memory leak
+security:
+  - Patched CVE-2024-1234
+deprecations:
+  - Removed legacy API
+supportedOperatingSystems:
+  - Windows
+  - Linux
+  - macOS
+eol: '2025-12-31'
+---
+
+# Test Release Notes
+
+This is a test release.
+`
+
+	mdxContent2 := `---
+subject: Another Agent
+releaseDate: '2024-01-16'
+version: 1.6.0
+features:
+  - New dashboard feature
+bugs:
+  - Fixed crash on startup
+---
+
+# Another Release
+`
+
+	mdxFile1 := filepath.Join(releaseNotesDir, "test-agent-1.5.0.mdx")
+	mdxFile2 := filepath.Join(releaseNotesDir, "test-agent-1.6.0.mdx")
+
+	err = os.WriteFile(mdxFile1, []byte(mdxContent1), 0644)
 	require.NoError(t, err)
 
-	// Get current working directory as workspace
-	workspace, err := os.Getwd()
+	err = os.WriteFile(mdxFile2, []byte(mdxContent2), 0644)
 	require.NoError(t, err)
-	// Navigate up to the project root
-	workspace = filepath.Join(workspace, "../..")
+
+	// Mock GetChangedMDXFiles to return our test files
+	originalFunc := github.GetChangedMDXFilesFunc
+	github.GetChangedMDXFilesFunc = func() ([]string, error) {
+		return []string{mdxFile1, mdxFile2}, nil
+	}
+	defer func() {
+		github.GetChangedMDXFilesFunc = originalFunc
+	}()
 
 	// Set environment variables
 	t.Setenv("INPUT_VERSION", "1.5.0")
-	t.Setenv("GITHUB_EVENT_PATH", tmpEventFile)
-	t.Setenv("GITHUB_WORKSPACE", workspace)
+	t.Setenv("GITHUB_WORKSPACE", tmpWorkspace)
 
 	// Load metadata
-	metadata, err := LoadMetadata()
+	metadata, err := LoadMetadataForDocs()
 	require.NoError(t, err)
+	assert.NotNil(t, metadata)
+	assert.Len(t, metadata, 2, "Should load 2 MDX files")
 
-	// Verify version is set
-	assert.Equal(t, "1.5.0", metadata.Version)
+	// Verify first file's metadata
+	assert.Equal(t, "1.5.0", metadata[0].Version)
+	assert.Equal(t, []string{"Added new monitoring capability", "Improved performance"}, metadata[0].Features)
+	assert.Equal(t, []string{"Fixed memory leak"}, metadata[0].Bugs)
+	assert.Equal(t, []string{"Patched CVE-2024-1234"}, metadata[0].Security)
+	assert.Equal(t, []string{"Removed legacy API"}, metadata[0].Deprecations)
+	assert.Equal(t, []string{"Windows", "Linux", "macOS"}, metadata[0].SupportedOperatingSystems)
+	assert.Equal(t, "2025-12-31", metadata[0].EOL)
 
-	// The actual metadata content depends on what's in the committed files
-	// We just verify that if there are changed MDX files, we get some metadata
-	t.Logf("Loaded metadata: features=%d, bugs=%d, security=%d",
-		len(metadata.Features), len(metadata.Bugs), len(metadata.Security))
+	// Verify second file's metadata
+	assert.Equal(t, "1.6.0", metadata[1].Version)
+	assert.Equal(t, []string{"New dashboard feature"}, metadata[1].Features)
+	assert.Equal(t, []string{"Fixed crash on startup"}, metadata[1].Bugs)
 }
 
 func TestLoadMetadata_NoMDXFiles_ReturnsEmptyMetadata(t *testing.T) {
-	t.Setenv("INPUT_VERSION", "3.0.0")
-
 	// Don't set GITHUB_EVENT_PATH - simulates no PR context
-	os.Unsetenv("GITHUB_EVENT_PATH")
+	err := os.Unsetenv("GITHUB_EVENT_PATH")
+	if err != nil {
+		return
+	}
 
-	metadata, err := LoadMetadata()
+	metadata, err := LoadMetadataForDocs()
 	require.NoError(t, err)
-
-	assert.Equal(t, "3.0.0", metadata.Version)
-	assert.Nil(t, metadata.Features)
-	assert.Nil(t, metadata.Bugs)
-	assert.Nil(t, metadata.Security)
-	assert.Nil(t, metadata.Deprecations)
-	assert.Nil(t, metadata.SupportedOperatingSystems)
-	assert.Empty(t, metadata.EOL)
+	assert.Nil(t, metadata)
 }
