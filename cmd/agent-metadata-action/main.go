@@ -30,10 +30,7 @@ func run() error {
 	}
 
 	agentType := os.Getenv("INPUT_AGENT_TYPE")
-	agentVersion, err := config.LoadVersion()
-	if err != nil {
-		return err
-	}
+	agentVersion := os.Getenv("INPUT_VERSION")
 
 	if agentType != "" && agentVersion != "" { // Scenario 1: Agent repo flow
 		fmt.Println("::debug::Agent scenario")

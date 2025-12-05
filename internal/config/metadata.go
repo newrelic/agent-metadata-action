@@ -3,17 +3,11 @@ package config
 import (
 	"fmt"
 	"os"
-	"regexp"
 
 	"agent-metadata-action/internal/github"
 	"agent-metadata-action/internal/models"
 	"agent-metadata-action/internal/parser"
 )
-
-// semverPattern validates strict semantic versioning format: MAJOR.MINOR.PATCH (e.g., 1.2.3)
-// Does not allow prerelease identifiers or build metadata
-// @todo may need to revisit if tags used by teams don't match semver
-var semverPattern = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
 
 // LoadMetadataForAgents loads metadata with only version populated
 func LoadMetadataForAgents(version string) models.Metadata {
@@ -39,6 +33,11 @@ func LoadMetadataForDocs() ([]models.Metadata, error) {
 				return nil, fmt.Errorf("failed to parse MDX file %s: %w", filepath, err)
 			}
 
+			// Validate version is not blank
+			if frontMatter.Version == "" {
+				return nil, fmt.Errorf("version is required in metadata for file %s", filepath)
+			}
+
 			metadataArray = append(metadataArray, models.Metadata{
 				Version:                   frontMatter.Version,
 				Features:                  frontMatter.Features,
@@ -53,17 +52,4 @@ func LoadMetadataForDocs() ([]models.Metadata, error) {
 		fmt.Fprintf(os.Stderr, "::notice::Loaded metadata from %d changed MDX files\n", len(changedFilepaths))
 	}
 	return metadataArray, nil
-}
-
-// LoadVersion loads the version from INPUT_VERSION
-// Returns an error if a version is provided and it is not in valid X.Y.Z format
-func LoadVersion() (string, error) {
-	version := os.Getenv("INPUT_VERSION")
-
-	// Validate strict semver format (X.Y.Z only)
-	if version != "" && !semverPattern.MatchString(version) {
-		return "", fmt.Errorf("invalid version format: %s (must be X.Y.Z format, e.g., 1.2.3)", version)
-	}
-
-	return version, nil
 }

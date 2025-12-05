@@ -9,7 +9,7 @@ on:
       - '**'
 
 jobs:
-  test-agent-flow:
+  test-agent-flow-no-v-version:
     name: Test Agent Repository Flow
     runs-on: ubuntu-latest
     steps:
@@ -21,6 +21,20 @@ jobs:
         with:
           agent-type: 'myagent'
           version: '0.0.0'
+          cache: false
+
+  test-agent-flow-v-version:
+    name: Test Agent Repository Flow with "v" prefixed version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout action repository
+        uses: actions/checkout@v4
+
+      - name: Run Agent Metadata Action (with configs)
+        uses: ./
+        with:
+          agent-type: 'myagent'
+          version: 'v0.0.0'
           cache: false
 
   test-docs-flow:
