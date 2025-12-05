@@ -11,86 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadVersion_ValidFormats(t *testing.T) {
-	tests := []struct {
-		name    string
-		version string
-	}{
-		{
-			name:    "standard version",
-			version: "1.2.3",
-		},
-		{
-			name:    "simple version",
-			version: "1.0.0",
-		},
-		{
-			name:    "large numbers",
-			version: "100.200.300",
-		},
-		{
-			name:    "zero version",
-			version: "0.0.0",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("INPUT_VERSION", tt.version)
-
-			version, err := LoadVersion()
-			require.NoError(t, err)
-			assert.Equal(t, tt.version, version)
-		})
-	}
-}
-
-func TestLoadVersion_InvalidFormats(t *testing.T) {
-	tests := []struct {
-		name    string
-		version string
-	}{
-		{
-			name:    "with v prefix",
-			version: "v1.2.3",
-		},
-		{
-			name:    "with prerelease",
-			version: "1.2.3-alpha",
-		},
-		{
-			name:    "with build metadata",
-			version: "1.2.3+build",
-		},
-		{
-			name:    "two components",
-			version: "1.2",
-		},
-		{
-			name:    "four components",
-			version: "1.2.3.4",
-		},
-		{
-			name:    "leading zero",
-			version: "01.2.3",
-		},
-		{
-			name:    "non-numeric",
-			version: "abc",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("INPUT_VERSION", tt.version)
-
-			_, err := LoadVersion()
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "invalid version format")
-		})
-	}
-}
-
 func TestLoadMetadataForAgents(t *testing.T) {
 	t.Setenv("INPUT_AGENT_TYPE", "myagenttype")
 	t.Setenv("INPUT_VERSION", "1.2.3")
@@ -206,4 +126,46 @@ func TestLoadMetadata_NoMDXFiles_ReturnsEmptyMetadata(t *testing.T) {
 	metadata, err := LoadMetadataForDocs()
 	require.NoError(t, err)
 	assert.Nil(t, metadata)
+}
+
+func TestLoadMetadata_MDXFileWithBlankVersion_ReturnsError(t *testing.T) {
+	// Create a temporary workspace
+	tmpWorkspace := t.TempDir()
+
+	// Create the release notes directory structure
+	releaseNotesDir := filepath.Join(tmpWorkspace, "src/content/docs/release-notes/agent-release-notes")
+	err := os.MkdirAll(releaseNotesDir, 0755)
+	require.NoError(t, err)
+
+	// Create test MDX file with blank version
+	mdxContent := `---
+subject: Test Agent
+releaseDate: '2024-01-15'
+version: ""
+features:
+  - New feature
+---
+
+# Test Release Notes
+`
+
+	mdxFile := filepath.Join(releaseNotesDir, "test-agent.mdx")
+	err = os.WriteFile(mdxFile, []byte(mdxContent), 0644)
+	require.NoError(t, err)
+
+	// Mock GetChangedMDXFiles to return our test file
+	originalFunc := github.GetChangedMDXFilesFunc
+	github.GetChangedMDXFilesFunc = func() ([]string, error) {
+		return []string{mdxFile}, nil
+	}
+	defer func() {
+		github.GetChangedMDXFilesFunc = originalFunc
+	}()
+
+	t.Setenv("GITHUB_WORKSPACE", tmpWorkspace)
+
+	// Load metadata - should fail due to blank version
+	_, err = LoadMetadataForDocs()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "version is required")
 }

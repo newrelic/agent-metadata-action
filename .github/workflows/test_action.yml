@@ -1,7 +1,7 @@
 name: Action Test
 
 permissions:
-  contents: read
+  contents: write
 
 on:
   push:
@@ -9,18 +9,54 @@ on:
       - '**'
 
 jobs:
-  test-agent-flow:
+  setup-test-tag:
+    name: Setup Test Tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout action repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push temporary tag for testing
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag -f v0.0.0 HEAD
+          git push -f origin v0.0.0
+
+  test-agent-flow-no-v-version:
+    needs: setup-test-tag
     name: Test Agent Repository Flow
     runs-on: ubuntu-latest
     steps:
       - name: Checkout action repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Run Agent Metadata Action (with configs)
         uses: ./
         with:
           agent-type: 'myagent'
           version: '0.0.0'
+          cache: false
+
+  test-agent-flow-v-version:
+    needs: setup-test-tag
+    name: Test Agent Repository Flow with "v" prefixed version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout action repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Agent Metadata Action (with configs)
+        uses: ./
+        with:
+          agent-type: 'myagent'
+          version: 'v0.0.0'
           cache: false
 
   test-docs-flow:
@@ -83,3 +119,18 @@ jobs:
         run: |
           cd ${{ env.TEMP_WORKSPACE }}
           ${{ github.workspace }}/agent-metadata-action
+
+  cleanup-test-tag:
+    name: Cleanup Test Tag
+    runs-on: ubuntu-latest
+    needs: [test-agent-flow-no-v-version, test-agent-flow-v-version, test-docs-flow]
+    if: always()
+    steps:
+      - name: Checkout action repository
+        uses: actions/checkout@v4
+
+      - name: Delete temporary tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git push origin :refs/tags/v0.0.0 || true

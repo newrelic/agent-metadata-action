@@ -6,7 +6,7 @@ inputs:
     required: false
     default: ''
   version:
-    description: 'Agent version in strict semver format MAJOR.MINOR.PATCH (ex. 1.2.3)'
+    description: 'Agent version in semver format (ex. 1.2.3 or v1.2.3). The action will prepend "v" if not present for tag checkout.'
     required: false
     default: ''
   cache:
@@ -16,10 +16,21 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Normalize version tag for checkout
+      id: version
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        if [[ -n "$VERSION" && ! "$VERSION" =~ ^v ]]; then
+          echo "ref=v${VERSION}" >> $GITHUB_OUTPUT
+        else
+          echo "ref=${VERSION}" >> $GITHUB_OUTPUT
+        fi
+
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        ref: ${{ inputs.version }} # When ref is empty (as in docs scenario), this will default to checking out the commit that triggered the action
+        ref: ${{ steps.version.outputs.ref }} # When ref is empty (as in docs scenario), this will default to checking out the commit that triggered the action
 
     - name: Setup Go
       uses: actions/setup-go@v4
