@@ -91,17 +91,6 @@ schema: ./schema.json
 `,
 			expectedError: "format is required",
 		},
-		{
-			name: "missing schema",
-			yamlData: `
-version: 1.0.0
-platform: kubernetes
-description: A test configuration
-type: test-type
-format: json
-`,
-			expectedError: "schema is required",
-		},
 	}
 
 	for _, tt := range tests {
@@ -128,6 +117,27 @@ schema: ./schema.json
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "platform is required for config with type 'mytype' and version '1.0.0'")
+}
+
+func TestConfigurationDefinition_UnmarshalYAML_OptionalSchema(t *testing.T) {
+	// Schema is optional (for now, but will be required in the future)
+	yamlData := `
+version: 1.0.0
+platform: kubernetes
+description: A test configuration
+type: test-type
+format: json
+`
+	var config ConfigurationDefinition
+	err := yaml.Unmarshal([]byte(yamlData), &config)
+
+	require.NoError(t, err)
+	assert.Equal(t, "1.0.0", config.Version)
+	assert.Equal(t, "kubernetes", config.Platform)
+	assert.Equal(t, "A test configuration", config.Description)
+	assert.Equal(t, "test-type", config.Type)
+	assert.Equal(t, "json", config.Format)
+	assert.Equal(t, "", config.Schema) // Schema is empty when not provided
 }
 
 func TestRequireField_ValidValue(t *testing.T) {
