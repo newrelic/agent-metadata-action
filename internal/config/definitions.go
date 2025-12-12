@@ -36,8 +36,13 @@ func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationD
 		return nil, fmt.Errorf("configurationDefinitions cannot be empty")
 	}
 
-	// Load and encode schema files (schema is required by validation)
+	// Load and encode schema files (schema is optional for now but will be required in the future)
 	for i := range configFile.Configs {
+		// Skip if no schema path is provided
+		if configFile.Configs[i].Schema == "" {
+			continue
+		}
+
 		// @todo at some point, we may want to do this concurrently if there are any agents with a large number of files
 		encoded, err := loadAndEncodeSchema(workspacePath, configFile.Configs[i].Schema)
 		if err != nil {

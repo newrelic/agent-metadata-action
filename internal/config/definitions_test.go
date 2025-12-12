@@ -256,7 +256,7 @@ func TestReadConfigurationDefinitions_ValidationIntegration(t *testing.T) {
 	err := os.MkdirAll(configDir, 0755)
 	require.NoError(t, err)
 
-	// Test one example to verify validation works end-to-end
+	// Test that schema is optional (will be required in the future)
 	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
 	yamlContent := `configurationDefinitions:
   - version: 1.2.3
@@ -269,9 +269,9 @@ func TestReadConfigurationDefinitions_ValidationIntegration(t *testing.T) {
 	require.NoError(t, err)
 
 	configs, err := ReadConfigurationDefinitions(tmpDir)
-	assert.Error(t, err)
-	assert.Nil(t, configs)
-	assert.Contains(t, err.Error(), "schema is required")
+	require.NoError(t, err)
+	assert.Len(t, configs, 1)
+	assert.Equal(t, "", configs[0].Schema) // Schema is empty when not provided
 }
 
 func TestReadConfigurationDefinitions_EmptyArray(t *testing.T) {

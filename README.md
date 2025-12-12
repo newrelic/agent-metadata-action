@@ -2,7 +2,7 @@
 
 # Agent Metadata Action
 
-A GitHub Action that reads agent configuration metadata from the calling repository. This action parses the `.fleetControl/configurationDefinitions.yml` file and makes the configuration data available for downstream workflow steps.
+A GitHub Action that reads agent configuration metadata from the calling repository. This action parses the `.fleetControl/configurationDefinitions.yml` file and makes the configuration data available in New Relic.
 
 ## Installation
 
@@ -62,17 +62,17 @@ For the agent scenario, the action expects a YAML file at `.fleetControl/configu
 
 ```yaml
 configurationDefinitions:
-  - platform: "kubernetes"  # or "host"
+  - platform: "kubernetes"  # or "host" or "all" if there is no distinction
     description: "Description of the configuration"
     type: "config-type"
-    version: "1.0.0"
-    format: "json"
+    version: "1.0.0" -- config schema version
+    format: "json"   -- format of the agent config file
     schema: "./schemas/config-schema.json"
 ```
 
 **All fields are required.** The action validates each configuration entry and will fail with a clear error message if any required field is missing (version, platform, description, type, format, schema).
-
-**Schema files** are automatically base64-encoded and embedded in the output. Schema paths must be relative to the `.fleetControl` directory and cannot use directory traversal (`..`) for security.
+**Dec 2025 - schema temporarily optional until full functionality is ready
+**Schema paths must be relative to the `.fleetControl` directory and cannot use directory traversal (`..`) for security.
 
 ## Building
 

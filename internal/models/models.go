@@ -40,6 +40,7 @@ func (c *ConfigurationDefinition) UnmarshalYAML(node *yaml.Node) error {
 	}
 
 	// Validate all required fields
+	// Note: schema is currently optional but will be required in the future
 	for _, check := range []struct {
 		value string
 		field string
@@ -49,7 +50,6 @@ func (c *ConfigurationDefinition) UnmarshalYAML(node *yaml.Node) error {
 		{raw.Description, "description"},
 		{raw.Type, "type"},
 		{raw.Format, "format"},
-		{raw.Schema, "schema"},
 	} {
 		if err := requireField(check.value, check.field, context); err != nil {
 			return err
