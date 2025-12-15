@@ -23,3 +23,7 @@ func GetVersion() string {
 func GetEventPath() string {
 	return os.Getenv("GITHUB_EVENT_PATH")
 }
+
+func GetToken() string {
+	return os.Getenv("NEWRELIC_TOKEN")
+}

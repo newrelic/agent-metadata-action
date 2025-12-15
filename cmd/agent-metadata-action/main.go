@@ -44,7 +44,7 @@ func run() error {
 	}
 
 	// Get OAuth token from environment (set by action.yml authentication step)
-	token := os.Getenv("NEWRELIC_TOKEN")
+	token := config.GetToken()
 	if token == "" {
 		return fmt.Errorf("NEWRELIC_TOKEN is required but not set")
 	}

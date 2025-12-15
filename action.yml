@@ -51,7 +51,7 @@ runs:
         echo "::group::Installing newrelic-auth-cli"
         LATEST_RELEASE=$(curl -s https://api.github.com/repos/newrelic/newrelic-auth-rs/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
         echo "Downloading newrelic-auth-cli version $LATEST_RELEASE"
-        curl -L "https://github.com/newrelic/newrelic-auth-rs/releases/download/${LATEST_RELEASE}/newrelic-auth-cli-x86_64-unknown-linux-gnu.tar.gz" -o newrelic-auth-cli.tar.gz
+        curl -L "https://github.com/newrelic/newrelic-auth-rs/releases/download/${LATEST_RELEASE}/newrelic-auth-cli_amd64.tar.gz" -o newrelic-auth-cli.tar.gz
         tar -xzf newrelic-auth-cli.tar.gz
         chmod +x newrelic-auth-cli
         sudo mv newrelic-auth-cli /usr/local/bin/
