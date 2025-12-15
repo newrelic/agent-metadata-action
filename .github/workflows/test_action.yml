@@ -55,11 +55,13 @@ jobs:
 
       - name: Setup mock newrelic-auth-cli
         run: |
-          # Make our mock CLI executable
+          # Make our mock CLI executable and install to standard location
           chmod +x .github/mock-newrelic-auth-cli
+          sudo cp .github/mock-newrelic-auth-cli /usr/local/bin/newrelic-auth-cli
 
-          # Add to PATH so it's found before any real installation
-          echo "${{ github.workspace }}/.github" >> $GITHUB_PATH
+          # Verify it's accessible
+          which newrelic-auth-cli
+          newrelic-auth-cli --help || echo "Mock CLI is ready"
 
       - name: Run Agent Metadata Action (with configs)
         uses: ./
@@ -117,11 +119,13 @@ jobs:
 
       - name: Setup mock newrelic-auth-cli
         run: |
-          # Make our mock CLI executable
+          # Make our mock CLI executable and install to standard location
           chmod +x .github/mock-newrelic-auth-cli
+          sudo cp .github/mock-newrelic-auth-cli /usr/local/bin/newrelic-auth-cli
 
-          # Add to PATH so it's found before any real installation
-          echo "${{ github.workspace }}/.github" >> $GITHUB_PATH
+          # Verify it's accessible
+          which newrelic-auth-cli
+          newrelic-auth-cli --help || echo "Mock CLI is ready"
 
       - name: Run Agent Metadata Action (with configs)
         uses: ./
