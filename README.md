@@ -15,6 +15,15 @@ Add this action to your workflow:
 
 ## Usage
 
+### Prerequisites
+
+This action requires OAuth credentials to authenticate with New Relic services. You must configure the following secrets in your repository:
+
+- `OAUTH_CLIENT_ID` - Your OAuth client ID for system identity authentication
+- `OAUTH_CLIENT_SECRET` - Your OAuth client secret for system identity authentication
+
+These must be passed as action inputs using the `with:` parameter in your workflow.
+
 ### Example Workflow For Releasing a New Agent Version
 This action automatically checks out your repository at the specified version tag, then reads the `.fleetControl/configurationDefinitions.yml` file and other associated files in `/fleetControl` and saves the agent information in New Relic. The action handles the checkout internally, so you don't need to include a separate `actions/checkout` step. If you do not want to use this action, you can call New Relic directly to add the agent information.
 
@@ -31,6 +40,8 @@ jobs:
       - name: Read agent metadata
         uses: newrelic/agent-metadata-action@v1
         with:
+          newrelic-client-id: ${{ secrets.OAUTH_CLIENT_ID }}
+          newrelic-private-key: ${{ secrets.OAUTH_CLIENT_SECRET }}
           agent-type: dotnet # Required: The type of agent (e.g., dotnet, java, python)
           version: 1.0.0 # Required: will be used to check out appropriate release tag
           cache: true  # Optional: Enable Go build cache (default: true)
@@ -53,6 +64,8 @@ jobs:
       - name: Read agent metadata
         uses: newrelic/agent-metadata-action@v1
         with:
+          newrelic-client-id: ${{ secrets.OAUTH_CLIENT_ID }}
+          newrelic-private-key: ${{ secrets.OAUTH_CLIENT_SECRET }}
           cache: true  # Optional: Enable Go build cache (default: true)
 ```
 

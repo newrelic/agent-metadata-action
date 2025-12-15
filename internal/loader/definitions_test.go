@@ -1,4 +1,4 @@
-package config
+package loader
 
 import (
 	"encoding/base64"

@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"agent-metadata-action/internal/config"
 )
 
 const ROOT_RELEASE_NOTES_DIR = "src/content/docs/release-notes"
@@ -48,7 +50,7 @@ var GetChangedMDXFilesFunc = getChangedMDXFilesImpl
 
 // getChangedMDXFilesImpl is the actual implementation
 func getChangedMDXFilesImpl() ([]string, error) {
-	eventPath := os.Getenv("GITHUB_EVENT_PATH")
+	eventPath := config.GetEventPath()
 	if eventPath == "" {
 		return nil, fmt.Errorf("GITHUB_EVENT_PATH not set")
 	}
@@ -67,7 +69,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 		fmt.Sprintf("%s...%s", event.PullRequest.Base.SHA, event.PullRequest.Head.SHA))
 
 	// Set working directory to GITHUB_WORKSPACE so git can find the repository
-	if workspace := os.Getenv("GITHUB_WORKSPACE"); workspace != "" {
+	if workspace := config.GetWorkspace(); workspace != "" {
 		cmd.Dir = workspace
 	}
 
@@ -78,7 +80,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 		return nil, fmt.Errorf("git diff failed: %w", err)
 	}
 
-	workspace := os.Getenv("GITHUB_WORKSPACE")
+	workspace := config.GetWorkspace()
 	var mdxFiles []string
 	for _, line := range strings.Split(out.String(), "\n") {
 		line = strings.TrimSpace(line)
