@@ -48,6 +48,18 @@ runs:
     - name: Install NewRelic Auth CLI
       shell: bash
       run: |
+        # Only skip installation if explicitly testing with a mock CLI
+        if [ "$MOCK_NEWRELIC_AUTH_CLI" = "true" ]; then
+          if command -v newrelic-auth-cli &> /dev/null; then
+            echo "::notice::Using mock newrelic-auth-cli from PATH (testing mode)"
+            echo "::debug::Mock CLI at: $(which newrelic-auth-cli)"
+            exit 0
+          else
+            echo "::error::MOCK_NEWRELIC_AUTH_CLI is true but newrelic-auth-cli not found in PATH"
+            exit 1
+          fi
+        fi
+
         echo "::group::Installing newrelic-auth-cli"
         LATEST_RELEASE=$(curl -s https://api.github.com/repos/newrelic/newrelic-auth-rs/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
         echo "Downloading newrelic-auth-cli version $LATEST_RELEASE"
