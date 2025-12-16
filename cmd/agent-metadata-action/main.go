@@ -1,13 +1,27 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 
+	"agent-metadata-action/internal/client"
 	"agent-metadata-action/internal/config"
+	"agent-metadata-action/internal/loader"
 	"agent-metadata-action/internal/models"
 )
+
+// metadataClient interface for testing
+type metadataClient interface {
+	SendMetadata(ctx context.Context, agentType string, metadata *models.AgentMetadata) error
+}
+
+// createMetadataClientFunc is a variable that holds the function to create a metadata client
+// This allows tests to override the implementation
+var createMetadataClientFunc = func(baseURL, token string) metadataClient {
+	return client.NewInstrumentationClient(baseURL, token)
+}
 
 func main() {
 	if err := run(); err != nil {
@@ -21,37 +35,50 @@ func run() error {
 
 	// Workspace is required
 	if workspace == "" {
-		return fmt.Errorf("Error: GITHUB_WORKSPACE is required but not set")
+		return fmt.Errorf("GITHUB_WORKSPACE is required but not set")
 	}
 
 	// Validate workspace directory exists
 	if _, err := os.Stat(workspace); err != nil {
-		return fmt.Errorf("Error reading configs: workspace directory does not exist: %s", workspace)
+		return fmt.Errorf("error reading configs: workspace directory does not exist: %s", workspace)
 	}
 
-	agentType := os.Getenv("INPUT_AGENT_TYPE")
-	agentVersion := os.Getenv("INPUT_VERSION")
+	// Get OAuth token from environment (set by action.yml authentication step)
+	token := config.GetToken()
+	if token == "" {
+		return fmt.Errorf("NEWRELIC_TOKEN is required but not set")
+	}
+	fmt.Println("::notice::OAuth token loaded from environment")
+
+	// Create instrumentation client
+	ctx := context.Background()
+	metadataClient := createMetadataClientFunc(config.GetMetadataURL(), token)
+
+	agentType := config.GetAgentType()
+	agentVersion := config.GetVersion()
 
 	if agentType != "" && agentVersion != "" { // Scenario 1: Agent repo flow
 		fmt.Println("::debug::Agent scenario")
 		fleetControlPath := workspace + "/.fleetControl"
-		if _, err := os.Stat(fleetControlPath); err == nil {
+		if _, err := os.Stat(fleetControlPath); err != nil {
+			return fmt.Errorf("error ./fleetControl folder does not exist: %s", fleetControlPath)
+		} else {
 			fmt.Printf("::debug::Reading config from workspace: %s\n", workspace)
 
-			configs, err := config.ReadConfigurationDefinitions(workspace)
+			configs, err := loader.ReadConfigurationDefinitions(workspace)
 			if err != nil {
-				return fmt.Errorf("Error reading configs: %w", err)
+				return fmt.Errorf("error reading configs: %w", err)
 			}
 
-			agentControl, err := config.LoadAndEncodeAgentControl(workspace)
+			agentControl, err := loader.LoadAndEncodeAgentControl(workspace)
 			if err != nil {
-				return fmt.Errorf("Error reading agent control: %w", err)
+				return fmt.Errorf("error reading agent control: %w", err)
 			}
 
 			fmt.Println("::notice::Successfully read configs file")
 			fmt.Printf("::debug::Found %d configs\n", len(configs))
 
-			metadata := config.LoadMetadataForAgents(agentVersion)
+			metadata := loader.LoadMetadataForAgents(agentVersion)
 
 			agentMetadata := models.AgentMetadata{
 				ConfigurationDefinitions: configs,
@@ -59,22 +86,33 @@ func run() error {
 				AgentControl:             agentControl,
 			}
 
-			// @todo use the AgentMetadata object to call the InstrumentationMetadata service to add/update the agent in NGEP
 			printJSON("Agent Metadata", agentMetadata)
-		}
-	} else { // Scenario 2: Docs repo flow
-		fmt.Println("::debug::Docs scenario")
-		metadata, err := config.LoadMetadataForDocs()
-		if err != nil {
-			return fmt.Errorf("Error reading metadata: %w", err)
-		}
-		for _, currMetadata := range metadata {
-			agentMetadata := models.AgentMetadata{
-				Metadata: currMetadata,
+
+			// Send metadata to instrumentation service
+			fmt.Println("::debug::Sending metadata to instrumentation service...")
+			if err := metadataClient.SendMetadata(ctx, agentType, &agentMetadata); err != nil {
+				return fmt.Errorf("failed to send metadata: %w", err)
 			}
-			printJSON("Agent Metadata", agentMetadata)
+			fmt.Println("::notice::Successfully sent metadata to instrumentation service")
 		}
 	}
+	// TODO: Docs workflow disabled until metadata service call is implemented
+	// else {
+	// 	// Scenario 2: Docs workflow
+	// 	fmt.Println("::notice::Running in metadata-only mode (.fleetControl not found, using MDX files)")
+	// 	metadata, err := loader.LoadMetadataForDocs()
+	// 	if err != nil {
+	// 		return fmt.Errorf("error reading metadata: %w", err)
+	// 	}
+	// 	for _, currMetadata := range metadata {
+	// 		agentMetadata := models.AgentMetadata{
+	// 			Metadata: currMetadata,
+	// 		}
+	// 		printJSON("Agent Metadata", agentMetadata)
+	// 		// TODO: Implement metadata service call for docs workflow
+	// 		// Need to determine agent type from file path or require INPUT_AGENT_TYPE
+	// 	}
+	// }
 
 	return nil
 }

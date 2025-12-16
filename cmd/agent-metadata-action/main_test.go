@@ -2,18 +2,36 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"agent-metadata-action/internal/github"
+	"agent-metadata-action/internal/models"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// mockMetadataClient is a mock implementation for testing
+type mockMetadataClient struct{}
+
+func (m *mockMetadataClient) SendMetadata(ctx context.Context, agentType string, metadata *models.AgentMetadata) error {
+	// Mock implementation - does nothing, returns success
+	return nil
+}
+
 func TestRun_AgentRepoFlow(t *testing.T) {
+	// Override client creation with mock
+	originalCreateClient := createMetadataClientFunc
+	createMetadataClientFunc = func(baseURL, token string) metadataClient {
+		return &mockMetadataClient{}
+	}
+	defer func() {
+		createMetadataClientFunc = originalCreateClient
+	}()
 	// Get project root
 	projectRoot, err := filepath.Abs("../..")
 	require.NoError(t, err)
@@ -24,6 +42,7 @@ func TestRun_AgentRepoFlow(t *testing.T) {
 	t.Setenv("INPUT_AGENT_TYPE", "java")
 	t.Setenv("INPUT_VERSION", "1.2.3")
 	t.Setenv("GITHUB_WORKSPACE", workspace)
+	t.Setenv("NEWRELIC_TOKEN", "mock-token-for-testing")
 
 	// Capture stdout and stderr
 	oldStdout := os.Stdout
@@ -67,6 +86,18 @@ func TestRun_AgentRepoFlow(t *testing.T) {
 }
 
 func TestRun_DocsFlow(t *testing.T) {
+	// TODO: Re-enable when docs workflow is implemented
+	t.Skip("Docs workflow is currently disabled - skipping test")
+
+	// Override client creation with mock
+	originalCreateClient := createMetadataClientFunc
+	createMetadataClientFunc = func(baseURL, token string) metadataClient {
+		return &mockMetadataClient{}
+	}
+	defer func() {
+		createMetadataClientFunc = originalCreateClient
+	}()
+
 	// Get project root
 	projectRoot, err := filepath.Abs("../..")
 	require.NoError(t, err)
@@ -85,6 +116,7 @@ func TestRun_DocsFlow(t *testing.T) {
 
 	// Set environment variables
 	t.Setenv("GITHUB_WORKSPACE", workspace)
+	t.Setenv("NEWRELIC_TOKEN", "mock-token-for-testing")
 
 	// Capture stdout and stderr
 	oldStdout := os.Stdout
@@ -124,12 +156,22 @@ func TestRun_DocsFlow(t *testing.T) {
 }
 
 func TestRun_InvalidWorkspace(t *testing.T) {
+	// Override client creation with mock
+	originalCreateClient := createMetadataClientFunc
+	createMetadataClientFunc = func(baseURL, token string) metadataClient {
+		return &mockMetadataClient{}
+	}
+	defer func() {
+		createMetadataClientFunc = originalCreateClient
+	}()
+
 	// Set invalid workspace
 	t.Setenv("INPUT_AGENT_TYPE", "java")
 	t.Setenv("INPUT_VERSION", "1.0.0")
 	t.Setenv("GITHUB_WORKSPACE", "/nonexistent/path")
+	t.Setenv("NEWRELIC_TOKEN", "mock-token-for-testing")
 
 	err := run()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Error reading configs")
+	assert.Contains(t, err.Error(), "workspace directory does not exist")
 }
