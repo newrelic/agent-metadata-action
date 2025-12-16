@@ -118,7 +118,6 @@ runs:
         echo "::debug::Parsing JSON response..."
         if ! TOKEN=$(echo "$AUTH_OUTPUT" | jq -r '.token' 2>&1); then
           echo "::error::Failed to parse token from response"
-          echo "::debug::jq error: $TOKEN"
           rm -f "$TEMP_KEY_FILE"
           exit 1
         fi
@@ -126,7 +125,6 @@ runs:
         # Validate token was extracted
         if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
           echo "::error::Token extraction failed - empty or null token"
-          echo "::debug::AUTH_OUTPUT structure: $(echo "$AUTH_OUTPUT" | jq -r 'keys' 2>/dev/null || echo "Not valid JSON")"
           rm -f "$TEMP_KEY_FILE"
           exit 1
         fi
