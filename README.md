@@ -20,7 +20,7 @@ Add this action to your workflow:
 This action requires OAuth credentials to authenticate with New Relic services. You must configure the following secrets in your repository:
 
 - `OAUTH_CLIENT_ID` - Your OAuth client ID for system identity authentication
-- `OAUTH_CLIENT_SECRET` - Your OAuth client secret for system identity authentication
+- `OAUTH_CLIENT_SECRET` - Your OAuth client secret for system identity authentication (base64 encoded)
 
 These must be passed as action inputs using the `with:` parameter in your workflow.
 

@@ -70,7 +70,7 @@ jobs:
           MOCK_NEWRELIC_AUTH_CLI: true
         with:
           newrelic-client-id: fake-client-id-for-testing
-          newrelic-private-key: fake-private-key-for-testing
+          newrelic-private-key: ZmFrZS1wcml2YXRlLWtleS1mb3ItdGVzdGluZwo=
           agent-type: 'myagent'
           version: '0.0.0'
           cache: false
@@ -134,7 +134,7 @@ jobs:
           MOCK_NEWRELIC_AUTH_CLI: true
         with:
           newrelic-client-id: fake-client-id-for-testing
-          newrelic-private-key: fake-private-key-for-testing
+          newrelic-private-key: ZmFrZS1wcml2YXRlLWtleS1mb3ItdGVzdGluZwo=
           agent-type: 'myagent'
           version: 'v0.0.0'
           cache: false
