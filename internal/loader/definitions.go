@@ -124,7 +124,7 @@ func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControl, err
 
 	return []models.AgentControl{
 		{
-			Platform: "all",
+			Platform: "ALL",
 			Content:  encoded,
 		},
 	}, nil
