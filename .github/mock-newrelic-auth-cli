@@ -2,7 +2,11 @@
 # Mock newrelic-auth-cli for testing
 # This script simulates the newrelic-auth-cli command without actually calling NewRelic services
 
-# Return a fake JWT token in JSON format (stdout only, no debug messages)
+# Return a fake JWT token in JSON format matching the real CLI output (stdout only, no debug messages)
 cat <<'EOF'
-{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0IiwibmFtZSI6Ik1vY2sgVG9rZW4iLCJpYXQiOjE1MTYyMzkwMjJ9.4Adcj0cgqE7VvqPKktP_VGKf1K0CIMYmN84MfH8SqHI"}
+{
+  "expires_at": "2099-12-31T23:59:59.999999999Z",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0IiwibmFtZSI6Ik1vY2sgVG9rZW4iLCJpYXQiOjE1MTYyMzkwMjJ9.4Adcj0cgqE7VvqPKktP_VGKf1K0CIMYmN84MfH8SqHI",
+  "token_type": "Bearer"
+}
 EOF
