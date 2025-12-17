@@ -116,7 +116,7 @@ runs:
 
         # Extract token from JSON output
         echo "::debug::Parsing JSON response..."
-        if ! TOKEN=$(echo "$AUTH_OUTPUT" | jq -r '.token' 2>&1); then
+        if ! TOKEN=$(echo "$AUTH_OUTPUT" | jq -r '.access_token' 2>&1); then
           echo "::error::Failed to parse token from response"
           rm -f "$TEMP_KEY_FILE"
           exit 1
