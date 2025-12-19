@@ -1,12 +1,11 @@
 package loader
 
 import (
-	"fmt"
-	"os"
-
 	"agent-metadata-action/internal/github"
 	"agent-metadata-action/internal/models"
 	"agent-metadata-action/internal/parser"
+	"fmt"
+	"os"
 )
 
 // LoadMetadataForAgents loads metadata with only version populated
@@ -16,29 +15,42 @@ func LoadMetadataForAgents(version string) models.Metadata {
 	}
 }
 
-// LoadMetadataForDocs loads metadata from changed MDX files in a PR
-func LoadMetadataForDocs() ([]models.Metadata, error) {
+type MetadataForDocs struct {
+	AgentType             string
+	AgentMetadataFromDocs models.Metadata
+}
 
-	var metadataArray []models.Metadata
+// LoadMetadataForDocs loads metadata from changed MDX files in a PR
+// Loads as many files as it can and collates any errors it finds
+func LoadMetadataForDocs() ([]MetadataForDocs, error) {
+	filesProcessed := 0
 
 	// Get changed MDX files (for PR context)
 	changedFilepaths, err := github.GetChangedMDXFiles()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "::debug::Could not get changed files: %v\n", err)
+		return nil, fmt.Errorf("could not get changed files")
 	} else if len(changedFilepaths) > 0 {
+		var metadataForDocs []MetadataForDocs
 		for _, filepath := range changedFilepaths {
 			frontMatter, err := parser.ParseMDXFile(filepath)
 			if err != nil {
-				// @todo should we try to load what we can or fail if we hit one bad file?
-				return nil, fmt.Errorf("failed to parse MDX file %s: %w", filepath, err)
+				fmt.Printf("::warn::Failed to parse MDX file %s %s - skipping ", filepath, err)
+				continue
 			}
 
-			// Validate version is not blank
 			if frontMatter.Version == "" {
-				return nil, fmt.Errorf("version is required in metadata for file %s", filepath)
+				fmt.Printf("::warn::Version is required in metadata for file %s - skipping ", filepath)
+				continue
 			}
 
-			metadataArray = append(metadataArray, models.Metadata{
+			agentType := parser.SubjectToAgentTypeMapping[parser.Subject(frontMatter.Subject)]
+
+			if agentType == "" {
+				fmt.Printf("::warn::Subject (to derive agent type) is required in metadata for file %s - skipping ", filepath)
+				continue
+			}
+
+			metadata := models.Metadata{
 				Version:                   frontMatter.Version,
 				Features:                  frontMatter.Features,
 				Bugs:                      frontMatter.Bugs,
@@ -46,10 +58,23 @@ func LoadMetadataForDocs() ([]models.Metadata, error) {
 				Deprecations:              frontMatter.Deprecations,
 				SupportedOperatingSystems: frontMatter.SupportedOperatingSystems,
 				EOL:                       frontMatter.EOL,
+			}
+
+			metadataForDocs = append(metadataForDocs, MetadataForDocs{
+				AgentType:             agentType,
+				AgentMetadataFromDocs: metadata,
 			})
+
+			filesProcessed++
 		}
 
-		fmt.Fprintf(os.Stderr, "::notice::Loaded metadata from %d changed MDX files\n", len(changedFilepaths))
+		if filesProcessed == 0 {
+			return nil, fmt.Errorf("unable to load metadata for any of the %d changed MDX files", len(changedFilepaths))
+		} else {
+			fmt.Fprintf(os.Stderr, "::notice::Loaded metadata for %d out of  %d changed MDX files\n", filesProcessed, len(changedFilepaths))
+		}
+
+		return metadataForDocs, nil
 	}
-	return metadataArray, nil
+	return nil, fmt.Errorf("unknown error in LoadMetadataForDocs")
 }
