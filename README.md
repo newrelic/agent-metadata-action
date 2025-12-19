@@ -84,7 +84,9 @@ configurationDefinitions:
 ```
 
 **All fields are required.** The action validates each configuration entry and will fail with a clear error message if any required field is missing (version, platform, description, type, format, schema).
+
 **Dec 2025 - schema temporarily optional until full functionality is ready
+
 **Schema paths must be relative to the `.fleetControl` directory and cannot use directory traversal (`..`) for security.
 
 ## Building
@@ -109,12 +111,6 @@ go test ./...
 
 # Run tests with verbose output
 go test -v ./...
-
-# Run tests for a specific package
-go test -v ./internal/config
-
-# Run a specific test
-go test -v -run TestLoadEnv_Success ./internal/config
 ```
 
 ## Support

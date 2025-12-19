@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"agent-metadata-action/internal/github"
+	"agent-metadata-action/internal/testutil"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +37,7 @@ func TestLoadMetadata_WithMDXFiles_Success(t *testing.T) {
 
 	// Create test MDX files with known content
 	mdxContent1 := `---
-subject: Test Agent
+subject: Java agent
 releaseDate: '2024-01-15'
 version: 1.5.0
 features:
@@ -61,7 +62,7 @@ This is a test release.
 `
 
 	mdxContent2 := `---
-subject: Another Agent
+subject: Node.js agent
 releaseDate: '2024-01-16'
 version: 1.6.0
 features:
@@ -102,18 +103,20 @@ bugs:
 	assert.Len(t, metadata, 2, "Should load 2 MDX files")
 
 	// Verify first file's metadata
-	assert.Equal(t, "1.5.0", metadata[0].Version)
-	assert.Equal(t, []string{"Added new monitoring capability", "Improved performance"}, metadata[0].Features)
-	assert.Equal(t, []string{"Fixed memory leak"}, metadata[0].Bugs)
-	assert.Equal(t, []string{"Patched CVE-2024-1234"}, metadata[0].Security)
-	assert.Equal(t, []string{"Removed legacy API"}, metadata[0].Deprecations)
-	assert.Equal(t, []string{"Windows", "Linux", "macOS"}, metadata[0].SupportedOperatingSystems)
-	assert.Equal(t, "2025-12-31", metadata[0].EOL)
+	assert.Equal(t, "JavaAgent", metadata[0].AgentType)
+	assert.Equal(t, "1.5.0", metadata[0].AgentMetadataFromDocs.Version)
+	assert.Equal(t, []string{"Added new monitoring capability", "Improved performance"}, metadata[0].AgentMetadataFromDocs.Features)
+	assert.Equal(t, []string{"Fixed memory leak"}, metadata[0].AgentMetadataFromDocs.Bugs)
+	assert.Equal(t, []string{"Patched CVE-2024-1234"}, metadata[0].AgentMetadataFromDocs.Security)
+	assert.Equal(t, []string{"Removed legacy API"}, metadata[0].AgentMetadataFromDocs.Deprecations)
+	assert.Equal(t, []string{"Windows", "Linux", "macOS"}, metadata[0].AgentMetadataFromDocs.SupportedOperatingSystems)
+	assert.Equal(t, "2025-12-31", metadata[0].AgentMetadataFromDocs.EOL)
 
 	// Verify second file's metadata
-	assert.Equal(t, "1.6.0", metadata[1].Version)
-	assert.Equal(t, []string{"New dashboard feature"}, metadata[1].Features)
-	assert.Equal(t, []string{"Fixed crash on startup"}, metadata[1].Bugs)
+	assert.Equal(t, "NodeAgent", metadata[1].AgentType)
+	assert.Equal(t, "1.6.0", metadata[1].AgentMetadataFromDocs.Version)
+	assert.Equal(t, []string{"New dashboard feature"}, metadata[1].AgentMetadataFromDocs.Features)
+	assert.Equal(t, []string{"Fixed crash on startup"}, metadata[1].AgentMetadataFromDocs.Bugs)
 }
 
 func TestLoadMetadata_NoMDXFiles_ReturnsEmptyMetadata(t *testing.T) {
@@ -124,11 +127,13 @@ func TestLoadMetadata_NoMDXFiles_ReturnsEmptyMetadata(t *testing.T) {
 	}
 
 	metadata, err := LoadMetadataForDocs()
-	require.NoError(t, err)
+	require.Error(t, err)
 	assert.Nil(t, metadata)
 }
 
 func TestLoadMetadata_MDXFileWithBlankVersion_ReturnsError(t *testing.T) {
+	getStdout, _ := testutil.CaptureOutput(t)
+
 	// Create a temporary workspace
 	tmpWorkspace := t.TempDir()
 
@@ -139,7 +144,7 @@ func TestLoadMetadata_MDXFileWithBlankVersion_ReturnsError(t *testing.T) {
 
 	// Create test MDX file with blank version
 	mdxContent := `---
-subject: Test Agent
+subject: Java agent
 releaseDate: '2024-01-15'
 version: ""
 features:
@@ -166,6 +171,10 @@ features:
 
 	// Load metadata - should fail due to blank version
 	_, err = LoadMetadataForDocs()
+
+	stdout := getStdout()
+
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "version is required")
+	assert.ErrorContains(t, err, "unable to load metadata for any")
+	assert.Contains(t, stdout, "Version is required")
 }
