@@ -21,7 +21,7 @@ type MetadataForDocs struct {
 }
 
 // LoadMetadataForDocs loads metadata from changed MDX files in a PR
-// Loads as many files as it can and collates any errors it finds
+// Loads as many files as it can and warns on issues with certain files
 func LoadMetadataForDocs() ([]MetadataForDocs, error) {
 	filesProcessed := 0
 
