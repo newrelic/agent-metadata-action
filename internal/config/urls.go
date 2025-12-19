@@ -6,12 +6,6 @@ import "os"
 const (
 	// MetadataURL is the instrumentation metadata service endpoint
 	MetadataURL = "https://instrumentation-metadata.service.newrelic.com"
-
-	// OCIRegistryURL is the OCI registry endpoint
-	OCIRegistryURL = "https://oci-registry.service.newrelic.com"
-
-	// SigningURL is the OCI signing service endpoint
-	SigningURL = "https://signing.service.newrelic.com"
 )
 
 // ServiceURLs holds all service endpoint URLs

@@ -371,7 +371,7 @@ func TestReadAgentControl_Success(t *testing.T) {
 	agentControl, err := LoadAndEncodeAgentControl(tmpDir)
 	require.NoError(t, err)
 	assert.Len(t, agentControl, 1)
-	assert.Equal(t, "all", agentControl[0].Platform)
+	assert.Equal(t, AGENT_CONTROL_PLATFORM, agentControl[0].Platform)
 	assert.NotEmpty(t, agentControl[0].Content)
 
 	// Verify content was base64 encoded

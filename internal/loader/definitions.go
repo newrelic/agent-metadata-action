@@ -17,6 +17,7 @@ const FLEET_CONTROL_DIR = ".fleetControl"
 const CONFIG_FILE_PATH = "configurationDefinitions.yml"
 const AGENT_CONTROL_DIR = "agentControl"
 const AGENT_CONTROL_FILE = "agent-schema-for-agent-control.yml"
+const AGENT_CONTROL_PLATFORM = "ALL"
 
 // ReadConfigurationDefinitions reads and parses the configurationDefinitions file
 func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationDefinition, error) {
@@ -102,7 +103,7 @@ func loadAndEncodeSchema(workspacePath, schemaPath string) (string, error) {
 }
 
 // LoadAndEncodeAgentControl reads and encodes the agent control content
-// Returns a single entry with platform "all"
+// Returns a single entry with platform AGENT_CONTROL_PLATFORM
 func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControl, error) {
 	agentControlPath := filepath.Join(workspacePath, FLEET_CONTROL_DIR, AGENT_CONTROL_DIR, AGENT_CONTROL_FILE)
 
@@ -124,7 +125,7 @@ func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControl, err
 
 	return []models.AgentControl{
 		{
-			Platform: "all",
+			Platform: AGENT_CONTROL_PLATFORM,
 			Content:  encoded,
 		},
 	}, nil
