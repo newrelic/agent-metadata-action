@@ -4,10 +4,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
+	"agent-metadata-action/internal/fileutil"
 	"agent-metadata-action/internal/models"
 
 	"gopkg.in/yaml.v3"
@@ -23,7 +23,7 @@ const AGENT_CONTROL_PLATFORM = "ALL"
 func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationDefinition, error) {
 	fullPath := filepath.Join(workspacePath, FLEET_CONTROL_DIR, CONFIG_FILE_PATH)
 
-	data, err := os.ReadFile(fullPath)
+	data, err := fileutil.ReadFileSafe(fullPath, fileutil.MaxConfigFileSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file at %s: %w", fullPath, err)
 	}
@@ -85,7 +85,7 @@ func loadAndEncodeSchema(workspacePath, schemaPath string) (string, error) {
 		return "", fmt.Errorf("invalid schema path: must be within .fleetControl directory")
 	}
 
-	data, err := os.ReadFile(fullPath)
+	data, err := fileutil.ReadFileSafe(fullPath, fileutil.MaxConfigFileSize)
 	if err != nil {
 		return "", fmt.Errorf("failed to read schema file at %s: %w", fullPath, err)
 	}
@@ -107,7 +107,7 @@ func loadAndEncodeSchema(workspacePath, schemaPath string) (string, error) {
 func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControl, error) {
 	agentControlPath := filepath.Join(workspacePath, FLEET_CONTROL_DIR, AGENT_CONTROL_DIR, AGENT_CONTROL_FILE)
 
-	data, err := os.ReadFile(agentControlPath)
+	data, err := fileutil.ReadFileSafe(agentControlPath, fileutil.MaxConfigFileSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read agent control file at %s: %w", agentControlPath, err)
 	}

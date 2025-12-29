@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -433,4 +434,60 @@ func TestReadAgentControl_InvalidYAML(t *testing.T) {
 	assert.Nil(t, agentControl)
 	assert.Contains(t, err.Error(), "agent control file")
 	assert.Contains(t, err.Error(), "is not valid YAML")
+}
+
+func TestReadConfigurationDefinitions_ExceedsMaxSize(t *testing.T) {
+	// Create temporary directory structure
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".fleetControl")
+	err := os.MkdirAll(configDir, 0755)
+	require.NoError(t, err)
+
+	// Create a config file that exceeds the max size (10MB)
+	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	// Create 11MB of YAML content using strings.Repeat for efficiency
+	largeContent := []byte("configurationDefinitions:\n" + strings.Repeat("# padding\n", 11*1024*1024/10))
+	err = os.WriteFile(configFile, largeContent, 0644)
+	require.NoError(t, err)
+
+	// Test reading the config - should fail due to size
+	configs, err := ReadConfigurationDefinitions(tmpDir)
+	assert.Error(t, err)
+	assert.Nil(t, configs)
+	assert.Contains(t, err.Error(), "exceeds maximum size")
+}
+
+func TestLoadAndEncodeSchema_ExceedsMaxSize(t *testing.T) {
+	// Create temporary directory structure
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".fleetControl")
+	schemasDir := filepath.Join(configDir, "schemas")
+	err := os.MkdirAll(schemasDir, 0755)
+	require.NoError(t, err)
+
+	// Create a schema file that exceeds the max size (10MB)
+	schemaFile := filepath.Join(schemasDir, "large-schema.json")
+	// Create 11MB of JSON content using strings.Repeat for efficiency
+	largeJSON := []byte(`{"description": "` + strings.Repeat("x", 11*1024*1024) + `"}`)
+	err = os.WriteFile(schemaFile, largeJSON, 0644)
+	require.NoError(t, err)
+
+	// Create test config file that references large schema
+	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	testYAML := `configurationDefinitions:
+  - platform: linux
+    description: Test configuration
+    type: test-config
+    version: 1.0.0
+    format: yaml
+    schema: ./schemas/large-schema.json`
+
+	err = os.WriteFile(configFile, []byte(testYAML), 0644)
+	require.NoError(t, err)
+
+	// Test reading the config - should fail due to schema size
+	configs, err := ReadConfigurationDefinitions(tmpDir)
+	assert.Error(t, err)
+	assert.Nil(t, configs)
+	assert.Contains(t, err.Error(), "exceeds maximum size")
 }

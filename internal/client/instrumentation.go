@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
+	"agent-metadata-action/internal/fileutil"
 	"agent-metadata-action/internal/models"
 )
 
@@ -98,9 +98,9 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 	fmt.Printf("::debug::Response received in %s\n", duration)
 	fmt.Printf("::debug::HTTP status code: %d %s\n", resp.StatusCode, resp.Status)
 
-	// Read response body for error details
+	// Read response body for error details (with size limit)
 	fmt.Println("::debug::Reading response body...")
-	body, err := io.ReadAll(resp.Body)
+	body, err := fileutil.ReadAllSafe(resp.Body, fileutil.MaxHTTPResponseSize)
 	if err != nil {
 		fmt.Printf("::error::Failed to read response body: %v\n", err)
 		return fmt.Errorf("failed to read response: %w", err)

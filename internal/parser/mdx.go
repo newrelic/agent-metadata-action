@@ -2,8 +2,9 @@ package parser
 
 import (
 	"fmt"
-	"os"
 	"strings"
+
+	"agent-metadata-action/internal/fileutil"
 
 	"gopkg.in/yaml.v3"
 )
@@ -48,7 +49,7 @@ var SubjectToAgentTypeMapping = map[Subject]string{
 
 // ParseMDXFile reads an MDX file and extracts the YAML frontmatter
 func ParseMDXFile(filePath string) (*MDXFrontmatter, error) {
-	data, err := os.ReadFile(filePath)
+	data, err := fileutil.ReadFileSafe(filePath, fileutil.MaxMDXFileSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read MDX file: %w", err)
 	}

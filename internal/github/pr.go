@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"agent-metadata-action/internal/config"
+	"agent-metadata-action/internal/fileutil"
 )
 
 const ROOT_RELEASE_NOTES_DIR = "src/content/docs/release-notes"
@@ -65,7 +65,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 		return nil, fmt.Errorf("GITHUB_EVENT_PATH not set")
 	}
 
-	data, err := os.ReadFile(eventPath)
+	data, err := fileutil.ReadFileSafe(eventPath, fileutil.MaxConfigFileSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read event payload: %w", err)
 	}
