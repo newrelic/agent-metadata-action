@@ -207,3 +207,143 @@ func TestIsIgnoredFilename(t *testing.T) {
 		})
 	}
 }
+
+func TestIsValidGitSHA(t *testing.T) {
+	tests := []struct {
+		name     string
+		sha      string
+		expected bool
+	}{
+		{
+			name:     "valid SHA",
+			sha:      "a1b2c3d4e5f6789012345678901234567890abcd",
+			expected: true,
+		},
+		{
+			name:     "valid SHA with all zeros",
+			sha:      "0000000000000000000000000000000000000000",
+			expected: true,
+		},
+		{
+			name:     "valid SHA with all f's",
+			sha:      "ffffffffffffffffffffffffffffffffffffffff",
+			expected: true,
+		},
+		{
+			name:     "too short",
+			sha:      "a1b2c3d4e5f678901234567890123456789",
+			expected: false,
+		},
+		{
+			name:     "too long",
+			sha:      "a1b2c3d4e5f6789012345678901234567890abcdef",
+			expected: false,
+		},
+		{
+			name:     "uppercase letters",
+			sha:      "A1B2C3D4E5F6789012345678901234567890ABCD",
+			expected: false,
+		},
+		{
+			name:     "contains non-hex characters",
+			sha:      "g1b2c3d4e5f6789012345678901234567890abcd",
+			expected: false,
+		},
+		{
+			name:     "command injection attempt with semicolon",
+			sha:      "abc123; rm -rf /",
+			expected: false,
+		},
+		{
+			name:     "command injection attempt with pipe",
+			sha:      "abc123 | cat /etc/passwd",
+			expected: false,
+		},
+		{
+			name:     "command injection attempt with backticks",
+			sha:      "abc123`whoami`",
+			expected: false,
+		},
+		{
+			name:     "command injection attempt with dollar sign",
+			sha:      "abc123$(whoami)",
+			expected: false,
+		},
+		{
+			name:     "empty string",
+			sha:      "",
+			expected: false,
+		},
+		{
+			name:     "spaces",
+			sha:      "a1b2c3d4 e5f6789012345678901234567890abcd",
+			expected: false,
+		},
+		{
+			name:     "newline character",
+			sha:      "a1b2c3d4e5f6789012345678901234567890abc\n",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isValidGitSHA(tt.sha)
+			if result != tt.expected {
+				t.Errorf("isValidGitSHA(%q) = %v, expected %v", tt.sha, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetChangedMDXFiles_InvalidSHA(t *testing.T) {
+	// Create a temporary event file with invalid SHA
+	tmpFile := filepath.Join(t.TempDir(), "event.json")
+	invalidEvent := `{
+		"pull_request": {
+			"base": {"sha": "invalid-sha"},
+			"head": {"sha": "a1b2c3d4e5f6789012345678901234567890abcd"}
+		}
+	}`
+	err := os.WriteFile(tmpFile, []byte(invalidEvent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write event file: %v", err)
+	}
+
+	t.Setenv("GITHUB_EVENT_PATH", tmpFile)
+	t.Setenv("GITHUB_WORKSPACE", t.TempDir())
+
+	_, err = GetChangedMDXFiles()
+	if err == nil {
+		t.Fatal("Expected error for invalid SHA, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid base SHA format") {
+		t.Errorf("Expected error about invalid base SHA, got: %v", err)
+	}
+}
+
+func TestGetChangedMDXFiles_CommandInjectionAttempt(t *testing.T) {
+	// Create a temporary event file with command injection attempt in SHA
+	tmpFile := filepath.Join(t.TempDir(), "event.json")
+	maliciousEvent := `{
+		"pull_request": {
+			"base": {"sha": "a1b2c3d4e5f6789012345678901234567890abcd"},
+			"head": {"sha": "abc123; rm -rf /"}
+		}
+	}`
+	err := os.WriteFile(tmpFile, []byte(maliciousEvent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write event file: %v", err)
+	}
+
+	t.Setenv("GITHUB_EVENT_PATH", tmpFile)
+	t.Setenv("GITHUB_WORKSPACE", t.TempDir())
+
+	_, err = GetChangedMDXFiles()
+	if err == nil {
+		t.Fatal("Expected error for command injection attempt, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid head SHA format") {
+		t.Errorf("Expected error about invalid head SHA, got: %v", err)
+	}
+}
