@@ -71,7 +71,7 @@ func LoadMetadataForDocs() ([]MetadataForDocs, error) {
 		if filesProcessed == 0 {
 			return nil, fmt.Errorf("unable to load metadata for any of the %d changed MDX files", len(changedFilepaths))
 		} else {
-			fmt.Fprintf(os.Stderr, "::notice::Loaded metadata for %d out of  %d changed MDX files\n", filesProcessed, len(changedFilepaths))
+			fmt.Fprintf(os.Stderr, "::notice::Loaded metadata for %d out of %d changed MDX files\n", filesProcessed, len(changedFilepaths))
 		}
 
 		return metadataForDocs, nil

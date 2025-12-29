@@ -105,7 +105,7 @@ func run() error {
 		}
 
 		for _, currMetadata := range metadata {
-			fmt.Printf("::debug::Found metadata for %s", currMetadata.AgentType)
+			fmt.Printf("::debug::Found metadata for %s %s", currMetadata.AgentType, currMetadata.AgentMetadataFromDocs.Version)
 			printJSON("Agent Metadata", currMetadata.AgentMetadataFromDocs)
 
 			// TODO: Implement metadata service call for docs workflow

@@ -1,15 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"agent-metadata-action/internal/github"
 	"agent-metadata-action/internal/models"
+	"agent-metadata-action/internal/testutil"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,36 +44,21 @@ func TestRun_AgentRepoFlow(t *testing.T) {
 	t.Setenv("NEWRELIC_TOKEN", "mock-token-for-testing")
 
 	// Capture stdout and stderr
-	oldStdout := os.Stdout
-	oldStderr := os.Stderr
-	rOut, wOut, _ := os.Pipe()
-	rErr, wErr, _ := os.Pipe()
-	os.Stdout = wOut
-	os.Stderr = wErr
+	getStdout, getStderr := testutil.CaptureOutput(t)
 
 	// Call run
 	err = run()
 
-	// Restore stdout/stderr and read captured output
-	wOut.Close()
-	wErr.Close()
-	os.Stdout = oldStdout
-	os.Stderr = oldStderr
-
-	var bufOut, bufErr bytes.Buffer
-	io.Copy(&bufOut, rOut)
-	io.Copy(&bufErr, rErr)
-
-	outputStr := bufOut.String()
-	stderrStr := bufErr.String()
+	// Retrieve captured output
+	outputStr := getStdout()
+	stderrStr := getStderr()
 
 	// Verify no error
 	require.NoError(t, err)
 
 	// Verify output
 	assert.Contains(t, outputStr, "\"metadata\":")
-	assert.NotContains(t, outputStr, "\"version\": null")
-	assert.Contains(t, outputStr, "\"features\": null")
+	assert.Contains(t, outputStr, "\"version\": \"1.2.3\"")
 	assert.NotContains(t, outputStr, "\"configurationDefinitions\": null")
 	assert.NotContains(t, outputStr, "\"agentControl\": null")
 
@@ -86,9 +70,6 @@ func TestRun_AgentRepoFlow(t *testing.T) {
 }
 
 func TestRun_DocsFlow(t *testing.T) {
-	// TODO: Re-enable when docs workflow is implemented
-	t.Skip("Docs workflow is currently disabled - skipping test")
-
 	// Override client creation with mock
 	originalCreateClient := createMetadataClientFunc
 	createMetadataClientFunc = func(baseURL, token string) metadataClient {
@@ -98,14 +79,32 @@ func TestRun_DocsFlow(t *testing.T) {
 		createMetadataClientFunc = originalCreateClient
 	}()
 
-	// Get project root
-	projectRoot, err := filepath.Abs("../..")
-	require.NoError(t, err)
+	// Create temporary workspace with test MDX files
+	workspace := t.TempDir()
+	mdxDir := filepath.Join(workspace, "src/content/docs/release-notes/agent-release-notes/java-release-notes")
+	require.NoError(t, os.MkdirAll(mdxDir, 0755))
 
-	workspace := filepath.Join(projectRoot, "integration-test", "docs-flow")
+	// Create test MDX file with frontmatter
+	testMDXFile := filepath.Join(mdxDir, "java-agent-130.mdx")
+	mdxContent := `---
+subject: Java agent
+releaseDate: '2024-01-15'
+version: 1.3.0
+features: ["New feature 1", "New feature 2"]
+bugs: ["Bug fix 1"]
+security: ["Security fix 1"]
+deprecations: ["Deprecated API"]
+supportedOperatingSystems: ["linux", "windows", "macos"]
+eol: '2025-12-31'
+---
+
+# Java Agent 1.3.0
+
+Release notes content here.
+`
+	require.NoError(t, os.WriteFile(testMDXFile, []byte(mdxContent), 0644))
 
 	// Mock GetChangedMDXFiles to return test MDX files
-	testMDXFile := filepath.Join(workspace, "src/content/docs/release-notes/agent-release-notes/java-release-notes/java-agent-130.mdx")
 	originalFunc := github.GetChangedMDXFilesFunc
 	github.GetChangedMDXFilesFunc = func() ([]string, error) {
 		return []string{testMDXFile}, nil
@@ -114,45 +113,30 @@ func TestRun_DocsFlow(t *testing.T) {
 		github.GetChangedMDXFilesFunc = originalFunc
 	}()
 
-	// Set environment variables
+	// Set environment variables - omit INPUT_AGENT_TYPE to trigger docs flow
 	t.Setenv("GITHUB_WORKSPACE", workspace)
 	t.Setenv("NEWRELIC_TOKEN", "mock-token-for-testing")
 
-	// Capture stdout and stderr
-	oldStdout := os.Stdout
-	oldStderr := os.Stderr
-	rOut, wOut, _ := os.Pipe()
-	rErr, wErr, _ := os.Pipe()
-	os.Stdout = wOut
-	os.Stderr = wErr
+	getStdout, getStderr := testutil.CaptureOutput(t)
 
-	// Call run
-	err = run()
+	err := run()
 
-	// Restore stdout/stderr and read captured output
-	wOut.Close()
-	wErr.Close()
-	os.Stdout = oldStdout
-	os.Stderr = oldStderr
-
-	var bufOut, bufErr bytes.Buffer
-	io.Copy(&bufOut, rOut)
-	io.Copy(&bufErr, rErr)
-
-	outputStr := bufOut.String()
-	stderrStr := bufErr.String()
+	outputStr := getStdout()
+	stderrStr := getStderr()
 
 	// Verify no error
 	require.NoError(t, err)
 
-	// Verify output
-	assert.Contains(t, outputStr, "\"metadata\":")
-	assert.NotContains(t, outputStr, "\"version\": null")
-	assert.Contains(t, outputStr, "\"configurationDefinitions\": null")
-	assert.Contains(t, outputStr, "\"agentControl\": null")
+	// Verify docs scenario was triggered
+	assert.Contains(t, outputStr, "Docs scenario")
+	assert.Contains(t, stderrStr, "::notice::Loaded metadata for 1 out of 1 changed MDX files")
 
-	// Stderr may have debug message about no PR context
-	t.Logf("Stderr: %s", stderrStr)
+	// Verify output contains agent metadata
+	assert.Contains(t, outputStr, "JavaAgent")
+	assert.Contains(t, outputStr, "1.3.0")
+	assert.Contains(t, outputStr, "New feature 1")
+	assert.Contains(t, outputStr, "Bug fix 1")
+	assert.Contains(t, outputStr, "Security fix 1")
 }
 
 func TestRun_InvalidWorkspace(t *testing.T) {

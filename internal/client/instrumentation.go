@@ -38,6 +38,10 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 
 	// Validate inputs
 	fmt.Println("::debug::Validating inputs...")
+	if metadata == nil {
+		fmt.Println("::error::Metadata is required but was nil")
+		return fmt.Errorf("metadata is required")
+	}
 	if agentType == "" {
 		fmt.Println("::error::Agent type is required but was empty")
 		return fmt.Errorf("agent type is required")
