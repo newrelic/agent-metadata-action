@@ -121,11 +121,6 @@ func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControl, err
 		return nil, fmt.Errorf("agent control file at %s is empty", agentControlPath)
 	}
 
-	var temp interface{}
-	if err := yaml.Unmarshal(data, &temp); err != nil {
-		return nil, fmt.Errorf("agent control file at %s is not valid YAML: %w", agentControlPath, err)
-	}
-
 	// Validate size before encoding to prevent memory explosion
 	if err := fileutil.ValidateSizeForEncoding(data, fileutil.MaxBase64EncodeSize, "agent control file"); err != nil {
 		return nil, fmt.Errorf("agent control file at %s: %w", agentControlPath, err)

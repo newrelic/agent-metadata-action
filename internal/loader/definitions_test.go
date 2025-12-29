@@ -415,27 +415,6 @@ func TestReadAgentControl_EmptyFile(t *testing.T) {
 	assert.Contains(t, err.Error(), "is empty")
 }
 
-func TestReadAgentControl_InvalidYAML(t *testing.T) {
-	// Create temporary directory structure with invalid YAML agent control file
-	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, ".fleetControl")
-	agentControlDir := filepath.Join(configDir, "agentControl")
-	err := os.MkdirAll(agentControlDir, 0755)
-	require.NoError(t, err)
-
-	// Create agent control file with invalid YAML
-	agentControlFile := filepath.Join(agentControlDir, "agent-schema-for-agent-control.yml")
-	err = os.WriteFile(agentControlFile, []byte(`invalid: yaml: [unclosed`), 0644)
-	require.NoError(t, err)
-
-	// Test reading the agent control - should fail
-	agentControl, err := LoadAndEncodeAgentControl(tmpDir)
-	assert.Error(t, err)
-	assert.Nil(t, agentControl)
-	assert.Contains(t, err.Error(), "agent control file")
-	assert.Contains(t, err.Error(), "is not valid YAML")
-}
-
 func TestReadConfigurationDefinitions_ExceedsMaxSize(t *testing.T) {
 	// Create temporary directory structure
 	tmpDir := t.TempDir()
