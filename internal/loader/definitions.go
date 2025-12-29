@@ -98,6 +98,11 @@ func loadAndEncodeSchema(workspacePath, schemaPath string) (string, error) {
 		return "", fmt.Errorf("schema file at %s is not valid JSON", fullPath)
 	}
 
+	// Validate size before encoding to prevent memory explosion
+	if err := fileutil.ValidateSizeForEncoding(data, fileutil.MaxBase64EncodeSize, "schema file"); err != nil {
+		return "", fmt.Errorf("schema file at %s: %w", fullPath, err)
+	}
+
 	encoded := base64.StdEncoding.EncodeToString(data)
 	return encoded, nil
 }
@@ -119,6 +124,11 @@ func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControl, err
 	var temp interface{}
 	if err := yaml.Unmarshal(data, &temp); err != nil {
 		return nil, fmt.Errorf("agent control file at %s is not valid YAML: %w", agentControlPath, err)
+	}
+
+	// Validate size before encoding to prevent memory explosion
+	if err := fileutil.ValidateSizeForEncoding(data, fileutil.MaxBase64EncodeSize, "agent control file"); err != nil {
+		return nil, fmt.Errorf("agent control file at %s: %w", agentControlPath, err)
 	}
 
 	encoded := base64.StdEncoding.EncodeToString(data)

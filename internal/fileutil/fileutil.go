@@ -15,6 +15,11 @@ const (
 
 	// MaxHTTPResponseSize is the maximum size for HTTP response bodies (50MB)
 	MaxHTTPResponseSize = 50 * 1024 * 1024
+
+	// MaxBase64EncodeSize is the maximum size of data to base64 encode (5MB)
+	// Base64 encoding increases size by ~33%, so 5MB becomes ~6.7MB
+	// This prevents memory explosion from encoding large files
+	MaxBase64EncodeSize = 5 * 1024 * 1024
 )
 
 // ReadFileSafe reads a file with a size limit to prevent DoS attacks
@@ -49,4 +54,13 @@ func ReadAllSafe(r io.Reader, maxSize int64) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// ValidateSizeForEncoding checks if data is safe to base64 encode
+// Base64 encoding increases size by ~33%, so we limit input size to prevent memory explosion
+func ValidateSizeForEncoding(data []byte, maxSize int64, context string) error {
+	if int64(len(data)) > maxSize {
+		return fmt.Errorf("%s size (%d bytes) exceeds maximum encodable size (%d bytes)", context, len(data), maxSize)
+	}
+	return nil
 }

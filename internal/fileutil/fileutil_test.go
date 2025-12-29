@@ -123,3 +123,41 @@ func TestReadAllSafe_LargeFile(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exceeds maximum size")
 }
+
+func TestValidateSizeForEncoding_Success(t *testing.T) {
+	data := []byte("test data")
+	err := ValidateSizeForEncoding(data, 1024, "test file")
+	assert.NoError(t, err)
+}
+
+func TestValidateSizeForEncoding_ExceedsLimit(t *testing.T) {
+	// Create data larger than limit
+	data := []byte(strings.Repeat("x", 2048))
+	err := ValidateSizeForEncoding(data, 1024, "test file")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "test file size (2048 bytes)")
+	assert.Contains(t, err.Error(), "exceeds maximum encodable size (1024 bytes)")
+}
+
+func TestValidateSizeForEncoding_ExactlyLimit(t *testing.T) {
+	// Create data exactly at limit
+	data := []byte(strings.Repeat("x", 1024))
+	err := ValidateSizeForEncoding(data, 1024, "test file")
+	assert.NoError(t, err)
+}
+
+func TestValidateSizeForEncoding_EmptyData(t *testing.T) {
+	data := []byte("")
+	err := ValidateSizeForEncoding(data, 1024, "test file")
+	assert.NoError(t, err)
+}
+
+func TestValidateSizeForEncoding_LargeData(t *testing.T) {
+	// Create 10MB of data
+	largeData := []byte(strings.Repeat("x", 10*1024*1024))
+
+	// Should fail with 5MB limit
+	err := ValidateSizeForEncoding(largeData, MaxBase64EncodeSize, "large file")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds maximum encodable size")
+}
