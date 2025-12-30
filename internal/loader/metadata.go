@@ -28,7 +28,7 @@ func LoadMetadataForDocs() ([]MetadataForDocs, error) {
 	// Get changed MDX files (for PR context)
 	changedFilepaths, err := github.GetChangedMDXFiles()
 	if err != nil {
-		return nil, fmt.Errorf("could not get changed files")
+		return nil, fmt.Errorf("could not get changed files -- %s", err)
 	} else if len(changedFilepaths) > 0 {
 		var metadataForDocs []MetadataForDocs
 		for _, filepath := range changedFilepaths {
