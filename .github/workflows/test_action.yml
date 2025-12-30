@@ -195,7 +195,7 @@ jobs:
           # Create two commits: one without MDX files, one with them
           # This simulates a push that adds MDX files
 
-          # Create base commit (remove MDX files temporarily)
+          # Create "before" commit (remove MDX files temporarily)
           TEMP_BACKUP="${{ runner.temp }}/mdx-backup"
           mkdir -p "$TEMP_BACKUP"
 
@@ -207,10 +207,10 @@ jobs:
           git config user.email "test@example.com"
           git config user.name "Test User"
           git add -A
-          git commit -m "Base commit without MDX files" || echo "No changes to commit"
-          BASE_SHA=$(git rev-parse HEAD)
+          git commit -m "Before commit without MDX files" || echo "No changes to commit"
+          BEFORE_SHA=$(git rev-parse HEAD)
 
-          # Restore MDX files and create head commit
+          # Restore MDX files and create "after" commit
           if [ -d "$TEMP_BACKUP/docs-flow" ]; then
             mkdir -p integration-test
             cp -r "$TEMP_BACKUP/docs-flow" integration-test/
@@ -218,23 +218,28 @@ jobs:
 
           git add -A
           git commit -m "Add release notes MDX files"
-          HEAD_SHA=$(git rev-parse HEAD)
+          AFTER_SHA=$(git rev-parse HEAD)
+
+          echo "BEFORE_SHA: $BEFORE_SHA"
+          echo "AFTER_SHA: $AFTER_SHA"
+
+          # Verify the MDX files exist
+          echo "MDX files that will be detected as changed:"
+          git diff --name-only ${BEFORE_SHA} ${AFTER_SHA} | grep -E '\.mdx$' || echo "No MDX files found"
+
+          # Push commits to temporary branch so they're available when action checks out
+          TEMP_BRANCH="docs-flow-test-${GITHUB_RUN_ID}"
+          git push origin HEAD:refs/heads/${TEMP_BRANCH}
+          echo "TEMP_BRANCH=${TEMP_BRANCH}" >> $GITHUB_ENV
 
           # Create mock push event
           cat > /tmp/push-event.json <<EOF
           {
-            "ref": "refs/heads/main",
-            "before": "${BASE_SHA}",
-            "after": "${HEAD_SHA}"
+            "ref": "refs/heads/${TEMP_BRANCH}",
+            "before": "${BEFORE_SHA}",
+            "after": "${AFTER_SHA}"
           }
           EOF
-
-          echo "BASE_SHA: $BASE_SHA"
-          echo "HEAD_SHA: $HEAD_SHA"
-
-          # Verify the MDX files exist
-          echo "MDX files that will be detected as changed:"
-          git diff --name-only ${BASE_SHA} ${HEAD_SHA} | grep -E '\.mdx$' || echo "No MDX files found"
 
       - name: Run Agent Metadata Action (metadata from MDX)
         uses: ./
@@ -259,6 +264,13 @@ jobs:
           if [ -f mock-server.pid ]; then
             kill $(cat mock-server.pid) || true
             rm mock-server.pid
+          fi
+
+      - name: Cleanup temporary branch
+        if: always()
+        run: |
+          if [ -n "$TEMP_BRANCH" ]; then
+            git push origin --delete $TEMP_BRANCH || true
           fi
 
   cleanup-test-tag:
