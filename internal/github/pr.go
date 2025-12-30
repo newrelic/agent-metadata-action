@@ -94,8 +94,11 @@ func getChangedMDXFilesImpl() ([]string, error) {
 		fmt.Sprintf("%s...%s", event.PullRequest.Base.SHA, event.PullRequest.Head.SHA))
 
 	// Set working directory to GITHUB_WORKSPACE so git can find the repository
-	if workspace := config.GetWorkspace(); workspace != "" {
+	workspace := config.GetWorkspace()
+	if workspace != "" {
 		cmd.Dir = workspace
+	} else {
+		fmt.Printf("::debug::workspace: %s", workspace)
 	}
 
 	var out bytes.Buffer
@@ -105,7 +108,6 @@ func getChangedMDXFilesImpl() ([]string, error) {
 		return nil, fmt.Errorf("git diff failed: %w", err)
 	}
 
-	workspace := config.GetWorkspace()
 	var mdxFiles []string
 	for _, line := range strings.Split(out.String(), "\n") {
 		line = strings.TrimSpace(line)
