@@ -122,6 +122,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 			if workspace != "" {
 				line = filepath.Join(workspace, line)
 			}
+			fmt.Printf("::debug::mdx append line: %s", line)
 			mdxFiles = append(mdxFiles, line)
 		}
 	}
