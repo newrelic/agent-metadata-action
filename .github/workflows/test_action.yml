@@ -195,7 +195,7 @@ jobs:
           # Create two commits: one without MDX files, one with them
           # This simulates a push that adds MDX files
 
-          # Create base commit (remove MDX files temporarily)
+          # Create "before" commit (remove MDX files temporarily)
           TEMP_BACKUP="${{ runner.temp }}/mdx-backup"
           mkdir -p "$TEMP_BACKUP"
 
@@ -207,10 +207,10 @@ jobs:
           git config user.email "test@example.com"
           git config user.name "Test User"
           git add -A
-          git commit -m "Base commit without MDX files" || echo "No changes to commit"
-          BASE_SHA=$(git rev-parse HEAD)
+          git commit -m "Before commit without MDX files" || echo "No changes to commit"
+          BEFORE_SHA=$(git rev-parse HEAD)
 
-          # Restore MDX files and create head commit
+          # Restore MDX files and create "after" commit
           if [ -d "$TEMP_BACKUP/docs-flow" ]; then
             mkdir -p integration-test
             cp -r "$TEMP_BACKUP/docs-flow" integration-test/
@@ -218,34 +218,44 @@ jobs:
 
           git add -A
           git commit -m "Add release notes MDX files"
-          HEAD_SHA=$(git rev-parse HEAD)
+          AFTER_SHA=$(git rev-parse HEAD)
+
+          echo "BEFORE_SHA: $BEFORE_SHA"
+          echo "AFTER_SHA: $AFTER_SHA"
+
+          # Verify the MDX files exist
+          echo "MDX files that will be detected as changed:"
+          git diff --name-only ${BEFORE_SHA} ${AFTER_SHA} | grep -E '\.mdx$' || echo "No MDX files found"
 
           # Create mock push event
           cat > /tmp/push-event.json <<EOF
           {
             "ref": "refs/heads/main",
-            "before": "${BASE_SHA}",
-            "after": "${HEAD_SHA}"
+            "before": "${BEFORE_SHA}",
+            "after": "${AFTER_SHA}"
           }
           EOF
 
-          echo "BASE_SHA: $BASE_SHA"
-          echo "HEAD_SHA: $HEAD_SHA"
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+          cache: false
 
-          # Verify the MDX files exist
-          echo "MDX files that will be detected as changed:"
-          git diff --name-only ${BASE_SHA} ${HEAD_SHA} | grep -E '\.mdx$' || echo "No MDX files found"
-
-      - name: Run Agent Metadata Action (metadata from MDX)
-        uses: ./
+      - name: Build and run action directly (docs flow)
         env:
           GITHUB_EVENT_PATH: '/tmp/push-event.json'
+          GITHUB_WORKSPACE: ${{ github.workspace }}
           METADATA_SERVICE_URL: http://127.0.0.1:8080
-          MOCK_NEWRELIC_AUTH_CLI: true
-        with:
-          newrelic-client-id: fake-client-id-for-testing
-          newrelic-private-key: ZmFrZS1wcml2YXRlLWtleS1mb3ItdGVzdGluZwo=
-          cache: false
+          NEWRELIC_TOKEN: fake-token-for-testing
+        run: |
+          echo "::group::Building action"
+          go build -o agent-metadata-action ./cmd/agent-metadata-action
+          echo "::endgroup::"
+
+          echo "::group::Running action (docs flow - no agent-type or version)"
+          ./agent-metadata-action
+          echo "::endgroup::"
 
       - name: Show mock server logs
         if: always()
