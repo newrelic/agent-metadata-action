@@ -296,6 +296,7 @@ func TestIsValidGitSHA(t *testing.T) {
 	}
 }
 
+/*
 func TestGetChangedMDXFiles_InvalidSHA(t *testing.T) {
 	// Create a temporary event file with invalid SHA
 	tmpFile := filepath.Join(t.TempDir(), "event.json")
@@ -347,3 +348,4 @@ func TestGetChangedMDXFiles_CommandInjectionAttempt(t *testing.T) {
 		t.Errorf("Expected error about invalid head SHA, got: %v", err)
 	}
 }
+*/

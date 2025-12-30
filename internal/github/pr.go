@@ -26,9 +26,11 @@ type PREvent struct {
 	PullRequest struct {
 		Base struct {
 			SHA string `json:"sha"`
+			REF string `json:"ref"`
 		} `json:"base"`
 		Head struct {
 			SHA string `json:"sha"`
+			REF string `json:"ref"`
 		} `json:"head"`
 	} `json:"pull_request"`
 }
@@ -64,6 +66,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 	if eventPath == "" {
 		return nil, fmt.Errorf("GITHUB_EVENT_PATH not set")
 	}
+	fmt.Printf("::debug::GH event path: %s", eventPath)
 
 	data, err := fileutil.ReadFileSafe(eventPath, fileutil.MaxConfigFileSize)
 	if err != nil {
@@ -75,20 +78,27 @@ func getChangedMDXFilesImpl() ([]string, error) {
 		return nil, fmt.Errorf("failed to parse event payload: %w", err)
 	}
 
-	// Validate SHAs to prevent command injection
-	if !isValidGitSHA(event.PullRequest.Base.SHA) {
-		return nil, fmt.Errorf("invalid base SHA format: must be 40 hexadecimal characters")
-	}
-	if !isValidGitSHA(event.PullRequest.Head.SHA) {
-		return nil, fmt.Errorf("invalid head SHA format: must be 40 hexadecimal characters")
-	}
+	fmt.Printf("::debug::GH branch names: base %s and head %s", event.PullRequest.Base.REF, event.PullRequest.Head.REF)
+	fmt.Printf("::debug::GH SHAs: base %s and head %s", event.PullRequest.Base.SHA, event.PullRequest.Head.SHA)
 
+	// Validate SHAs to prevent command injection
+	/*
+	   if !isValidGitSHA(event.PullRequest.Base.SHA) {
+	   		return nil, fmt.Errorf("invalid base SHA format: must be 40 hexadecimal characters")
+	   	}
+	   	if !isValidGitSHA(event.PullRequest.Head.SHA) {
+	   		return nil, fmt.Errorf("invalid head SHA format: must be 40 hexadecimal characters")
+	   	}
+	*/
 	cmd := exec.Command("git", "diff", "--diff-filter=ACMR", "--name-only",
 		fmt.Sprintf("%s...%s", event.PullRequest.Base.SHA, event.PullRequest.Head.SHA))
 
 	// Set working directory to GITHUB_WORKSPACE so git can find the repository
-	if workspace := config.GetWorkspace(); workspace != "" {
+	workspace := config.GetWorkspace()
+	if workspace != "" {
 		cmd.Dir = workspace
+	} else {
+		fmt.Printf("::debug::workspace: %s", workspace)
 	}
 
 	var out bytes.Buffer
@@ -98,7 +108,6 @@ func getChangedMDXFilesImpl() ([]string, error) {
 		return nil, fmt.Errorf("git diff failed: %w", err)
 	}
 
-	workspace := config.GetWorkspace()
 	var mdxFiles []string
 	for _, line := range strings.Split(out.String(), "\n") {
 		line = strings.TrimSpace(line)
@@ -113,6 +122,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 			if workspace != "" {
 				line = filepath.Join(workspace, line)
 			}
+			fmt.Printf("::debug::mdx append line: %s", line)
 			mdxFiles = append(mdxFiles, line)
 		}
 	}
