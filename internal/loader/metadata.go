@@ -77,6 +77,6 @@ func LoadMetadataForDocs() ([]MetadataForDocs, error) {
 		return metadataForDocs, nil
 	} else {
 		fmt.Print("::debug::no changed files detected in the PR context\n")
+		return nil, nil
 	}
-	return nil, fmt.Errorf("unknown error in LoadMetadataForDocs")
 }
