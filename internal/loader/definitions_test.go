@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -371,7 +372,7 @@ func TestReadAgentControl_Success(t *testing.T) {
 	agentControl, err := LoadAndEncodeAgentControl(tmpDir)
 	require.NoError(t, err)
 	assert.Len(t, agentControl, 1)
-	assert.Equal(t, "all", agentControl[0].Platform)
+	assert.Equal(t, AGENT_CONTROL_PLATFORM, agentControl[0].Platform)
 	assert.NotEmpty(t, agentControl[0].Content)
 
 	// Verify content was base64 encoded
@@ -414,23 +415,115 @@ func TestReadAgentControl_EmptyFile(t *testing.T) {
 	assert.Contains(t, err.Error(), "is empty")
 }
 
-func TestReadAgentControl_InvalidYAML(t *testing.T) {
-	// Create temporary directory structure with invalid YAML agent control file
+func TestReadConfigurationDefinitions_ExceedsMaxSize(t *testing.T) {
+	// Create temporary directory structure
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".fleetControl")
+	err := os.MkdirAll(configDir, 0755)
+	require.NoError(t, err)
+
+	// Create a config file that exceeds the max size (10MB)
+	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	// Create 11MB of YAML content using strings.Repeat for efficiency
+	largeContent := []byte("configurationDefinitions:\n" + strings.Repeat("# padding\n", 11*1024*1024/10))
+	err = os.WriteFile(configFile, largeContent, 0644)
+	require.NoError(t, err)
+
+	// Test reading the config - should fail due to size
+	configs, err := ReadConfigurationDefinitions(tmpDir)
+	assert.Error(t, err)
+	assert.Nil(t, configs)
+	assert.Contains(t, err.Error(), "exceeds maximum size")
+}
+
+func TestLoadAndEncodeSchema_ExceedsMaxSize(t *testing.T) {
+	// Create temporary directory structure
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".fleetControl")
+	schemasDir := filepath.Join(configDir, "schemas")
+	err := os.MkdirAll(schemasDir, 0755)
+	require.NoError(t, err)
+
+	// Create a schema file that exceeds the max size (10MB)
+	schemaFile := filepath.Join(schemasDir, "large-schema.json")
+	// Create 11MB of JSON content using strings.Repeat for efficiency
+	largeJSON := []byte(`{"description": "` + strings.Repeat("x", 11*1024*1024) + `"}`)
+	err = os.WriteFile(schemaFile, largeJSON, 0644)
+	require.NoError(t, err)
+
+	// Create test config file that references large schema
+	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	testYAML := `configurationDefinitions:
+  - platform: linux
+    description: Test configuration
+    type: test-config
+    version: 1.0.0
+    format: yaml
+    schema: ./schemas/large-schema.json`
+
+	err = os.WriteFile(configFile, []byte(testYAML), 0644)
+	require.NoError(t, err)
+
+	// Test reading the config - should fail due to schema size
+	configs, err := ReadConfigurationDefinitions(tmpDir)
+	assert.Error(t, err)
+	assert.Nil(t, configs)
+	assert.Contains(t, err.Error(), "exceeds maximum size")
+}
+
+func TestLoadAndEncodeSchema_ExceedsEncodingLimit(t *testing.T) {
+	// Create temporary directory structure
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".fleetControl")
+	schemasDir := filepath.Join(configDir, "schemas")
+	err := os.MkdirAll(schemasDir, 0755)
+	require.NoError(t, err)
+
+	// Create a schema file that passes read limit (10MB) but exceeds encoding limit (5MB)
+	schemaFile := filepath.Join(schemasDir, "large-schema.json")
+	// Create 6MB of JSON content (passes 10MB read limit, fails 5MB encoding limit)
+	largeJSON := []byte(`{"description": "` + strings.Repeat("x", 6*1024*1024) + `"}`)
+	err = os.WriteFile(schemaFile, largeJSON, 0644)
+	require.NoError(t, err)
+
+	// Create test config file that references large schema
+	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	testYAML := `configurationDefinitions:
+  - platform: linux
+    description: Test configuration
+    type: test-config
+    version: 1.0.0
+    format: yaml
+    schema: ./schemas/large-schema.json`
+
+	err = os.WriteFile(configFile, []byte(testYAML), 0644)
+	require.NoError(t, err)
+
+	// Test reading the config - should fail due to encoding size limit
+	configs, err := ReadConfigurationDefinitions(tmpDir)
+	assert.Error(t, err)
+	assert.Nil(t, configs)
+	assert.Contains(t, err.Error(), "exceeds maximum encodable size")
+}
+
+func TestLoadAndEncodeAgentControl_ExceedsEncodingLimit(t *testing.T) {
+	// Create temporary directory structure
 	tmpDir := t.TempDir()
 	configDir := filepath.Join(tmpDir, ".fleetControl")
 	agentControlDir := filepath.Join(configDir, "agentControl")
 	err := os.MkdirAll(agentControlDir, 0755)
 	require.NoError(t, err)
 
-	// Create agent control file with invalid YAML
+	// Create agent control file that passes read limit (10MB) but exceeds encoding limit (5MB)
 	agentControlFile := filepath.Join(agentControlDir, "agent-schema-for-agent-control.yml")
-	err = os.WriteFile(agentControlFile, []byte(`invalid: yaml: [unclosed`), 0644)
+	// Create 6MB of valid YAML content
+	largeYAML := "description: |\n  " + strings.Repeat("large content ", 6*1024*1024/14)
+	err = os.WriteFile(agentControlFile, []byte(largeYAML), 0644)
 	require.NoError(t, err)
 
-	// Test reading the agent control - should fail
+	// Test reading the agent control - should fail due to encoding size limit
 	agentControl, err := LoadAndEncodeAgentControl(tmpDir)
 	assert.Error(t, err)
 	assert.Nil(t, agentControl)
-	assert.Contains(t, err.Error(), "agent control file")
-	assert.Contains(t, err.Error(), "is not valid YAML")
+	assert.Contains(t, err.Error(), "exceeds maximum encodable size")
 }

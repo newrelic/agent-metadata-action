@@ -4,18 +4,22 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"agent-metadata-action/internal/config"
+	"agent-metadata-action/internal/fileutil"
 )
 
 const ROOT_RELEASE_NOTES_DIR = "src/content/docs/release-notes"
 const RELEASE_NOTES_FILE_EXTENSION = ".mdx"
 
 var IGNORED_FILENAMES = []string{"index.mdx"}
+
+// gitSHARegex validates Git SHA-1 hashes (40 hexadecimal characters)
+var gitSHARegex = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // PREvent represents the GitHub PR event payload
 type PREvent struct {
@@ -44,6 +48,12 @@ func isIgnoredFilename(filename string) bool {
 	return false
 }
 
+// isValidGitSHA validates that a string is a valid Git SHA-1 hash
+// Git SHA-1 hashes are exactly 40 hexadecimal characters
+func isValidGitSHA(sha string) bool {
+	return gitSHARegex.MatchString(sha)
+}
+
 // GetChangedMDXFilesFunc is a variable that holds the function to get changed MDX files
 // This allows tests to override the implementation
 var GetChangedMDXFilesFunc = getChangedMDXFilesImpl
@@ -55,7 +65,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 		return nil, fmt.Errorf("GITHUB_EVENT_PATH not set")
 	}
 
-	data, err := os.ReadFile(eventPath)
+	data, err := fileutil.ReadFileSafe(eventPath, fileutil.MaxConfigFileSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read event payload: %w", err)
 	}
@@ -63,6 +73,14 @@ func getChangedMDXFilesImpl() ([]string, error) {
 	var event PREvent
 	if err := json.Unmarshal(data, &event); err != nil {
 		return nil, fmt.Errorf("failed to parse event payload: %w", err)
+	}
+
+	// Validate SHAs to prevent command injection
+	if !isValidGitSHA(event.PullRequest.Base.SHA) {
+		return nil, fmt.Errorf("invalid base SHA format: must be 40 hexadecimal characters")
+	}
+	if !isValidGitSHA(event.PullRequest.Head.SHA) {
+		return nil, fmt.Errorf("invalid head SHA format: must be 40 hexadecimal characters")
 	}
 
 	cmd := exec.Command("git", "diff", "--diff-filter=ACMR", "--name-only",

@@ -4,10 +4,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
+	"agent-metadata-action/internal/fileutil"
 	"agent-metadata-action/internal/models"
 
 	"gopkg.in/yaml.v3"
@@ -17,12 +17,13 @@ const FLEET_CONTROL_DIR = ".fleetControl"
 const CONFIG_FILE_PATH = "configurationDefinitions.yml"
 const AGENT_CONTROL_DIR = "agentControl"
 const AGENT_CONTROL_FILE = "agent-schema-for-agent-control.yml"
+const AGENT_CONTROL_PLATFORM = "ALL"
 
 // ReadConfigurationDefinitions reads and parses the configurationDefinitions file
 func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationDefinition, error) {
 	fullPath := filepath.Join(workspacePath, FLEET_CONTROL_DIR, CONFIG_FILE_PATH)
 
-	data, err := os.ReadFile(fullPath)
+	data, err := fileutil.ReadFileSafe(fullPath, fileutil.MaxConfigFileSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file at %s: %w", fullPath, err)
 	}
@@ -84,7 +85,7 @@ func loadAndEncodeSchema(workspacePath, schemaPath string) (string, error) {
 		return "", fmt.Errorf("invalid schema path: must be within .fleetControl directory")
 	}
 
-	data, err := os.ReadFile(fullPath)
+	data, err := fileutil.ReadFileSafe(fullPath, fileutil.MaxConfigFileSize)
 	if err != nil {
 		return "", fmt.Errorf("failed to read schema file at %s: %w", fullPath, err)
 	}
@@ -97,16 +98,21 @@ func loadAndEncodeSchema(workspacePath, schemaPath string) (string, error) {
 		return "", fmt.Errorf("schema file at %s is not valid JSON", fullPath)
 	}
 
+	// Validate size before encoding to prevent memory explosion
+	if err := fileutil.ValidateSizeForEncoding(data, fileutil.MaxBase64EncodeSize, "schema file"); err != nil {
+		return "", fmt.Errorf("schema file at %s: %w", fullPath, err)
+	}
+
 	encoded := base64.StdEncoding.EncodeToString(data)
 	return encoded, nil
 }
 
 // LoadAndEncodeAgentControl reads and encodes the agent control content
-// Returns a single entry with platform "all"
+// Returns a single entry with platform AGENT_CONTROL_PLATFORM
 func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControl, error) {
 	agentControlPath := filepath.Join(workspacePath, FLEET_CONTROL_DIR, AGENT_CONTROL_DIR, AGENT_CONTROL_FILE)
 
-	data, err := os.ReadFile(agentControlPath)
+	data, err := fileutil.ReadFileSafe(agentControlPath, fileutil.MaxConfigFileSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read agent control file at %s: %w", agentControlPath, err)
 	}
@@ -115,16 +121,16 @@ func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControl, err
 		return nil, fmt.Errorf("agent control file at %s is empty", agentControlPath)
 	}
 
-	var temp interface{}
-	if err := yaml.Unmarshal(data, &temp); err != nil {
-		return nil, fmt.Errorf("agent control file at %s is not valid YAML: %w", agentControlPath, err)
+	// Validate size before encoding to prevent memory explosion
+	if err := fileutil.ValidateSizeForEncoding(data, fileutil.MaxBase64EncodeSize, "agent control file"); err != nil {
+		return nil, fmt.Errorf("agent control file at %s: %w", agentControlPath, err)
 	}
 
 	encoded := base64.StdEncoding.EncodeToString(data)
 
 	return []models.AgentControl{
 		{
-			Platform: "all",
+			Platform: AGENT_CONTROL_PLATFORM,
 			Content:  encoded,
 		},
 	}, nil

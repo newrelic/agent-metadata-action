@@ -95,24 +95,22 @@ func run() error {
 			}
 			fmt.Println("::notice::Successfully sent metadata to instrumentation service")
 		}
+	} else { // Scenario 2: Docs flow
+		fmt.Println("::debug::Docs scenario")
+
+		metadata, err := loader.LoadMetadataForDocs()
+
+		if err != nil {
+			return fmt.Errorf("error reading metadata: %w", err)
+		}
+
+		for _, currMetadata := range metadata {
+			fmt.Printf("::debug::Found metadata for %s %s", currMetadata.AgentType, currMetadata.AgentMetadataFromDocs.Version)
+			printJSON("Agent Metadata", currMetadata.AgentMetadataFromDocs)
+
+			// TODO: Implement metadata service call for docs workflow
+		}
 	}
-	// TODO: Docs workflow disabled until metadata service call is implemented
-	// else {
-	// 	// Scenario 2: Docs workflow
-	// 	fmt.Println("::notice::Running in metadata-only mode (.fleetControl not found, using MDX files)")
-	// 	metadata, err := loader.LoadMetadataForDocs()
-	// 	if err != nil {
-	// 		return fmt.Errorf("error reading metadata: %w", err)
-	// 	}
-	// 	for _, currMetadata := range metadata {
-	// 		agentMetadata := models.AgentMetadata{
-	// 			Metadata: currMetadata,
-	// 		}
-	// 		printJSON("Agent Metadata", agentMetadata)
-	// 		// TODO: Implement metadata service call for docs workflow
-	// 		// Need to determine agent type from file path or require INPUT_AGENT_TYPE
-	// 	}
-	// }
 
 	return nil
 }

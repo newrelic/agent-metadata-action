@@ -2,8 +2,9 @@ package parser
 
 import (
 	"fmt"
-	"os"
 	"strings"
+
+	"agent-metadata-action/internal/fileutil"
 
 	"gopkg.in/yaml.v3"
 )
@@ -22,9 +23,33 @@ type MDXFrontmatter struct {
 	EOL                       string   `yaml:"eol"`
 }
 
+type Subject string
+
+const (
+	DotNet   Subject = ".NET agent"
+	Infra    Subject = "Infrastructure agent"
+	InfraK8s Subject = "Kubernetes integration"
+	Java     Subject = "Java agent"
+	Node     Subject = "Node.js agent"
+	NRDot    Subject = "NRDOT"
+	Python   Subject = "Python agent"
+	Ruby     Subject = "Ruby agent"
+)
+
+var SubjectToAgentTypeMapping = map[Subject]string{
+	DotNet:   "DotnetAgent",
+	Infra:    "InfrastructureAgent",
+	InfraK8s: "InfrastructureK8sAgent",
+	Java:     "JavaAgent",
+	Node:     "NodeAgent",
+	NRDot:    "NrdotAgent",
+	Python:   "PythonAgent",
+	Ruby:     "RubyAgent",
+}
+
 // ParseMDXFile reads an MDX file and extracts the YAML frontmatter
 func ParseMDXFile(filePath string) (*MDXFrontmatter, error) {
-	data, err := os.ReadFile(filePath)
+	data, err := fileutil.ReadFileSafe(filePath, fileutil.MaxMDXFileSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read MDX file: %w", err)
 	}
