@@ -245,8 +245,6 @@ jobs:
         with:
           newrelic-client-id: fake-client-id-for-testing
           newrelic-private-key: ZmFrZS1wcml2YXRlLWtleS1mb3ItdGVzdGluZwo=
-          agent-type: 'myagent'
-          version: '0.0.1'
           cache: false
 
       - name: Show mock server logs
