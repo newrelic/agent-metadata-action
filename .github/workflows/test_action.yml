@@ -193,13 +193,12 @@ jobs:
   #         git commit -m "Add release notes MDX files"
   #         HEAD_SHA=$(git rev-parse HEAD)
 
-  #         # Create mock PR event
-  #         cat > /tmp/pr-event.json <<EOF
+  #         # Create mock push event
+  #         cat > /tmp/push-event.json <<EOF
   #         {
-  #           "pull_request": {
-  #             "base": {"sha": "${BASE_SHA}"},
-  #             "head": {"sha": "${HEAD_SHA}"}
-  #           }
+  #           "ref": "refs/heads/main",
+  #           "before": "${BASE_SHA}",
+  #           "after": "${HEAD_SHA}"
   #         }
   #         EOF
 
@@ -213,7 +212,7 @@ jobs:
   #     - name: Run Agent Metadata Action (metadata from MDX)
   #       uses: ./
   #       env:
-  #         GITHUB_EVENT_PATH: '/tmp/pr-event.json'
+  #         GITHUB_EVENT_PATH: '/tmp/push-event.json'
   #       with:
   #         newrelic-client-id: ${{ secrets.OAUTH_CLIENT_ID }}
   #         newrelic-private-key: ${{ secrets.OAUTH_CLIENT_SECRET }}
