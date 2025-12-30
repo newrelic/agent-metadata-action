@@ -101,10 +101,12 @@ bugs:
 	}
 	headSHA := strings.TrimSpace(string(headSHAOut))
 
-	// Create PR event
-	event := PREvent{}
-	event.PullRequest.Base.SHA = baseSHA
-	event.PullRequest.Head.SHA = headSHA
+	// Create push event
+	event := PushEvent{
+		Before: baseSHA,
+		After:  headSHA,
+		Ref:    "refs/heads/main",
+	}
 
 	eventData, err := json.Marshal(event)
 	if err != nil {
@@ -301,10 +303,9 @@ func TestGetChangedMDXFiles_InvalidSHA(t *testing.T) {
 	// Create a temporary event file with invalid SHA
 	tmpFile := filepath.Join(t.TempDir(), "event.json")
 	invalidEvent := `{
-		"pull_request": {
-			"base": {"sha": "invalid-sha"},
-			"head": {"sha": "a1b2c3d4e5f6789012345678901234567890abcd"}
-		}
+		"ref": "refs/heads/main",
+		"before": "invalid-sha",
+		"after": "a1b2c3d4e5f6789012345678901234567890abcd"
 	}`
 	err := os.WriteFile(tmpFile, []byte(invalidEvent), 0644)
 	if err != nil {
@@ -327,10 +328,9 @@ func TestGetChangedMDXFiles_CommandInjectionAttempt(t *testing.T) {
 	// Create a temporary event file with command injection attempt in SHA
 	tmpFile := filepath.Join(t.TempDir(), "event.json")
 	maliciousEvent := `{
-		"pull_request": {
-			"base": {"sha": "a1b2c3d4e5f6789012345678901234567890abcd"},
-			"head": {"sha": "abc123; rm -rf /"}
-		}
+		"ref": "refs/heads/main",
+		"before": "a1b2c3d4e5f6789012345678901234567890abcd",
+		"after": "abc123; rm -rf /"
 	}`
 	err := os.WriteFile(tmpFile, []byte(maliciousEvent), 0644)
 	if err != nil {
