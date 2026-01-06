@@ -59,7 +59,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 	if eventPath == "" {
 		return nil, fmt.Errorf("GITHUB_EVENT_PATH not set")
 	}
-	fmt.Printf("::debug::GH event path: %s", eventPath)
+	fmt.Printf("::debug::GH event path: %s\n", eventPath)
 
 	data, err := fileutil.ReadFileSafe(eventPath, fileutil.MaxConfigFileSize)
 	if err != nil {
@@ -71,9 +71,9 @@ func getChangedMDXFilesImpl() ([]string, error) {
 		return nil, fmt.Errorf("failed to parse event payload: %w", err)
 	}
 
-	fmt.Printf("::debug::event payload %s", event)
-	fmt.Printf("::debug::GH branch name: %s", event.Ref)
-	fmt.Printf("::debug::GH SHAs: before %s and after %s", event.Before, event.After)
+	fmt.Printf("::debug::event payload %s\n", event)
+	fmt.Printf("::debug::GH branch name: %s\n", event.Ref)
+	fmt.Printf("::debug::GH SHAs: before %s and after %s\n", event.Before, event.After)
 
 	// Validate SHAs to prevent command injection
 	/*
@@ -92,7 +92,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 	if workspace != "" {
 		cmd.Dir = workspace
 	} else {
-		fmt.Printf("::debug::workspace: %s", workspace)
+		fmt.Printf("::debug::workspace: %s\n", workspace)
 	}
 
 	var out bytes.Buffer
@@ -118,7 +118,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 			if workspace != "" {
 				line = filepath.Join(workspace, line)
 			}
-			fmt.Printf("::debug::mdx append line: %s", line)
+			fmt.Printf("::debug::mdx append line: %s\n", line)
 			mdxFiles = append(mdxFiles, line)
 		}
 	}
