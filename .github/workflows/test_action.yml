@@ -24,7 +24,8 @@ jobs:
           cp -r integration-test/agent-flow/.fleetControl .
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add .fleetControl
+          # Force add despite .gitignore
+          git add -f .fleetControl
           git commit -m "Temporary: Add .fleetControl for testing"
 
       - name: Push temporary tag for testing
