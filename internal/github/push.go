@@ -102,6 +102,8 @@ func getChangedMDXFilesImpl() ([]string, error) {
 		return nil, fmt.Errorf("git diff failed: %w", err)
 	}
 
+	fmt.Printf("::debug::git diff output:\n%s\n", out.String())
+
 	var mdxFiles []string
 	for _, line := range strings.Split(out.String(), "\n") {
 		line = strings.TrimSpace(line)

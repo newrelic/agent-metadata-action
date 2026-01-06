@@ -63,6 +63,11 @@ jobs:
           which newrelic-auth-cli
           newrelic-auth-cli --help || echo "Mock CLI is ready"
 
+      - name: Copy test .fleetControl to root
+        run: |
+          cp -r integration-test/agent-flow/.fleetControl .
+          echo "Copied .fleetControl to root for testing"
+
       - name: Run Agent Metadata Action (with configs)
         uses: ./
         env:
@@ -126,6 +131,11 @@ jobs:
           # Verify it's accessible
           which newrelic-auth-cli
           newrelic-auth-cli --help || echo "Mock CLI is ready"
+
+      - name: Copy test .fleetControl to root
+        run: |
+          cp -r integration-test/agent-flow/.fleetControl .
+          echo "Copied .fleetControl to root for testing"
 
       - name: Run Agent Metadata Action (with configs)
         uses: ./
