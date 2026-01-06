@@ -18,6 +18,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Copy test .fleetControl to root for tagging
+        run: |
+          # Copy .fleetControl so it's included in the v0.0.0 tag
+          cp -r integration-test/agent-flow/.fleetControl .
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .fleetControl
+          git commit -m "Temporary: Add .fleetControl for testing"
+
       - name: Push temporary tag for testing
         run: |
           git config user.name "github-actions"
@@ -62,11 +71,6 @@ jobs:
           # Verify it's accessible
           which newrelic-auth-cli
           newrelic-auth-cli --help || echo "Mock CLI is ready"
-
-      - name: Copy test .fleetControl to root
-        run: |
-          cp -r integration-test/agent-flow/.fleetControl .
-          echo "Copied .fleetControl to root for testing"
 
       - name: Run Agent Metadata Action (with configs)
         uses: ./
@@ -131,11 +135,6 @@ jobs:
           # Verify it's accessible
           which newrelic-auth-cli
           newrelic-auth-cli --help || echo "Mock CLI is ready"
-
-      - name: Copy test .fleetControl to root
-        run: |
-          cp -r integration-test/agent-flow/.fleetControl .
-          echo "Copied .fleetControl to root for testing"
 
       - name: Run Agent Metadata Action (with configs)
         uses: ./
@@ -202,40 +201,46 @@ jobs:
 
       - name: Create mock push event with real commits
         run: |
-          # Create two commits: one without MDX files, one with them
-          # This simulates a push that adds MDX files
+          # Create two isolated commits: one without MDX files, one with them
+          # This simulates a push that adds MDX files, isolated from real push changes
 
-          # Create "before" commit (remove MDX files temporarily)
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          # Backup MDX files
           TEMP_BACKUP="${{ runner.temp }}/mdx-backup"
           mkdir -p "$TEMP_BACKUP"
 
           if [ -d "integration-test/docs-flow" ]; then
             cp -r integration-test/docs-flow "$TEMP_BACKUP/"
             rm -rf integration-test/docs-flow
+            git add -A
+            # Always create a commit, even if no changes (ensures clean baseline)
+            git commit -m "Before commit without MDX files" --allow-empty
+          else
+            # If docs-flow doesn't exist, create empty commit as baseline
+            git commit -m "Before commit without MDX files" --allow-empty
           fi
-
-          git config user.email "test@example.com"
-          git config user.name "Test User"
-          git add -A
-          git commit -m "Before commit without MDX files" || echo "No changes to commit"
           BEFORE_SHA=$(git rev-parse HEAD)
 
           # Restore MDX files and create "after" commit
           if [ -d "$TEMP_BACKUP/docs-flow" ]; then
             mkdir -p integration-test
             cp -r "$TEMP_BACKUP/docs-flow" integration-test/
+            git add -A
+            git commit -m "Add release notes MDX files"
+          else
+            echo "::error::Failed to backup docs-flow - cannot create test commits"
+            exit 1
           fi
-
-          git add -A
-          git commit -m "Add release notes MDX files"
           AFTER_SHA=$(git rev-parse HEAD)
 
           echo "BEFORE_SHA: $BEFORE_SHA"
           echo "AFTER_SHA: $AFTER_SHA"
 
-          # Verify the MDX files exist
+          # Verify the MDX files exist and show what will be detected
           echo "MDX files that will be detected as changed:"
-          git diff --name-only ${BEFORE_SHA} ${AFTER_SHA} | grep -E '\.mdx$' || echo "No MDX files found"
+          git diff --name-only ${BEFORE_SHA} ${AFTER_SHA} | grep -E '\.mdx$' || echo "::warning::No MDX files found in diff"
 
           # Create mock push event
           cat > /tmp/push-event.json <<EOF
