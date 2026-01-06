@@ -15,6 +15,10 @@ inputs:
     description: 'Agent version in semver format (ex. 1.2.3 or v1.2.3). The action will prepend "v" if not present for tag checkout.'
     required: false
     default: ''
+  fetch-depth:
+    description: 'Number of commits to fetch (> 1 may be required for docs flow)'
+    required: false
+    default: '1'
   cache:
     description: 'Enable Go build cache'
     required: false
@@ -37,7 +41,7 @@ runs:
       uses: actions/checkout@v4
       with:
         ref: ${{ steps.version.outputs.ref }} # When ref is empty (as in docs scenario), this will default to checking out the commit that triggered the action
-
+        fetch-depth: ${{ inputs.fetch-depth }}
     - name: Setup Go
       uses: actions/setup-go@v4
       with:
