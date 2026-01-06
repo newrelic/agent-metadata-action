@@ -200,8 +200,19 @@ jobs:
           which newrelic-auth-cli
           newrelic-auth-cli --help || echo "Mock CLI is ready"
 
-      - name: Create mock push event with real commits
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+
+      - name: Create fake commits and run action (docs flow)
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+          METADATA_SERVICE_URL: http://127.0.0.1:8080
+          NEWRELIC_TOKEN: fake-token-for-testing
         run: |
+          echo "::group::Create fake commits"
           # Create two isolated commits: one without MDX files, one with them
           # This simulates a push that adds MDX files, isolated from real push changes
 
@@ -242,9 +253,15 @@ jobs:
           # Verify the MDX files exist and show what will be detected
           echo "MDX files that will be detected as changed:"
           git diff --name-only ${BEFORE_SHA} ${AFTER_SHA} | grep -E '\.mdx$' || echo "::warning::No MDX files found in diff"
+          echo "::endgroup::"
 
-          # Overwrite GitHub's event file with our fake push event
-          # GitHub Actions won't let us override GITHUB_EVENT_PATH, so we overwrite the file instead
+          echo "::group::Building action"
+          go build -o agent-metadata-action ./cmd/agent-metadata-action
+          echo "::endgroup::"
+
+          echo "::group::Overwrite event file and verify"
+          # Overwrite GitHub's event file with our fake push event IN THE SAME STEP
+          # GitHub Actions resets this between steps, so we must do it right before running
           cat > "${GITHUB_EVENT_PATH}" <<EOF
           {
             "ref": "refs/heads/main",
@@ -253,25 +270,6 @@ jobs:
           }
           EOF
 
-          echo "::notice::Overwrote GitHub event file with fake push event"
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version-file: 'go.mod'
-          cache: false
-
-      - name: Build and run action directly (docs flow)
-        env:
-          GITHUB_WORKSPACE: ${{ github.workspace }}
-          METADATA_SERVICE_URL: http://127.0.0.1:8080
-          NEWRELIC_TOKEN: fake-token-for-testing
-        run: |
-          echo "::group::Building action"
-          go build -o agent-metadata-action ./cmd/agent-metadata-action
-          echo "::endgroup::"
-
-          echo "::group::Verify fake event file"
           echo "GITHUB_EVENT_PATH=${GITHUB_EVENT_PATH}"
           echo "Contents of event file (should have our fake SHAs):"
           cat "${GITHUB_EVENT_PATH}"
