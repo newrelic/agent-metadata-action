@@ -105,7 +105,7 @@ func run() error {
 		}
 
 		for _, currMetadata := range metadata {
-			fmt.Printf("::debug::Found metadata for %s %s", currMetadata.AgentType, currMetadata.AgentMetadataFromDocs.Version)
+			fmt.Printf("::debug::Found metadata for %s %s \n", currMetadata.AgentType, currMetadata.AgentMetadataFromDocs.Version)
 			printJSON("Docs Metadata", currMetadata.AgentMetadataFromDocs)
 
 			currAgentMetadata := models.AgentMetadata{
@@ -113,9 +113,9 @@ func run() error {
 			}
 
 			if err := metadataClient.SendMetadata(ctx, currMetadata.AgentType, &currAgentMetadata); err != nil {
-				fmt.Printf("::error::Failed to send docs metadata to instrumentation service for agent type: %s", currMetadata.AgentType)
+				fmt.Printf("::error::Failed to send docs metadata to instrumentation service for agent type: %s \n", currMetadata.AgentType)
 			} else {
-				fmt.Printf("::notice::Successfully sent docs metadata to instrumentation service for agent type:  %s", currMetadata.AgentType)
+				fmt.Printf("::notice::Successfully sent docs metadata to instrumentation service for agent type:  %s \n", currMetadata.AgentType)
 			}
 		}
 	}
