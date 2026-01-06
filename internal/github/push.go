@@ -91,9 +91,8 @@ func getChangedMDXFilesImpl() ([]string, error) {
 	workspace := config.GetWorkspace()
 	if workspace != "" {
 		cmd.Dir = workspace
-	} else {
-		fmt.Printf("::debug::workspace: %s\n", workspace)
 	}
+	fmt.Printf("::debug::workspace: %s\n", workspace)
 
 	var out bytes.Buffer
 	cmd.Stdout = &out

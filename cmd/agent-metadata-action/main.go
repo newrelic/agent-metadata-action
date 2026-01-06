@@ -113,7 +113,7 @@ func run() error {
 			}
 
 			if err := metadataClient.SendMetadata(ctx, currMetadata.AgentType, &currAgentMetadata); err != nil {
-				fmt.Printf("::error::Failed to send docs metadata to instrumentation service for agent type: %s \n", currMetadata.AgentType)
+				fmt.Printf("::warn::Failed to send docs metadata to instrumentation service for agent type: %s \n", currMetadata.AgentType)
 			} else {
 				fmt.Printf("::notice::Successfully sent docs metadata to instrumentation service for agent type:  %s \n", currMetadata.AgentType)
 			}
