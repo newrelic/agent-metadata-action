@@ -1,0 +1,11 @@
+# Copied during tests from integration-test/agent-flow/
+.fleetControl/
+
+# Build output
+agent-metadata-action
+
+# Go coverage
+coverage.out
+
+# IDE
+.idea/

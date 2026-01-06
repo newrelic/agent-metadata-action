@@ -105,10 +105,18 @@ func run() error {
 		}
 
 		for _, currMetadata := range metadata {
-			fmt.Printf("::debug::Found metadata for %s %s", currMetadata.AgentType, currMetadata.AgentMetadataFromDocs.Version)
-			printJSON("Agent Metadata", currMetadata.AgentMetadataFromDocs)
+			fmt.Printf("::debug::Found metadata for %s %s \n", currMetadata.AgentType, currMetadata.AgentMetadataFromDocs.Version)
+			printJSON("Docs Metadata", currMetadata.AgentMetadataFromDocs)
 
-			// TODO: Implement metadata service call for docs workflow
+			currAgentMetadata := models.AgentMetadata{
+				Metadata: currMetadata.AgentMetadataFromDocs,
+			}
+
+			if err := metadataClient.SendMetadata(ctx, currMetadata.AgentType, &currAgentMetadata); err != nil {
+				fmt.Printf("::error::Failed to send docs metadata to instrumentation service for agent type: %s \n", currMetadata.AgentType)
+			} else {
+				fmt.Printf("::notice::Successfully sent docs metadata to instrumentation service for agent type:  %s \n", currMetadata.AgentType)
+			}
 		}
 	}
 

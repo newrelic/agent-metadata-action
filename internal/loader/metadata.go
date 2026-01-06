@@ -34,19 +34,19 @@ func LoadMetadataForDocs() ([]MetadataForDocs, error) {
 		for _, filepath := range changedFilepaths {
 			frontMatter, err := parser.ParseMDXFile(filepath)
 			if err != nil {
-				fmt.Printf("::warn::Failed to parse MDX file %s %s - skipping ", filepath, err)
+				fmt.Printf("::warn::Failed to parse MDX file %s %s - skipping\n", filepath, err)
 				continue
 			}
 
 			if frontMatter.Version == "" {
-				fmt.Printf("::warn::Version is required in metadata for file %s - skipping ", filepath)
+				fmt.Printf("::warn::Version is required in metadata for file %s - skipping\n", filepath)
 				continue
 			}
 
 			agentType := parser.SubjectToAgentTypeMapping[parser.Subject(frontMatter.Subject)]
 
 			if agentType == "" {
-				fmt.Printf("::warn::Subject (to derive agent type) is required in metadata for file %s - skipping ", filepath)
+				fmt.Printf("::warn::Subject (to derive agent type) is required in metadata for file %s - skipping\n", filepath)
 				continue
 			}
 
@@ -77,6 +77,6 @@ func LoadMetadataForDocs() ([]MetadataForDocs, error) {
 		return metadataForDocs, nil
 	} else {
 		fmt.Print("::debug::no changed files detected in the PR context\n")
+		return nil, nil
 	}
-	return nil, fmt.Errorf("unknown error in LoadMetadataForDocs")
 }

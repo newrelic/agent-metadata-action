@@ -18,6 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Copy test .fleetControl to root for tagging
+        run: |
+          # Copy .fleetControl so it's included in the v0.0.0 tag
+          cp -r integration-test/agent-flow/.fleetControl .
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          # Force add despite .gitignore
+          git add -f .fleetControl
+          git commit -m "Temporary: Add .fleetControl for testing"
+
       - name: Push temporary tag for testing
         run: |
           git config user.name "github-actions"
@@ -153,77 +163,140 @@ jobs:
             rm mock-server.pid
           fi
 
-  # TODO: Re-enable docs flow test once metadata service call is implemented for docs workflow
-  # test-docs-flow:
-  #   name: Test Documentation Flow (MDX Parsing)
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout action repository
-  #       uses: actions/checkout@v4
-  #       with:
-  #         fetch-depth: 0  # Need full history to create proper PR simulation
+  test-docs-flow:
+    name: Test Documentation Flow (MDX Parsing)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout action repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history to create proper push simulation
 
-  #     - name: Create mock PR event with real commits
-  #       run: |
-  #         # Create two commits: one without MDX files, one with them
-  #         # This simulates a PR that adds MDX files
+      - name: Start mock metadata service
+        run: |
+          # Start mock HTTP server for metadata service
+          node .github/mock-server.js 8080 > mock-server.log 2>&1 &
+          echo $! > mock-server.pid
 
-  #         # Create base commit (remove MDX files temporarily)
-  #         TEMP_BACKUP="${{ runner.temp }}/mdx-backup"
-  #         mkdir -p "$TEMP_BACKUP"
+          # Wait for server to be ready
+          sleep 2
 
-  #         if [ -d "integration-test/docs-flow" ]; then
-  #           cp -r integration-test/docs-flow "$TEMP_BACKUP/"
-  #           rm -rf integration-test/docs-flow
-  #         fi
+          # Verify server is running
+          if ! curl -f http://127.0.0.1:8080/ > /dev/null 2>&1; then
+            echo "Mock server failed to start"
+            cat mock-server.log
+            exit 1
+          fi
 
-  #         git config user.email "test@example.com"
-  #         git config user.name "Test User"
-  #         git add -A
-  #         git commit -m "Base commit without MDX files" || echo "No changes to commit"
-  #         BASE_SHA=$(git rev-parse HEAD)
+          echo "Mock metadata service is running on port 8080"
 
-  #         # Restore MDX files and create head commit
-  #         if [ -d "$TEMP_BACKUP/docs-flow" ]; then
-  #           mkdir -p integration-test
-  #           cp -r "$TEMP_BACKUP/docs-flow" integration-test/
-  #         fi
+      - name: Setup mock newrelic-auth-cli
+        run: |
+          # Make our mock CLI executable and install to standard location
+          chmod +x .github/mock-newrelic-auth-cli
+          sudo cp .github/mock-newrelic-auth-cli /usr/local/bin/newrelic-auth-cli
 
-  #         git add -A
-  #         git commit -m "Add release notes MDX files"
-  #         HEAD_SHA=$(git rev-parse HEAD)
+          # Verify it's accessible
+          which newrelic-auth-cli
+          newrelic-auth-cli --help || echo "Mock CLI is ready"
 
-  #         # Create mock PR event
-  #         cat > /tmp/pr-event.json <<EOF
-  #         {
-  #           "pull_request": {
-  #             "base": {"sha": "${BASE_SHA}"},
-  #             "head": {"sha": "${HEAD_SHA}"}
-  #           }
-  #         }
-  #         EOF
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+          cache: false
 
-  #         echo "BASE_SHA: $BASE_SHA"
-  #         echo "HEAD_SHA: $HEAD_SHA"
+      - name: Create fake commits and run action (docs flow)
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+          METADATA_SERVICE_URL: http://127.0.0.1:8080
+          NEWRELIC_TOKEN: fake-token-for-testing
+        run: |
+          echo "::group::Create fake commits"
+          # Create two isolated commits: one without MDX files, one with them
+          # This simulates a push that adds MDX files, isolated from real push changes
 
-  #         # Verify the MDX files exist
-  #         echo "MDX files that will be detected as changed:"
-  #         git diff --name-only ${BASE_SHA} ${HEAD_SHA} | grep -E '\.mdx$' || echo "No MDX files found"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
 
-  #     - name: Run Agent Metadata Action (metadata from MDX)
-  #       uses: ./
-  #       env:
-  #         GITHUB_EVENT_PATH: '/tmp/pr-event.json'
-  #       with:
-  #         newrelic-client-id: ${{ secrets.OAUTH_CLIENT_ID }}
-  #         newrelic-private-key: ${{ secrets.OAUTH_CLIENT_SECRET }}
-  #         cache: false
+          # Backup MDX files
+          TEMP_BACKUP="${{ runner.temp }}/mdx-backup"
+          mkdir -p "$TEMP_BACKUP"
+
+          if [ -d "integration-test/docs-flow" ]; then
+            cp -r integration-test/docs-flow "$TEMP_BACKUP/"
+            rm -rf integration-test/docs-flow
+            git add -A
+            # Always create a commit, even if no changes (ensures clean baseline)
+            git commit -m "Before commit without MDX files" --allow-empty
+          else
+            # If docs-flow doesn't exist, create empty commit as baseline
+            git commit -m "Before commit without MDX files" --allow-empty
+          fi
+          BEFORE_SHA=$(git rev-parse HEAD)
+
+          # Restore MDX files and create "after" commit
+          if [ -d "$TEMP_BACKUP/docs-flow" ]; then
+            mkdir -p integration-test
+            cp -r "$TEMP_BACKUP/docs-flow" integration-test/
+            git add -A
+            git commit -m "Add release notes MDX files"
+          else
+            echo "::error::Failed to backup docs-flow - cannot create test commits"
+            exit 1
+          fi
+          AFTER_SHA=$(git rev-parse HEAD)
+
+          echo "BEFORE_SHA: $BEFORE_SHA"
+          echo "AFTER_SHA: $AFTER_SHA"
+
+          # Verify the MDX files exist and show what will be detected
+          echo "MDX files that will be detected as changed:"
+          git diff --name-only ${BEFORE_SHA} ${AFTER_SHA} | grep -E '\.mdx$' || echo "::warning::No MDX files found in diff"
+          echo "::endgroup::"
+
+          echo "::group::Building action"
+          go build -o agent-metadata-action ./cmd/agent-metadata-action
+          echo "::endgroup::"
+
+          echo "::group::Overwrite event file and verify"
+          # Overwrite GitHub's event file with our fake push event IN THE SAME STEP
+          # GitHub Actions resets this between steps, so we must do it right before running
+          cat > "${GITHUB_EVENT_PATH}" <<EOF
+          {
+            "ref": "refs/heads/main",
+            "before": "${BEFORE_SHA}",
+            "after": "${AFTER_SHA}"
+          }
+          EOF
+
+          echo "GITHUB_EVENT_PATH=${GITHUB_EVENT_PATH}"
+          echo "Contents of event file (should have our fake SHAs):"
+          cat "${GITHUB_EVENT_PATH}"
+          echo "::endgroup::"
+
+          echo "::group::Running action (docs flow - no agent-type or version)"
+          ./agent-metadata-action
+          echo "::endgroup::"
+
+      - name: Show mock server logs
+        if: always()
+        run: |
+          echo "=== Mock Server Logs ==="
+          cat mock-server.log || echo "No logs found"
+
+      - name: Cleanup mock server
+        if: always()
+        run: |
+          if [ -f mock-server.pid ]; then
+            kill $(cat mock-server.pid) || true
+            rm mock-server.pid
+          fi
 
   cleanup-test-tag:
     name: Cleanup Test Tag
     runs-on: ubuntu-latest
-    # TODO: Add test-docs-flow back to needs when re-enabled
-    needs: [test-agent-flow-no-v-version, test-agent-flow-v-version] # , test-docs-flow
+    needs: [test-agent-flow-no-v-version, test-agent-flow-v-version, test-docs-flow]
     if: always()
     steps:
       - name: Checkout action repository

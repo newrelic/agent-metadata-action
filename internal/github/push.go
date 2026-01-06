@@ -21,18 +21,11 @@ var IGNORED_FILENAMES = []string{"index.mdx"}
 // gitSHARegex validates Git SHA-1 hashes (40 hexadecimal characters)
 var gitSHARegex = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
-// PREvent represents the GitHub PR event payload
-type PREvent struct {
-	PullRequest struct {
-		Base struct {
-			SHA string `json:"sha"`
-			REF string `json:"ref"`
-		} `json:"base"`
-		Head struct {
-			SHA string `json:"sha"`
-			REF string `json:"ref"`
-		} `json:"head"`
-	} `json:"pull_request"`
+// PushEvent represents the GitHub PR event payload
+type PushEvent struct {
+	Before string `json:"before"`
+	After  string `json:"after"`
+	Ref    string `json:"ref"`
 }
 
 // GetChangedMDXFiles returns RELEASE_NOTES_FILE_EXTENSION type files changed in the PR under ROOT_RELEASE_NOTES_DIR, excluding IGNORED_FILENAMES
@@ -66,39 +59,40 @@ func getChangedMDXFilesImpl() ([]string, error) {
 	if eventPath == "" {
 		return nil, fmt.Errorf("GITHUB_EVENT_PATH not set")
 	}
-	fmt.Printf("::debug::GH event path: %s", eventPath)
+	fmt.Printf("::debug::GH event path: %s\n", eventPath)
 
 	data, err := fileutil.ReadFileSafe(eventPath, fileutil.MaxConfigFileSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read event payload: %w", err)
 	}
 
-	var event PREvent
+	var event PushEvent
 	if err := json.Unmarshal(data, &event); err != nil {
 		return nil, fmt.Errorf("failed to parse event payload: %w", err)
 	}
 
-	fmt.Printf("::debug::GH branch names: base %s and head %s", event.PullRequest.Base.REF, event.PullRequest.Head.REF)
-	fmt.Printf("::debug::GH SHAs: base %s and head %s", event.PullRequest.Base.SHA, event.PullRequest.Head.SHA)
+	fmt.Printf("::debug::event payload %s\n", event)
+	fmt.Printf("::debug::GH branch name: %s\n", event.Ref)
+	fmt.Printf("::debug::GH SHAs: before %s and after %s\n", event.Before, event.After)
 
 	// Validate SHAs to prevent command injection
 	/*
-	   if !isValidGitSHA(event.PullRequest.Base.SHA) {
-	   		return nil, fmt.Errorf("invalid base SHA format: must be 40 hexadecimal characters")
+	   if !isValidGitSHA(event.Before) {
+	   		return nil, fmt.Errorf("invalid before SHA format: must be 40 hexadecimal characters")
 	   	}
-	   	if !isValidGitSHA(event.PullRequest.Head.SHA) {
-	   		return nil, fmt.Errorf("invalid head SHA format: must be 40 hexadecimal characters")
+	   	if !isValidGitSHA(event.After) {
+	   		return nil, fmt.Errorf("invalid after SHA format: must be 40 hexadecimal characters")
 	   	}
 	*/
 	cmd := exec.Command("git", "diff", "--diff-filter=ACMR", "--name-only",
-		fmt.Sprintf("%s...%s", event.PullRequest.Base.SHA, event.PullRequest.Head.SHA))
+		fmt.Sprintf("%s...%s", event.Before, event.After))
 
 	// Set working directory to GITHUB_WORKSPACE so git can find the repository
 	workspace := config.GetWorkspace()
 	if workspace != "" {
 		cmd.Dir = workspace
 	} else {
-		fmt.Printf("::debug::workspace: %s", workspace)
+		fmt.Printf("::debug::workspace: %s\n", workspace)
 	}
 
 	var out bytes.Buffer
@@ -107,6 +101,8 @@ func getChangedMDXFilesImpl() ([]string, error) {
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("git diff failed: %w", err)
 	}
+
+	fmt.Printf("::debug::git diff output:\n%s\n", out.String())
 
 	var mdxFiles []string
 	for _, line := range strings.Split(out.String(), "\n") {
@@ -122,7 +118,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 			if workspace != "" {
 				line = filepath.Join(workspace, line)
 			}
-			fmt.Printf("::debug::mdx append line: %s", line)
+			fmt.Printf("::debug::mdx append line: %s\n", line)
 			mdxFiles = append(mdxFiles, line)
 		}
 	}
