@@ -269,6 +269,13 @@ jobs:
           go build -o agent-metadata-action ./cmd/agent-metadata-action
           echo "::endgroup::"
 
+          echo "::group::Environment check"
+          echo "GITHUB_EVENT_PATH=${GITHUB_EVENT_PATH}"
+          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
+          echo "Contents of event file:"
+          cat "${GITHUB_EVENT_PATH}"
+          echo "::endgroup::"
+
           echo "::group::Running action (docs flow - no agent-type or version)"
           ./agent-metadata-action
           echo "::endgroup::"
