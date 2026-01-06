@@ -243,14 +243,17 @@ jobs:
           echo "MDX files that will be detected as changed:"
           git diff --name-only ${BEFORE_SHA} ${AFTER_SHA} | grep -E '\.mdx$' || echo "::warning::No MDX files found in diff"
 
-          # Create mock push event
-          cat > /tmp/push-event.json <<EOF
+          # Overwrite GitHub's event file with our fake push event
+          # GitHub Actions won't let us override GITHUB_EVENT_PATH, so we overwrite the file instead
+          cat > "${GITHUB_EVENT_PATH}" <<EOF
           {
             "ref": "refs/heads/main",
             "before": "${BEFORE_SHA}",
             "after": "${AFTER_SHA}"
           }
           EOF
+
+          echo "::notice::Overwrote GitHub event file with fake push event"
 
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -260,7 +263,6 @@ jobs:
 
       - name: Build and run action directly (docs flow)
         env:
-          GITHUB_EVENT_PATH: '/tmp/push-event.json'
           GITHUB_WORKSPACE: ${{ github.workspace }}
           METADATA_SERVICE_URL: http://127.0.0.1:8080
           NEWRELIC_TOKEN: fake-token-for-testing
@@ -269,10 +271,9 @@ jobs:
           go build -o agent-metadata-action ./cmd/agent-metadata-action
           echo "::endgroup::"
 
-          echo "::group::Environment check"
+          echo "::group::Verify fake event file"
           echo "GITHUB_EVENT_PATH=${GITHUB_EVENT_PATH}"
-          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
-          echo "Contents of event file:"
+          echo "Contents of event file (should have our fake SHAs):"
           cat "${GITHUB_EVENT_PATH}"
           echo "::endgroup::"
 
