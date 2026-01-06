@@ -16,7 +16,7 @@ inputs:
     required: false
     default: ''
   fetch-depth:
-    description: 'Number of commits to fetch. 0 fetches all history (required for docs flow to work). 1 is fastest for agent flow.'
+    description: 'Number of commits to fetch (> 1 may be required for docs flow)'
     required: false
     default: '1'
   cache:
