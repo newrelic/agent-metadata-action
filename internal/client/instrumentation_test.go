@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"agent-metadata-action/internal/models"
 	"agent-metadata-action/internal/testutil"
@@ -346,9 +347,13 @@ func TestSendMetadata_NetworkError(t *testing.T) {
 		AgentControl:             []models.AgentControl{},
 	}
 
+	// Use short timeout to avoid waiting 30 seconds for connection failure
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
 	getStdout, getStderr := testutil.CaptureOutputWithDisplay(t)
 
-	err := client.SendMetadata(context.Background(), "java", "1.2.3", metadata)
+	err := client.SendMetadata(ctx, "java", "1.2.3", metadata)
 
 	_ = getStdout()
 	_ = getStderr()

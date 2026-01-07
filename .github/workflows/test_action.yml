@@ -78,6 +78,7 @@ jobs:
         env:
           METADATA_SERVICE_URL: http://127.0.0.1:8080
           MOCK_NEWRELIC_AUTH_CLI: true
+          GITHUB_ACTION_REPOSITORY: ${{ github.repository }}
         with:
           newrelic-client-id: fake-client-id-for-testing
           newrelic-private-key: ZmFrZS1wcml2YXRlLWtleS1mb3ItdGVzdGluZwo=
@@ -142,6 +143,7 @@ jobs:
         env:
           METADATA_SERVICE_URL: http://127.0.0.1:8080
           MOCK_NEWRELIC_AUTH_CLI: true
+          GITHUB_ACTION_REPOSITORY: ${{ github.repository }}
         with:
           newrelic-client-id: fake-client-id-for-testing
           newrelic-private-key: ZmFrZS1wcml2YXRlLWtleS1mb3ItdGVzdGluZwo=
@@ -211,6 +213,7 @@ jobs:
           GITHUB_WORKSPACE: ${{ github.workspace }}
           METADATA_SERVICE_URL: http://127.0.0.1:8080
           NEWRELIC_TOKEN: fake-token-for-testing
+          GITHUB_ACTION_REPOSITORY: ${{ github.repository }}
         run: |
           echo "::group::Create fake commits"
           # Create two isolated commits: one without MDX files, one with them
