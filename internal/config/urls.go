@@ -1,7 +1,5 @@
 package config
 
-import "os"
-
 // Service URL configuration - hardcoded for security
 const (
 	// MetadataURL is the instrumentation metadata service endpoint
@@ -17,13 +15,15 @@ type ServiceURLs struct {
 
 // GetMetadataURL returns the metadata service URL.
 // Can be overridden with METADATA_SERVICE_URL environment variable ONLY when
-// GITHUB_REPOSITORY matches the action's own repository (for testing).
+// running in the action's own repository (for testing).
 // This prevents users from redirecting requests to steal tokens.
 func GetMetadataURL() string {
 	// Only allow override in the action's own repository for testing
-	if url := os.Getenv("METADATA_SERVICE_URL"); url != "" {
-		repo := os.Getenv("GITHUB_REPOSITORY")
-		if repo == "newrelic/agent-metadata-action" {
+	if url := GetMetadataServiceUrl(); url != "" {
+		// GITHUB_ACTION_REPOSITORY = repo where the action code lives
+		// GITHUB_REPOSITORY = repo where the action is being used
+		// If they match, we're running in the action's own repo (for testing)
+		if GetActionRepository() != "" && GetActionRepository() == GetRepository() {
 			return url
 		}
 		// Silently ignore override attempts from other repositories

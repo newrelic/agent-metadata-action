@@ -334,8 +334,9 @@ func TestSendMetadata_LargeResponseBodyTruncation(t *testing.T) {
 }
 
 func TestSendMetadata_NetworkError(t *testing.T) {
-	// Use an invalid URL that will cause network error
-	client := NewInstrumentationClient("http://invalid-host-that-does-not-exist.local", "token")
+	// Use a non-routable IP address that will cause network error without DNS lookup
+	// 192.0.2.1 is in TEST-NET-1 range (RFC 5737) - reserved for documentation
+	client := NewInstrumentationClient("http://192.0.2.1:1", "token")
 
 	metadata := &models.AgentMetadata{
 		Metadata: models.Metadata{
