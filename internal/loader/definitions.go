@@ -4,26 +4,26 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
-	"agent-metadata-action/internal/fileutil"
 	"agent-metadata-action/internal/models"
 
 	"gopkg.in/yaml.v3"
 )
 
-const FLEET_CONTROL_DIR = ".fleetControl"
-const CONFIG_FILE_PATH = "configurationDefinitions.yml"
-const AGENT_CONTROL_DIR = "agentControl"
-const AGENT_CONTROL_FILE = "agent-schema-for-agent-control.yml"
-const AGENT_CONTROL_PLATFORM = "ALL"
+const FleetControlDir = ".fleetControl"
+const ConfigFilePath = "configurationDefinitions.yml"
+const AgentControlDir = "agentControl"
+const AgentControlFile = "agent-schema-for-agent-control.yml"
+const AgentControlPlatform = "ALL"
 
 // ReadConfigurationDefinitions reads and parses the configurationDefinitions file
 func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationDefinition, error) {
-	fullPath := filepath.Join(workspacePath, FLEET_CONTROL_DIR, CONFIG_FILE_PATH)
+	fullPath := filepath.Join(workspacePath, FleetControlDir, ConfigFilePath)
 
-	data, err := fileutil.ReadFileSafe(fullPath, fileutil.MaxConfigFileSize)
+	data, err := os.ReadFile(fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file at %s: %w", fullPath, err)
 	}
@@ -37,19 +37,26 @@ func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationD
 		return nil, fmt.Errorf("configurationDefinitions cannot be empty")
 	}
 
-	// Load and encode schema files (schema is optional for now but will be required in the future)
+	// Load and encode schema files, if provided
 	for i := range configFile.Configs {
+		// Get schema path from map
+		schemaPath, _ := configFile.Configs[i]["schema"].(string)
+
 		// Skip if no schema path is provided
-		if configFile.Configs[i].Schema == "" {
+		if schemaPath == "" {
+			fmt.Println("::warn::no schema path provided")
 			continue
 		}
 
 		// @todo at some point, we may want to do this concurrently if there are any agents with a large number of files
-		encoded, err := loadAndEncodeSchema(workspacePath, configFile.Configs[i].Schema)
+		encoded, err := loadAndEncodeSchema(workspacePath, schemaPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load schema for config %s and version %s: %w", configFile.Configs[i].Type, configFile.Configs[i].Version, err)
+			fmt.Printf("::warn::failed to load schema at schema path %s: %v -- continuing without it\n", schemaPath, err)
+			continue
 		}
-		configFile.Configs[i].Schema = encoded
+
+		// Update schema with encoded content
+		configFile.Configs[i]["schema"] = encoded
 	}
 
 	return configFile.Configs, nil
@@ -67,16 +74,16 @@ func loadAndEncodeSchema(workspacePath, schemaPath string) (string, error) {
 	}
 
 	// Schema paths are relative to the .fleetControl directory
-	fullPath := filepath.Join(workspacePath, FLEET_CONTROL_DIR, schemaPath)
+	fullPath := filepath.Join(workspacePath, FleetControlDir, schemaPath)
 
 	// Additional security check: ensure the resolved path is within .fleetControl
-	fleetControlDir := filepath.Join(workspacePath, FLEET_CONTROL_DIR)
+	fleetCtrlDir := filepath.Join(workspacePath, FleetControlDir)
 	resolvedPath, err := filepath.Abs(fullPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve schema path: %w", err)
 	}
 
-	resolvedFleetControl, err := filepath.Abs(fleetControlDir)
+	resolvedFleetControl, err := filepath.Abs(fleetCtrlDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve fleet control directory: %w", err)
 	}
@@ -85,7 +92,7 @@ func loadAndEncodeSchema(workspacePath, schemaPath string) (string, error) {
 		return "", fmt.Errorf("invalid schema path: must be within .fleetControl directory")
 	}
 
-	data, err := fileutil.ReadFileSafe(fullPath, fileutil.MaxConfigFileSize)
+	data, err := os.ReadFile(fullPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read schema file at %s: %w", fullPath, err)
 	}
@@ -98,39 +105,38 @@ func loadAndEncodeSchema(workspacePath, schemaPath string) (string, error) {
 		return "", fmt.Errorf("schema file at %s is not valid JSON", fullPath)
 	}
 
-	// Validate size before encoding to prevent memory explosion
-	if err := fileutil.ValidateSizeForEncoding(data, fileutil.MaxBase64EncodeSize, "schema file"); err != nil {
-		return "", fmt.Errorf("schema file at %s: %w", fullPath, err)
-	}
-
 	encoded := base64.StdEncoding.EncodeToString(data)
 	return encoded, nil
 }
 
 // LoadAndEncodeAgentControl reads and encodes the agent control content
-// Returns a single entry with platform AGENT_CONTROL_PLATFORM
+// Returns a single entry with platform AgentControlPlatform
 func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControl, error) {
-	agentControlPath := filepath.Join(workspacePath, FLEET_CONTROL_DIR, AGENT_CONTROL_DIR, AGENT_CONTROL_FILE)
+	return LoadAndEncodeAgentControlFunc(workspacePath)
+}
 
-	data, err := fileutil.ReadFileSafe(agentControlPath, fileutil.MaxConfigFileSize)
+// LoadAndEncodeAgentControlFunc is a variable that holds the function to load and encode agent control
+// This allows tests to override the implementation
+var LoadAndEncodeAgentControlFunc = loadAndEncodeAgentControlImpl
+
+// loadAndEncodeAgentControlImpl is the actual implementation
+func loadAndEncodeAgentControlImpl(workspacePath string) ([]models.AgentControl, error) {
+	agentControlPath := filepath.Join(workspacePath, FleetControlDir, AgentControlDir, AgentControlFile)
+
+	data, err := os.ReadFile(agentControlPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read agent control file at %s: %w", agentControlPath, err)
+		return nil, fmt.Errorf("failed to read agent control file at  %s: %w", agentControlPath, err)
 	}
 
 	if len(data) == 0 {
-		return nil, fmt.Errorf("agent control file at %s is empty", agentControlPath)
-	}
-
-	// Validate size before encoding to prevent memory explosion
-	if err := fileutil.ValidateSizeForEncoding(data, fileutil.MaxBase64EncodeSize, "agent control file"); err != nil {
-		return nil, fmt.Errorf("agent control file at %s: %w", agentControlPath, err)
+		return nil, fmt.Errorf("agent control file at %s is empty\n", agentControlPath)
 	}
 
 	encoded := base64.StdEncoding.EncodeToString(data)
 
 	return []models.AgentControl{
 		{
-			Platform: AGENT_CONTROL_PLATFORM,
+			Platform: AgentControlPlatform,
 			Content:  encoded,
 		},
 	}, nil

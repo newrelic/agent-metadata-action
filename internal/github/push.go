@@ -4,19 +4,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"agent-metadata-action/internal/config"
-	"agent-metadata-action/internal/fileutil"
 )
 
-const ROOT_RELEASE_NOTES_DIR = "src/content/docs/release-notes"
-const RELEASE_NOTES_FILE_EXTENSION = ".mdx"
+const RootReleaseNotesDir = "src/content/docs/release-notes"
+const ReleaseNotesFileExtension = ".mdx"
 
-var IGNORED_FILENAMES = []string{"index.mdx"}
+var IgnoredFilenames = []string{"index.mdx"}
 
 // gitSHARegex validates Git SHA-1 hashes (40 hexadecimal characters)
 var gitSHARegex = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -28,14 +28,18 @@ type PushEvent struct {
 	Ref    string `json:"ref"`
 }
 
-// GetChangedMDXFiles returns RELEASE_NOTES_FILE_EXTENSION type files changed in the PR under ROOT_RELEASE_NOTES_DIR, excluding IGNORED_FILENAMES
+// GetChangedMDXFiles returns ReleaseNotesFileExtension type files changed in the PR under RootReleaseNotesDir, excluding IgnoredFilenames
 func GetChangedMDXFiles() ([]string, error) {
 	return GetChangedMDXFilesFunc()
 }
 
+// GetChangedMDXFilesFunc is a variable that holds the function to get changed MDX files
+// This allows tests to override the implementation
+var GetChangedMDXFilesFunc = getChangedMDXFilesImpl
+
 // isIgnoredFilename checks if the filename should be ignored
 func isIgnoredFilename(filename string) bool {
-	for _, ignored := range IGNORED_FILENAMES {
+	for _, ignored := range IgnoredFilenames {
 		if filename == ignored {
 			return true
 		}
@@ -49,10 +53,6 @@ func isValidGitSHA(sha string) bool {
 	return gitSHARegex.MatchString(sha)
 }
 
-// GetChangedMDXFilesFunc is a variable that holds the function to get changed MDX files
-// This allows tests to override the implementation
-var GetChangedMDXFilesFunc = getChangedMDXFilesImpl
-
 // getChangedMDXFilesImpl is the actual implementation
 func getChangedMDXFilesImpl() ([]string, error) {
 	eventPath := config.GetEventPath()
@@ -61,14 +61,14 @@ func getChangedMDXFilesImpl() ([]string, error) {
 	}
 	fmt.Printf("::debug::GH event path: %s\n", eventPath)
 
-	data, err := fileutil.ReadFileSafe(eventPath, fileutil.MaxConfigFileSize)
+	data, err := os.ReadFile(eventPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read event payload: %w", err)
+		return nil, fmt.Errorf("failed to read push event payload: %w", err)
 	}
 
 	var event PushEvent
 	if err := json.Unmarshal(data, &event); err != nil {
-		return nil, fmt.Errorf("failed to parse event payload: %w", err)
+		return nil, fmt.Errorf("failed to parse push event payload: %w", err)
 	}
 
 	fmt.Printf("::debug::event payload %s\n", event)
@@ -76,14 +76,13 @@ func getChangedMDXFilesImpl() ([]string, error) {
 	fmt.Printf("::debug::GH SHAs: before %s and after %s\n", event.Before, event.After)
 
 	// Validate SHAs to prevent command injection
-	/*
-	   if !isValidGitSHA(event.Before) {
-	   		return nil, fmt.Errorf("invalid before SHA format: must be 40 hexadecimal characters")
-	   	}
-	   	if !isValidGitSHA(event.After) {
-	   		return nil, fmt.Errorf("invalid after SHA format: must be 40 hexadecimal characters")
-	   	}
-	*/
+	if !isValidGitSHA(event.Before) {
+		return nil, fmt.Errorf("invalid before SHA format: must be 40 hexadecimal characters")
+	}
+	if !isValidGitSHA(event.After) {
+		return nil, fmt.Errorf("invalid after SHA format: must be 40 hexadecimal characters")
+	}
+
 	cmd := exec.Command("git", "diff", "--diff-filter=ACMR", "--name-only",
 		fmt.Sprintf("%s...%s", event.Before, event.After))
 
@@ -106,13 +105,14 @@ func getChangedMDXFilesImpl() ([]string, error) {
 	var mdxFiles []string
 	for _, line := range strings.Split(out.String(), "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" || !strings.HasSuffix(line, RELEASE_NOTES_FILE_EXTENSION) {
+		if line == "" || !strings.HasSuffix(line, ReleaseNotesFileExtension) {
 			continue
 		}
 		if isIgnoredFilename(filepath.Base(line)) {
 			continue
 		}
-		if strings.Contains(line, ROOT_RELEASE_NOTES_DIR) {
+		// a file we care about has been pushed
+		if strings.Contains(line, RootReleaseNotesDir) {
 			// Convert to absolute path if workspace is set
 			if workspace != "" {
 				line = filepath.Join(workspace, line)

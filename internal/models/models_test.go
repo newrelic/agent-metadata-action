@@ -22,139 +22,54 @@ schema: ./schema.json
 	err := yaml.Unmarshal([]byte(yamlData), &config)
 
 	require.NoError(t, err)
-	assert.Equal(t, "1.0.0", config.Version)
-	assert.Equal(t, "kubernetes", config.Platform)
-	assert.Equal(t, "A test configuration", config.Description)
-	assert.Equal(t, "test-type", config.Type)
-	assert.Equal(t, "json", config.Format)
-	assert.Equal(t, "./schema.json", config.Schema)
+	assert.Equal(t, "1.0.0", config["version"])
+	assert.Equal(t, "kubernetes", config["platform"])
+	assert.Equal(t, "A test configuration", config["description"])
+	assert.Equal(t, "test-type", config["type"])
+	assert.Equal(t, "json", config["format"])
+	assert.Equal(t, "./schema.json", config["schema"])
 }
 
-func TestConfigurationDefinition_UnmarshalYAML_MissingFields(t *testing.T) {
-	tests := []struct {
-		name          string
-		yamlData      string
-		expectedError string
-	}{
-		{
-			name: "missing version",
-			yamlData: `
-platform: kubernetes
-description: A test configuration
-type: test-type
-format: json
-schema: ./schema.json
-`,
-			expectedError: "version is required",
-		},
-		{
-			name: "missing platform",
-			yamlData: `
-version: 1.0.0
-description: A test configuration
-type: test-type
-format: json
-schema: ./schema.json
-`,
-			expectedError: "platform is required",
-		},
-		{
-			name: "missing description",
-			yamlData: `
-version: 1.0.0
-platform: kubernetes
-type: test-type
-format: json
-schema: ./schema.json
-`,
-			expectedError: "description is required",
-		},
-		{
-			name: "missing type",
-			yamlData: `
-version: 1.0.0
-platform: kubernetes
-description: A test configuration
-format: json
-schema: ./schema.json
-`,
-			expectedError: "type is required",
-		},
-		{
-			name: "missing format",
-			yamlData: `
-version: 1.0.0
-platform: kubernetes
-description: A test configuration
-type: test-type
-schema: ./schema.json
-`,
-			expectedError: "format is required",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var config ConfigurationDefinition
-			err := yaml.Unmarshal([]byte(tt.yamlData), &config)
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), tt.expectedError)
-		})
-	}
-}
-
-func TestConfigurationDefinition_UnmarshalYAML_ErrorContext(t *testing.T) {
-	// When type and version are provided, error messages should include context
-	yamlData := `
-version: 1.0.0
-description: A test configuration
-type: mytype
-format: json
-schema: ./schema.json
-`
-	var config ConfigurationDefinition
-	err := yaml.Unmarshal([]byte(yamlData), &config)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "platform is required for config with type 'mytype' and version '1.0.0'")
-}
-
-func TestConfigurationDefinition_UnmarshalYAML_OptionalSchema(t *testing.T) {
-	// Schema is optional (for now, but will be required in the future)
+func TestConfigurationDefinition_UnmarshalYAML_AdditionalFields(t *testing.T) {
+	// Test that additional fields are captured and passed through
 	yamlData := `
 version: 1.0.0
 platform: kubernetes
 description: A test configuration
 type: test-type
 format: json
+schema: ./schema.json
+newField: newValue
+anotherField: 12345
 `
 	var config ConfigurationDefinition
 	err := yaml.Unmarshal([]byte(yamlData), &config)
 
 	require.NoError(t, err)
-	assert.Equal(t, "1.0.0", config.Version)
-	assert.Equal(t, "kubernetes", config.Platform)
-	assert.Equal(t, "A test configuration", config.Description)
-	assert.Equal(t, "test-type", config.Type)
-	assert.Equal(t, "json", config.Format)
-	assert.Equal(t, "", config.Schema) // Schema is empty when not provided
+	assert.Equal(t, "1.0.0", config["version"])
+	assert.Equal(t, "kubernetes", config["platform"])
+	assert.Equal(t, "A test configuration", config["description"])
+	assert.Equal(t, "test-type", config["type"])
+	assert.Equal(t, "json", config["format"])
+	assert.Equal(t, "./schema.json", config["schema"])
+	assert.Equal(t, "newValue", config["newField"])
+	assert.Equal(t, 12345, config["anotherField"])
 }
 
-func TestRequireField_ValidValue(t *testing.T) {
-	err := requireField("some-value", "fieldName", "")
-	assert.NoError(t, err)
-}
+func TestConfigurationDefinition_UnmarshalYAML_MissingFields(t *testing.T) {
+	// Test that missing fields don't cause errors (no validation)
+	yamlData := `
+version: 1.0.0
+platform: kubernetes
+`
+	var config ConfigurationDefinition
+	err := yaml.Unmarshal([]byte(yamlData), &config)
 
-func TestRequireField_EmptyValueWithoutContext(t *testing.T) {
-	err := requireField("", "fieldName", "")
-	assert.Error(t, err)
-	assert.Equal(t, "fieldName is required", err.Error())
-}
-
-func TestRequireField_EmptyValueWithContext(t *testing.T) {
-	err := requireField("", "fieldName", "myContext")
-	assert.Error(t, err)
-	assert.Equal(t, "fieldName is required for myContext", err.Error())
+	require.NoError(t, err)
+	assert.Equal(t, "1.0.0", config["version"])
+	assert.Equal(t, "kubernetes", config["platform"])
+	assert.Nil(t, config["description"])
+	assert.Nil(t, config["type"])
 }
 
 func TestAgentMetadata_JSONMarshaling(t *testing.T) {
@@ -162,19 +77,19 @@ func TestAgentMetadata_JSONMarshaling(t *testing.T) {
 	agentMetadata := AgentMetadata{
 		ConfigurationDefinitions: []ConfigurationDefinition{
 			{
-				Version:     "1.0.0",
-				Platform:    "k8s",
-				Description: "Test config",
-				Type:        "test",
-				Format:      "json",
-				Schema:      "encoded",
+				"version":     "1.0.0",
+				"platform":    "k8s",
+				"description": "Test config",
+				"type":        "test",
+				"format":      "json",
+				"schema":      "encoded",
 			},
 		},
 		Metadata: Metadata{
-			Version:  "1.2.3",
-			Features: []string{"feature1"},
-			Bugs:     []string{"bug1"},
-			Security: []string{"CVE-1"},
+			"version":  "1.2.3",
+			"features": []string{"feature1"},
+			"bugs":     []string{"bug1"},
+			"security": []string{"CVE-1"},
 		},
 		AgentControl: []AgentControl{
 			{

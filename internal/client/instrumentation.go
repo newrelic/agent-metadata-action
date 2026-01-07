@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
-	"agent-metadata-action/internal/fileutil"
 	"agent-metadata-action/internal/models"
 )
 
@@ -19,12 +19,14 @@ type InstrumentationClient struct {
 	token      string
 }
 
+const TIMEOUT = 30 * time.Second
+
 // NewInstrumentationClient creates a new instrumentation client
 func NewInstrumentationClient(baseURL, token string) *InstrumentationClient {
 	return &InstrumentationClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: TIMEOUT,
 		},
 		token: token,
 	}
@@ -32,12 +34,10 @@ func NewInstrumentationClient(baseURL, token string) *InstrumentationClient {
 
 // SendMetadata sends agent metadata to the instrumentation service
 // POST /v1/agents/{agentType}/versions/{agentVersion}
-func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType string, metadata *models.AgentMetadata) error {
+func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType string, agentVersion string, metadata *models.AgentMetadata) error {
 	fmt.Println("::group::Sending metadata to instrumentation service")
 	defer fmt.Println("::endgroup::")
 
-	// Validate inputs
-	fmt.Println("::debug::Validating inputs...")
 	if metadata == nil {
 		fmt.Println("::error::Metadata is required but was nil")
 		return fmt.Errorf("metadata is required")
@@ -46,15 +46,21 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 		fmt.Println("::error::Agent type is required but was empty")
 		return fmt.Errorf("agent type is required")
 	}
-	if metadata.Metadata.Version == "" {
-		fmt.Println("::error::Agent version is required but was empty in metadata")
-		return fmt.Errorf("agent version is required in metadata")
+
+	// If agent version not in input variables, get version from metadata map (if present)
+	if agentVersion == "" {
+		agentVersion, _ = metadata.Metadata["version"].(string)
 	}
+	if agentVersion == "" {
+		fmt.Println("::error::Agent version is required but was empty")
+		return fmt.Errorf("agent version is required")
+	}
+
 	fmt.Printf("::debug::Agent type: %s\n", agentType)
-	fmt.Printf("::debug::Agent version: %s\n", metadata.Metadata.Version)
+	fmt.Printf("::debug::Agent version: %s\n", agentVersion)
 
 	// Construct URL
-	url := fmt.Sprintf("%s/v1/agents/%s/versions/%s", c.baseURL, "TestAgent", metadata.Metadata.Version) // @todo update TestAgent after testing
+	url := fmt.Sprintf("%s/v1/agents/%s/versions/%s", c.baseURL, "TestAgent", agentVersion) // @todo update TestAgent after testing
 	fmt.Printf("::debug::Target URL: %s\n", url)
 	fmt.Printf("::debug::Base URL: %s\n", c.baseURL)
 
@@ -98,9 +104,9 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 	fmt.Printf("::debug::Response received in %s\n", duration)
 	fmt.Printf("::debug::HTTP status code: %d %s\n", resp.StatusCode, resp.Status)
 
-	// Read response body for error details (with size limit)
+	// Read response body for error details
 	fmt.Println("::debug::Reading response body...")
-	body, err := fileutil.ReadAllSafe(resp.Body, fileutil.MaxHTTPResponseSize)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Printf("::error::Failed to read response body: %v\n", err)
 		return fmt.Errorf("failed to read response: %w", err)
@@ -109,8 +115,6 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 
 	// Check for non-2xx status codes
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		fmt.Printf("::error::Metadata submission failed with status %d\n", resp.StatusCode)
-
 		// Log response body for debugging, but truncate if too large
 		responsePreview := string(body)
 		if len(responsePreview) > 500 {
