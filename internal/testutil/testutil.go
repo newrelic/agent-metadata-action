@@ -25,6 +25,32 @@ import (
 //	    assert.Contains(t, stdout, "expected output")
 //	}
 func CaptureOutput(t *testing.T) (getStdout, getStderr func() string) {
+	return captureOutput(t, false)
+}
+
+// CaptureOutputWithDisplay captures stdout and stderr for the duration of the test,
+// while also displaying the output in real-time to the test log.
+// Returns functions to retrieve the captured output.
+//
+// Usage:
+//
+//	func TestMyFunction(t *testing.T) {
+//	    getStdout, getStderr := testutil.CaptureOutputWithDisplay(t)
+//
+//	    // Run code that writes to stdout/stderr (will be visible when running with -v)
+//	    myFunction()
+//
+//	    // Retrieve captured output (this closes pipes and restores stdout/stderr)
+//	    stdout := getStdout()
+//	    stderr := getStderr()
+//
+//	    assert.Contains(t, stdout, "expected output")
+//	}
+func CaptureOutputWithDisplay(t *testing.T) (getStdout, getStderr func() string) {
+	return captureOutput(t, true)
+}
+
+func captureOutput(t *testing.T, display bool) (getStdout, getStderr func() string) {
 	t.Helper()
 
 	// Save original stdout/stderr
@@ -49,14 +75,24 @@ func CaptureOutput(t *testing.T) (getStdout, getStderr func() string) {
 	// Read from pipes in goroutines
 	go func() {
 		var buf bytes.Buffer
-		io.Copy(&buf, rOut)
+		if display {
+			// Use TeeReader to write to both buffer and original stdout
+			io.Copy(&buf, io.TeeReader(rOut, oldStdout))
+		} else {
+			io.Copy(&buf, rOut)
+		}
 		outChan <- buf.String()
 		rOut.Close()
 	}()
 
 	go func() {
 		var buf bytes.Buffer
-		io.Copy(&buf, rErr)
+		if display {
+			// Use TeeReader to write to both buffer and original stderr
+			io.Copy(&buf, io.TeeReader(rErr, oldStderr))
+		} else {
+			io.Copy(&buf, rErr)
+		}
 		errChan <- buf.String()
 		rErr.Close()
 	}()

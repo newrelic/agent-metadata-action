@@ -34,7 +34,7 @@ func TestGetChangedMDXFiles(t *testing.T) {
 	}
 
 	// Create initial commit (without MDX files)
-	releaseNotesDir := filepath.Join(workspace, ROOT_RELEASE_NOTES_DIR, "agent-release-notes", "java-release-notes")
+	releaseNotesDir := filepath.Join(workspace, RootReleaseNotesDir, "agent-release-notes", "java-release-notes")
 	if err := os.MkdirAll(releaseNotesDir, 0755); err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
@@ -138,13 +138,13 @@ bugs:
 		t.Logf("Found changed file: %s", file)
 
 		// Verify it's under ROOT_RELEASE_NOTES_DIR
-		if !strings.Contains(file, ROOT_RELEASE_NOTES_DIR) {
-			t.Errorf("File %s is not under %s", file, ROOT_RELEASE_NOTES_DIR)
+		if !strings.Contains(file, RootReleaseNotesDir) {
+			t.Errorf("File %s is not under %s", file, RootReleaseNotesDir)
 		}
 
 		// Verify it's an .mdx file
-		if filepath.Ext(file) != RELEASE_NOTES_FILE_EXTENSION {
-			t.Errorf("File %s is not a %s file", file, RELEASE_NOTES_FILE_EXTENSION)
+		if filepath.Ext(file) != ReleaseNotesFileExtension {
+			t.Errorf("File %s is not a %s file", file, ReleaseNotesFileExtension)
 		}
 
 		// Verify it's not in the ignored list
@@ -298,7 +298,6 @@ func TestIsValidGitSHA(t *testing.T) {
 	}
 }
 
-/*
 func TestGetChangedMDXFiles_InvalidSHA(t *testing.T) {
 	// Create a temporary event file with invalid SHA
 	tmpFile := filepath.Join(t.TempDir(), "event.json")
@@ -319,8 +318,8 @@ func TestGetChangedMDXFiles_InvalidSHA(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error for invalid SHA, got nil")
 	}
-	if !strings.Contains(err.Error(), "invalid base SHA format") {
-		t.Errorf("Expected error about invalid base SHA, got: %v", err)
+	if !strings.Contains(err.Error(), "invalid before SHA format") {
+		t.Errorf("Expected error about invalid before SHA, got: %v", err)
 	}
 }
 
@@ -344,8 +343,7 @@ func TestGetChangedMDXFiles_CommandInjectionAttempt(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error for command injection attempt, got nil")
 	}
-	if !strings.Contains(err.Error(), "invalid head SHA format") {
-		t.Errorf("Expected error about invalid head SHA, got: %v", err)
+	if !strings.Contains(err.Error(), "invalid after SHA format") {
+		t.Errorf("Expected error about invalid after SHA, got: %v", err)
 	}
 }
-*/

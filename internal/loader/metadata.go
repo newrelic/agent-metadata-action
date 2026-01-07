@@ -5,13 +5,12 @@ import (
 	"agent-metadata-action/internal/models"
 	"agent-metadata-action/internal/parser"
 	"fmt"
-	"os"
 )
 
 // LoadMetadataForAgents loads metadata with only version populated
 func LoadMetadataForAgents(version string) models.Metadata {
 	return models.Metadata{
-		Version: version,
+		"version": version,
 	}
 }
 
@@ -38,27 +37,17 @@ func LoadMetadataForDocs() ([]MetadataForDocs, error) {
 				continue
 			}
 
-			if frontMatter.Version == "" {
-				fmt.Printf("::warn::Version is required in metadata for file %s - skipping\n", filepath)
-				continue
-			}
-
-			agentType := parser.SubjectToAgentTypeMapping[parser.Subject(frontMatter.Subject)]
+			// Check for required subject field to derive agent type
+			subject, _ := frontMatter["subject"].(string)
+			agentType := parser.SubjectToAgentTypeMapping[parser.Subject(subject)]
 
 			if agentType == "" {
 				fmt.Printf("::warn::Subject (to derive agent type) is required in metadata for file %s - skipping\n", filepath)
 				continue
 			}
 
-			metadata := models.Metadata{
-				Version:                   frontMatter.Version,
-				Features:                  frontMatter.Features,
-				Bugs:                      frontMatter.Bugs,
-				Security:                  frontMatter.Security,
-				Deprecations:              frontMatter.Deprecations,
-				SupportedOperatingSystems: frontMatter.SupportedOperatingSystems,
-				EOL:                       frontMatter.EOL,
-			}
+			// Convert frontMatter directly to Metadata (both are maps)
+			metadata := models.Metadata(frontMatter)
 
 			metadataForDocs = append(metadataForDocs, MetadataForDocs{
 				AgentType:             agentType,
@@ -70,13 +59,13 @@ func LoadMetadataForDocs() ([]MetadataForDocs, error) {
 
 		if filesProcessed == 0 {
 			return nil, fmt.Errorf("unable to load metadata for any of the %d changed MDX files", len(changedFilepaths))
-		} else {
-			fmt.Fprintf(os.Stderr, "::notice::Loaded metadata for %d out of %d changed MDX files\n", filesProcessed, len(changedFilepaths))
 		}
 
+		fmt.Printf("::notice::Loaded metadata for %d out of %d changed MDX files\n", filesProcessed, len(changedFilepaths))
+
 		return metadataForDocs, nil
-	} else {
-		fmt.Print("::debug::no changed files detected in the PR context\n")
-		return nil, nil
 	}
+
+	fmt.Print("::debug::no changed files detected in the PR context\n")
+	return nil, nil
 }
