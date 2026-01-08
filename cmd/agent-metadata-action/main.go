@@ -70,15 +70,20 @@ func run() error {
 				return fmt.Errorf("error reading configs: %w", err)
 			}
 
-			agentControl, err := loader.LoadAndEncodeAgentControl(workspace)
-			if err != nil {
-				return fmt.Errorf("error reading agent control: %w", err)
-			}
-
 			fmt.Println("::notice::Successfully read configs file")
 			fmt.Printf("::debug::Found %d configs\n", len(configs))
 
+			// @todo need to update this to read a list of files for future use
+			agentControl, err := loader.LoadAndEncodeAgentControl(workspace)
+			if err != nil {
+				fmt.Printf("::debug::Unable to read agent control file: %s\n", workspace)
+			} else {
+				fmt.Println("::notice::Successfully read agent control file")
+			}
+
 			metadata := loader.LoadMetadataForAgents(agentVersion)
+
+			// @todo will need to add agentRequirements here in a future PR
 
 			agentMetadata := models.AgentMetadata{
 				ConfigurationDefinitions: configs,
@@ -99,23 +104,23 @@ func run() error {
 		fmt.Println("::debug::Docs scenario")
 
 		metadata, err := loader.LoadMetadataForDocs()
-
 		if err != nil {
-			return fmt.Errorf("error reading metadata: %w", err)
-		}
+			// warn but don't fail the docs push - this data is useful but not required at this time
+			fmt.Printf("::warn::Error reading metadata %s \n", err)
+		} else {
+			for _, currMetadata := range metadata {
+				fmt.Printf("::debug::Found metadata for %s %s \n", currMetadata.AgentType, currMetadata.AgentMetadataFromDocs["version"])
+				printJSON("Docs Metadata", currMetadata.AgentMetadataFromDocs)
 
-		for _, currMetadata := range metadata {
-			fmt.Printf("::debug::Found metadata for %s %s \n", currMetadata.AgentType, currMetadata.AgentMetadataFromDocs["version"])
-			printJSON("Docs Metadata", currMetadata.AgentMetadataFromDocs)
+				currAgentMetadata := models.AgentMetadata{
+					Metadata: currMetadata.AgentMetadataFromDocs,
+				}
 
-			currAgentMetadata := models.AgentMetadata{
-				Metadata: currMetadata.AgentMetadataFromDocs,
-			}
-
-			if err := metadataClient.SendMetadata(ctx, currMetadata.AgentType, &currAgentMetadata); err != nil {
-				fmt.Printf("::warn::Failed to send docs metadata to instrumentation service for agent type: %s \n", currMetadata.AgentType)
-			} else {
-				fmt.Printf("::notice::Successfully sent docs metadata to instrumentation service for agent type:  %s \n", currMetadata.AgentType)
+				if err := metadataClient.SendMetadata(ctx, currMetadata.AgentType, &currAgentMetadata); err != nil {
+					fmt.Printf("::warn::Failed to send docs metadata to instrumentation service for agent type: %s \n", currMetadata.AgentType)
+				} else {
+					fmt.Printf("::notice::Successfully sent docs metadata to instrumentation service for agent type:  %s \n", currMetadata.AgentType)
+				}
 			}
 		}
 	}

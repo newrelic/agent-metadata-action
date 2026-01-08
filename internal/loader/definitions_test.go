@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"agent-metadata-action/internal/testutil"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -101,12 +102,16 @@ func TestReadConfigurationDefinitions_SchemaFileNotFound(t *testing.T) {
 	err = os.WriteFile(configFile, []byte(testYAML), 0644)
 	require.NoError(t, err)
 
-	// Test reading the config - should fail
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// Test reading the config - should not fail if schema can't be loaded
 	configs, err := ReadConfigurationDefinitions(tmpDir)
-	assert.Error(t, err)
-	assert.Nil(t, configs)
-	assert.Contains(t, err.Error(), "failed to load schema")
-	assert.Contains(t, err.Error(), "test-config")
+
+	outputStr := getStdout()
+
+	require.NoError(t, err)
+	assert.NotNil(t, configs)
+	assert.Contains(t, outputStr, "failed to load schema")
 }
 
 func TestReadConfigurationDefinitions_EmptySchemaFile(t *testing.T) {
@@ -135,12 +140,16 @@ func TestReadConfigurationDefinitions_EmptySchemaFile(t *testing.T) {
 	err = os.WriteFile(configFile, []byte(testYAML), 0644)
 	require.NoError(t, err)
 
-	// Test reading the config - should fail
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// Test reading the config - should not fail if schema can't be loaded
 	configs, err := ReadConfigurationDefinitions(tmpDir)
-	assert.Error(t, err)
-	assert.Nil(t, configs)
-	assert.Contains(t, err.Error(), "failed to load schema")
-	assert.Contains(t, err.Error(), "is empty")
+
+	outputStr := getStdout()
+
+	require.NoError(t, err)
+	assert.NotNil(t, configs)
+	assert.Contains(t, outputStr, "failed to load schema")
 }
 
 func TestReadConfigurationDefinitions_InvalidJSONSchema(t *testing.T) {
@@ -169,12 +178,16 @@ func TestReadConfigurationDefinitions_InvalidJSONSchema(t *testing.T) {
 	err = os.WriteFile(configFile, []byte(testYAML), 0644)
 	require.NoError(t, err)
 
-	// Test reading the config - should fail
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// Test reading the config - should not fail if schema can't be loaded
 	configs, err := ReadConfigurationDefinitions(tmpDir)
-	assert.Error(t, err)
-	assert.Nil(t, configs)
-	assert.Contains(t, err.Error(), "failed to load schema")
-	assert.Contains(t, err.Error(), "is not valid JSON")
+
+	outputStr := getStdout()
+
+	require.NoError(t, err)
+	assert.NotNil(t, configs)
+	assert.Contains(t, outputStr, "failed to load schema")
 }
 
 func TestReadConfigurationDefinitions_MultipleConfigs(t *testing.T) {
@@ -340,11 +353,16 @@ func TestReadConfigurationDefinitions_DirectoryTraversal(t *testing.T) {
 			err = os.WriteFile(configFile, []byte(testYAML), 0644)
 			require.NoError(t, err)
 
-			// Should fail with security error
+			getStdout, _ := testutil.CaptureOutput(t)
+
+			// Test reading the config - should not fail if schema can't be loaded
 			configs, err := ReadConfigurationDefinitions(tmpDir)
-			assert.Error(t, err)
-			assert.Nil(t, configs)
-			assert.Contains(t, err.Error(), "directory traversal")
+
+			outputStr := getStdout()
+
+			require.NoError(t, err)
+			assert.NotNil(t, configs)
+			assert.Contains(t, outputStr, "directory traversal")
 		})
 	}
 }

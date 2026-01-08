@@ -44,11 +44,13 @@ func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationD
 			fmt.Printf("::debug::no schema provided - skipping\n")
 			continue
 		}
+		schemaPath := configFile.Configs[i]["schema"].(string)
 
 		// @todo at some point, we may want to do this concurrently if there are any agents with a large number of files
-		encoded, err := loadAndEncodeSchema(workspacePath, configFile.Configs[i]["schema"].(string))
+		encoded, err := loadAndEncodeSchema(workspacePath, schemaPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load schema for config %s and version %s: %w", configFile.Configs[i]["type"], configFile.Configs[i]["version"], err)
+			fmt.Printf("::warn::failed to load schema at schema path %s: %v -- continuing without it\n", schemaPath, err)
+			continue
 		}
 		configFile.Configs[i]["schema"] = encoded
 	}
@@ -103,6 +105,7 @@ func loadAndEncodeSchema(workspacePath, schemaPath string) (string, error) {
 	return encoded, nil
 }
 
+// @todo break this out into a different file
 // LoadAndEncodeAgentControl reads and encodes the agent control content
 // Returns a single entry with platform AGENT_CONTROL_PLATFORM
 func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControl, error) {
