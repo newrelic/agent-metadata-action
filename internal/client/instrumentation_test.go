@@ -69,7 +69,7 @@ func TestSendMetadata_Success(t *testing.T) {
 
 	getStdout, getStderr := testutil.CaptureOutput(t)
 
-	err := client.SendMetadata(context.Background(), "java", metadata)
+	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
 
 	outputStr := getStdout()
 	stderrStr := getStderr()
@@ -89,7 +89,7 @@ func TestSendMetadata_NilMetadata(t *testing.T) {
 
 	getStdout, _ := testutil.CaptureOutput(t)
 
-	err := client.SendMetadata(context.Background(), "java", nil)
+	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", nil)
 
 	outputStr := getStdout()
 
@@ -109,7 +109,7 @@ func TestSendMetadata_EmptyAgentType(t *testing.T) {
 
 	getStdout, _ := testutil.CaptureOutput(t)
 
-	err := client.SendMetadata(context.Background(), "", metadata)
+	err := client.SendMetadata(context.Background(), "", "1.2.3", metadata)
 
 	outputStr := getStdout()
 
@@ -123,13 +123,13 @@ func TestSendMetadata_EmptyAgentVersion(t *testing.T) {
 
 	metadata := &models.AgentMetadata{
 		Metadata: models.Metadata{
-			"version": "", // Empty version
+			"version": "1.2.3",
 		},
 	}
 
 	getStdout, _ := testutil.CaptureOutput(t)
 
-	err := client.SendMetadata(context.Background(), "java", metadata)
+	err := client.SendMetadata(context.Background(), "java-agent", "", metadata)
 
 	outputStr := getStdout()
 
@@ -197,7 +197,7 @@ func TestSendMetadata_HTTPErrors(t *testing.T) {
 
 			getStdout, _ := testutil.CaptureOutput(t)
 
-			err := client.SendMetadata(context.Background(), "java", metadata)
+			err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
 
 			outputStr := getStdout()
 
@@ -229,7 +229,7 @@ func TestSendMetadata_LargeResponseBodyTruncation(t *testing.T) {
 
 	getStdout, _ := testutil.CaptureOutput(t)
 
-	err := client.SendMetadata(context.Background(), "java", metadata)
+	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
 
 	outputStr := getStdout()
 
@@ -252,7 +252,7 @@ func TestSendMetadata_NetworkError(t *testing.T) {
 
 	getStdout, _ := testutil.CaptureOutput(t)
 
-	err := client.SendMetadata(context.Background(), "java", metadata)
+	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
 
 	outputStr := getStdout()
 
@@ -285,7 +285,7 @@ func TestSendMetadata_ContextCancellation(t *testing.T) {
 
 	getStdout, _ := testutil.CaptureOutput(t)
 
-	err := client.SendMetadata(ctx, "java", metadata)
+	err := client.SendMetadata(ctx, "java-agent", "1.2.3", metadata)
 
 	_ = getStdout()
 
@@ -313,7 +313,7 @@ func TestSendMetadata_SuccessWithResponseBody(t *testing.T) {
 
 	getStdout, _ := testutil.CaptureOutput(t)
 
-	err := client.SendMetadata(context.Background(), "java", metadata)
+	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
 
 	outputStr := getStdout()
 
@@ -376,7 +376,7 @@ func TestSendMetadata_WithConfigurationDefinitionsAndAgentControl(t *testing.T) 
 
 	getStdout, _ := testutil.CaptureOutput(t)
 
-	err := client.SendMetadata(context.Background(), "java", metadata)
+	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
 
 	outputStr := getStdout()
 
