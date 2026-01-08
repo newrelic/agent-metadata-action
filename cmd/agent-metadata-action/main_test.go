@@ -17,7 +17,7 @@ import (
 // mockMetadataClient is a mock implementation for testing
 type mockMetadataClient struct{}
 
-func (m *mockMetadataClient) SendMetadata(ctx context.Context, agentType string, metadata *models.AgentMetadata) error {
+func (m *mockMetadataClient) SendMetadata(ctx context.Context, agentType string, agentVersion string, metadata *models.AgentMetadata) error {
 	// Mock implementation - does nothing, returns success
 	return nil
 }
@@ -128,7 +128,7 @@ Release notes content here.
 	require.NoError(t, err)
 
 	// Verify docs scenario was triggered
-	assert.Contains(t, outputStr, "Docs scenario")
+	assert.Contains(t, outputStr, "Running documentation flow")
 	assert.Contains(t, stderrStr, "::notice::Loaded metadata for 1 out of 1 changed MDX files")
 
 	// Verify output contains agent metadata
