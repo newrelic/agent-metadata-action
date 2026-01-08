@@ -46,15 +46,15 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 		fmt.Println("::error::Agent type is required but was empty")
 		return fmt.Errorf("agent type is required")
 	}
-	if metadata.Metadata.Version == "" {
+	if metadata.Metadata["version"] == "" {
 		fmt.Println("::error::Agent version is required but was empty in metadata")
 		return fmt.Errorf("agent version is required in metadata")
 	}
 	fmt.Printf("::debug::Agent type: %s\n", agentType)
-	fmt.Printf("::debug::Agent version: %s\n", metadata.Metadata.Version)
+	fmt.Printf("::debug::Agent version: %s\n", metadata.Metadata["version"])
 
 	// Construct URL
-	url := fmt.Sprintf("%s/v1/agents/%s/versions/%s", c.baseURL, "TestAgent", metadata.Metadata.Version) // @todo update TestAgent after testing
+	url := fmt.Sprintf("%s/v1/agents/%s/versions/%s", c.baseURL, "TestAgent", metadata.Metadata["version"]) // @todo update TestAgent after testing
 	fmt.Printf("::debug::Target URL: %s\n", url)
 	fmt.Printf("::debug::Base URL: %s\n", c.baseURL)
 

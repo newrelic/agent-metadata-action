@@ -105,7 +105,7 @@ func run() error {
 		}
 
 		for _, currMetadata := range metadata {
-			fmt.Printf("::debug::Found metadata for %s %s \n", currMetadata.AgentType, currMetadata.AgentMetadataFromDocs.Version)
+			fmt.Printf("::debug::Found metadata for %s %s \n", currMetadata.AgentType, currMetadata.AgentMetadataFromDocs["version"])
 			printJSON("Docs Metadata", currMetadata.AgentMetadataFromDocs)
 
 			currAgentMetadata := models.AgentMetadata{

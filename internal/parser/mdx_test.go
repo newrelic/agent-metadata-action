@@ -38,15 +38,15 @@ This is the content.
 	assert.NotNil(t, frontmatter)
 
 	// Verify all fields
-	assert.Equal(t, "Test Agent", frontmatter.Subject)
-	assert.Equal(t, "2024-01-01", frontmatter.ReleaseDate)
-	assert.Equal(t, "1.0.0", frontmatter.Version)
-	assert.Equal(t, []string{"Feature 1", "Feature 2"}, frontmatter.Features)
-	assert.Equal(t, []string{"Bug fix 1"}, frontmatter.Bugs)
-	assert.Equal(t, []string{"CVE-2024-1234"}, frontmatter.Security)
-	assert.Equal(t, []string{"Deprecated feature"}, frontmatter.Deprecations)
-	assert.Equal(t, []string{"linux", "windows"}, frontmatter.SupportedOperatingSystems)
-	assert.Equal(t, "2025-12-31", frontmatter.EOL)
+	assert.Equal(t, "Test Agent", frontmatter["subject"])
+	assert.Equal(t, "2024-01-01", frontmatter["releaseDate"])
+	assert.Equal(t, "1.0.0", frontmatter["version"])
+	assert.Equal(t, []interface{}{"Feature 1", "Feature 2"}, frontmatter["features"])
+	assert.Equal(t, []interface{}{"Bug fix 1"}, frontmatter["bugs"])
+	assert.Equal(t, []interface{}{"CVE-2024-1234"}, frontmatter["security"])
+	assert.Equal(t, []interface{}{"Deprecated feature"}, frontmatter["deprecations"])
+	assert.Equal(t, []interface{}{"linux", "windows"}, frontmatter["supportedOperatingSystems"])
+	assert.Equal(t, "2025-12-31", frontmatter["eol"])
 }
 
 func TestParseMDXFile_MinimalFrontmatter(t *testing.T) {
@@ -67,12 +67,12 @@ Content here.
 	require.NoError(t, err)
 	assert.NotNil(t, frontmatter)
 
-	assert.Equal(t, "Minimal Agent", frontmatter.Subject)
-	assert.Equal(t, "2024-01-01", frontmatter.ReleaseDate)
-	assert.Equal(t, "1.0.0", frontmatter.Version)
-	assert.Nil(t, frontmatter.Features)
-	assert.Nil(t, frontmatter.Bugs)
-	assert.Empty(t, frontmatter.EOL)
+	assert.Equal(t, "Minimal Agent", frontmatter["subject"])
+	assert.Equal(t, "2024-01-01", frontmatter["releaseDate"])
+	assert.Equal(t, "1.0.0", frontmatter["version"])
+	assert.Nil(t, frontmatter["features"])
+	assert.Nil(t, frontmatter["bugs"])
+	assert.Empty(t, frontmatter["eol"])
 }
 
 func TestParseMDXFile_NoFrontmatter(t *testing.T) {

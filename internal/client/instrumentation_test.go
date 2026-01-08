@@ -49,7 +49,7 @@ func TestSendMetadata_Success(t *testing.T) {
 		var metadata models.AgentMetadata
 		err = json.Unmarshal(body, &metadata)
 		require.NoError(t, err)
-		assert.Equal(t, "1.2.3", metadata.Metadata.Version)
+		assert.Equal(t, "1.2.3", metadata.Metadata["version"])
 
 		// Send success response
 		w.WriteHeader(http.StatusOK)
@@ -61,7 +61,7 @@ func TestSendMetadata_Success(t *testing.T) {
 
 	metadata := &models.AgentMetadata{
 		Metadata: models.Metadata{
-			Version: "1.2.3",
+			"version": "1.2.3",
 		},
 		ConfigurationDefinitions: []models.ConfigurationDefinition{},
 		AgentControl:             []models.AgentControl{},
@@ -103,7 +103,7 @@ func TestSendMetadata_EmptyAgentType(t *testing.T) {
 
 	metadata := &models.AgentMetadata{
 		Metadata: models.Metadata{
-			Version: "1.2.3",
+			"version": "1.2.3",
 		},
 	}
 
@@ -123,7 +123,7 @@ func TestSendMetadata_EmptyAgentVersion(t *testing.T) {
 
 	metadata := &models.AgentMetadata{
 		Metadata: models.Metadata{
-			Version: "", // Empty version
+			"version": "", // Empty version
 		},
 	}
 
@@ -189,7 +189,7 @@ func TestSendMetadata_HTTPErrors(t *testing.T) {
 
 			metadata := &models.AgentMetadata{
 				Metadata: models.Metadata{
-					Version: "1.2.3",
+					"version": "1.2.3",
 				},
 				ConfigurationDefinitions: []models.ConfigurationDefinition{},
 				AgentControl:             []models.AgentControl{},
@@ -221,7 +221,7 @@ func TestSendMetadata_LargeResponseBodyTruncation(t *testing.T) {
 
 	metadata := &models.AgentMetadata{
 		Metadata: models.Metadata{
-			Version: "1.2.3",
+			"version": "1.2.3",
 		},
 		ConfigurationDefinitions: []models.ConfigurationDefinition{},
 		AgentControl:             []models.AgentControl{},
@@ -244,7 +244,7 @@ func TestSendMetadata_NetworkError(t *testing.T) {
 
 	metadata := &models.AgentMetadata{
 		Metadata: models.Metadata{
-			Version: "1.2.3",
+			"version": "1.2.3",
 		},
 		ConfigurationDefinitions: []models.ConfigurationDefinition{},
 		AgentControl:             []models.AgentControl{},
@@ -273,7 +273,7 @@ func TestSendMetadata_ContextCancellation(t *testing.T) {
 
 	metadata := &models.AgentMetadata{
 		Metadata: models.Metadata{
-			Version: "1.2.3",
+			"version": "1.2.3",
 		},
 		ConfigurationDefinitions: []models.ConfigurationDefinition{},
 		AgentControl:             []models.AgentControl{},
@@ -305,7 +305,7 @@ func TestSendMetadata_SuccessWithResponseBody(t *testing.T) {
 
 	metadata := &models.AgentMetadata{
 		Metadata: models.Metadata{
-			Version: "1.2.3",
+			"version": "1.2.3",
 		},
 		ConfigurationDefinitions: []models.ConfigurationDefinition{},
 		AgentControl:             []models.AgentControl{},
@@ -346,24 +346,24 @@ func TestSendMetadata_WithConfigurationDefinitionsAndAgentControl(t *testing.T) 
 
 	metadata := &models.AgentMetadata{
 		Metadata: models.Metadata{
-			Version: "1.2.3",
+			"version": "1.2.3",
 		},
 		ConfigurationDefinitions: []models.ConfigurationDefinition{
 			{
-				Version:     "1.0.0",
-				Platform:    "linux",
-				Description: "Config 1",
-				Type:        "string",
-				Format:      "text",
-				Schema:      "schema1",
+				"version":     "1.0.0",
+				"platform":    "linux",
+				"description": "Config 1",
+				"type":        "string",
+				"format":      "text",
+				"schema":      "schema1",
 			},
 			{
-				Version:     "1.0.0",
-				Platform:    "windows",
-				Description: "Config 2",
-				Type:        "string",
-				Format:      "text",
-				Schema:      "schema2",
+				"version":     "1.0.0",
+				"platform":    "windows",
+				"description": "Config 2",
+				"type":        "string",
+				"format":      "text",
+				"schema":      "schema2",
 			},
 		},
 		AgentControl: []models.AgentControl{

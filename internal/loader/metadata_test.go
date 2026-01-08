@@ -17,13 +17,13 @@ func TestLoadMetadataForAgents(t *testing.T) {
 	t.Setenv("INPUT_VERSION", "1.2.3")
 
 	metadata := LoadMetadataForAgents("1.2.3")
-	assert.Equal(t, "1.2.3", metadata.Version)
-	assert.Empty(t, metadata.Features)
-	assert.Empty(t, metadata.Bugs)
-	assert.Empty(t, metadata.Security)
-	assert.Empty(t, metadata.Deprecations)
-	assert.Empty(t, metadata.SupportedOperatingSystems)
-	assert.Empty(t, metadata.EOL)
+	assert.Equal(t, "1.2.3", metadata["version"])
+	assert.Empty(t, metadata["features"])
+	assert.Empty(t, metadata["bugs"])
+	assert.Empty(t, metadata["security"])
+	assert.Empty(t, metadata["deprecations"])
+	assert.Empty(t, metadata["supportedOperatingSystems"])
+	assert.Empty(t, metadata["eol"])
 }
 
 func TestLoadMetadata_WithMDXFiles_Success(t *testing.T) {
@@ -104,19 +104,19 @@ bugs:
 
 	// Verify first file's metadata
 	assert.Equal(t, "JavaAgent", metadata[0].AgentType)
-	assert.Equal(t, "1.5.0", metadata[0].AgentMetadataFromDocs.Version)
-	assert.Equal(t, []string{"Added new monitoring capability", "Improved performance"}, metadata[0].AgentMetadataFromDocs.Features)
-	assert.Equal(t, []string{"Fixed memory leak"}, metadata[0].AgentMetadataFromDocs.Bugs)
-	assert.Equal(t, []string{"Patched CVE-2024-1234"}, metadata[0].AgentMetadataFromDocs.Security)
-	assert.Equal(t, []string{"Removed legacy API"}, metadata[0].AgentMetadataFromDocs.Deprecations)
-	assert.Equal(t, []string{"Windows", "Linux", "macOS"}, metadata[0].AgentMetadataFromDocs.SupportedOperatingSystems)
-	assert.Equal(t, "2025-12-31", metadata[0].AgentMetadataFromDocs.EOL)
+	assert.Equal(t, "1.5.0", metadata[0].AgentMetadataFromDocs["version"])
+	assert.Equal(t, []interface{}{"Added new monitoring capability", "Improved performance"}, metadata[0].AgentMetadataFromDocs["features"])
+	assert.Equal(t, []interface{}{"Fixed memory leak"}, metadata[0].AgentMetadataFromDocs["bugs"])
+	assert.Equal(t, []interface{}{"Patched CVE-2024-1234"}, metadata[0].AgentMetadataFromDocs["security"])
+	assert.Equal(t, []interface{}{"Removed legacy API"}, metadata[0].AgentMetadataFromDocs["deprecations"])
+	assert.Equal(t, []interface{}{"Windows", "Linux", "macOS"}, metadata[0].AgentMetadataFromDocs["supportedOperatingSystems"])
+	assert.Equal(t, "2025-12-31", metadata[0].AgentMetadataFromDocs["eol"])
 
 	// Verify second file's metadata
 	assert.Equal(t, "NodeAgent", metadata[1].AgentType)
-	assert.Equal(t, "1.6.0", metadata[1].AgentMetadataFromDocs.Version)
-	assert.Equal(t, []string{"New dashboard feature"}, metadata[1].AgentMetadataFromDocs.Features)
-	assert.Equal(t, []string{"Fixed crash on startup"}, metadata[1].AgentMetadataFromDocs.Bugs)
+	assert.Equal(t, "1.6.0", metadata[1].AgentMetadataFromDocs["version"])
+	assert.Equal(t, []interface{}{"New dashboard feature"}, metadata[1].AgentMetadataFromDocs["features"])
+	assert.Equal(t, []interface{}{"Fixed crash on startup"}, metadata[1].AgentMetadataFromDocs["bugs"])
 }
 
 func TestLoadMetadata_NoMDXFiles_ReturnsEmptyMetadata(t *testing.T) {

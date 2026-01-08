@@ -40,16 +40,17 @@ func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationD
 	// Load and encode schema files (schema is optional for now but will be required in the future)
 	for i := range configFile.Configs {
 		// Skip if no schema path is provided
-		if configFile.Configs[i].Schema == "" {
+		if configFile.Configs[i]["schema"] == nil || configFile.Configs[i]["schema"] == "" {
+			fmt.Printf("::debug::no schema provided - skipping\n")
 			continue
 		}
 
 		// @todo at some point, we may want to do this concurrently if there are any agents with a large number of files
-		encoded, err := loadAndEncodeSchema(workspacePath, configFile.Configs[i].Schema)
+		encoded, err := loadAndEncodeSchema(workspacePath, configFile.Configs[i]["schema"].(string))
 		if err != nil {
-			return nil, fmt.Errorf("failed to load schema for config %s and version %s: %w", configFile.Configs[i].Type, configFile.Configs[i].Version, err)
+			return nil, fmt.Errorf("failed to load schema for config %s and version %s: %w", configFile.Configs[i]["type"], configFile.Configs[i]["version"], err)
 		}
-		configFile.Configs[i].Schema = encoded
+		configFile.Configs[i]["schema"] = encoded
 	}
 
 	return configFile.Configs, nil

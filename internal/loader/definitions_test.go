@@ -42,15 +42,15 @@ func TestReadConfigurationDefinitions_Success(t *testing.T) {
 	configs, err := ReadConfigurationDefinitions(tmpDir)
 	require.NoError(t, err)
 	assert.Len(t, configs, 1)
-	assert.Equal(t, "linux", configs[0].Platform)
-	assert.Equal(t, "Test configuration", configs[0].Description)
+	assert.Equal(t, "linux", configs[0]["platform"])
+	assert.Equal(t, "Test configuration", configs[0]["description"])
 
 	// Verify schema was base64 encoded
 	expectedEncoded := base64.StdEncoding.EncodeToString([]byte(schemaContent))
-	assert.Equal(t, expectedEncoded, configs[0].Schema)
+	assert.Equal(t, expectedEncoded, configs[0]["schema"])
 
 	// Verify we can decode it back
-	decoded, err := base64.StdEncoding.DecodeString(configs[0].Schema)
+	decoded, err := base64.StdEncoding.DecodeString(configs[0]["schema"].(string))
 	require.NoError(t, err)
 	assert.Equal(t, schemaContent, string(decoded))
 }
@@ -232,19 +232,19 @@ func TestReadConfigurationDefinitions_MultipleConfigs(t *testing.T) {
 	assert.Len(t, configs, 3)
 
 	// Verify first config
-	assert.Equal(t, "linux", configs[0].Platform)
+	assert.Equal(t, "linux", configs[0]["platform"])
 	expectedEncoded1 := base64.StdEncoding.EncodeToString([]byte(schema1Content))
-	assert.Equal(t, expectedEncoded1, configs[0].Schema)
+	assert.Equal(t, expectedEncoded1, configs[0]["schema"])
 
 	// Verify second config
-	assert.Equal(t, "kubernetes", configs[1].Platform)
+	assert.Equal(t, "kubernetes", configs[1]["platform"])
 	expectedEncoded2 := base64.StdEncoding.EncodeToString([]byte(schema2Content))
-	assert.Equal(t, expectedEncoded2, configs[1].Schema)
+	assert.Equal(t, expectedEncoded2, configs[1]["schema"])
 
 	// Verify third config
-	assert.Equal(t, "host", configs[2].Platform)
+	assert.Equal(t, "host", configs[2]["platform"])
 	expectedEncoded3 := base64.StdEncoding.EncodeToString([]byte(schema3Content))
-	assert.Equal(t, expectedEncoded3, configs[2].Schema)
+	assert.Equal(t, expectedEncoded3, configs[2]["schema"])
 }
 
 func TestReadConfigurationDefinitions_ValidationIntegration(t *testing.T) {
@@ -271,7 +271,9 @@ func TestReadConfigurationDefinitions_ValidationIntegration(t *testing.T) {
 	configs, err := ReadConfigurationDefinitions(tmpDir)
 	require.NoError(t, err)
 	assert.Len(t, configs, 1)
-	assert.Equal(t, "", configs[0].Schema) // Schema is empty when not provided
+	// Schema is nil when not provided
+	schema, _ := configs[0]["schema"]
+	assert.Nil(t, schema)
 }
 
 func TestReadConfigurationDefinitions_EmptyArray(t *testing.T) {

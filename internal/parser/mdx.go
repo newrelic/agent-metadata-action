@@ -8,19 +8,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// MDXFrontmatter represents the YAML frontmatter in an MDX file
-type MDXFrontmatter struct {
-	Subject                   string   `yaml:"subject"`
-	ReleaseDate               string   `yaml:"releaseDate"`
-	Version                   string   `yaml:"version"`
-	MetaDescription           string   `yaml:"metaDescription"`
-	Features                  []string `yaml:"features"`
-	Bugs                      []string `yaml:"bugs"`
-	Security                  []string `yaml:"security"`
-	Deprecations              []string `yaml:"deprecations"`
-	SupportedOperatingSystems []string `yaml:"supportedOperatingSystems"`
-	EOL                       string   `yaml:"eol"`
-}
+// MDXFrontmatter represents the YAML frontmatter in an MDX file.
+// It uses a map to allow any attributes to be added or removed without code changes.
+type MDXFrontmatter map[string]interface{}
 
 type Subject string
 
@@ -47,7 +37,7 @@ var SubjectToAgentTypeMapping = map[Subject]string{
 }
 
 // ParseMDXFile reads an MDX file and extracts the YAML frontmatter
-func ParseMDXFile(filePath string) (*MDXFrontmatter, error) {
+func ParseMDXFile(filePath string) (MDXFrontmatter, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read MDX file: %w", err)
@@ -74,5 +64,5 @@ func ParseMDXFile(filePath string) (*MDXFrontmatter, error) {
 		return nil, fmt.Errorf("failed to parse YAML frontmatter: %w", err)
 	}
 
-	return &frontmatter, nil
+	return frontmatter, nil
 }
