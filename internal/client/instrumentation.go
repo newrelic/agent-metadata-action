@@ -67,7 +67,7 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 	}
 	fmt.Printf("::debug::JSON payload size: %d bytes\n", len(jsonBody))
 	fmt.Printf("::debug::Configuration definitions count: %d\n", len(metadata.ConfigurationDefinitions))
-	fmt.Printf("::debug::Agent control entries: %d\n", len(metadata.AgentControl))
+	fmt.Printf("::debug::Agent control entries: %d\n", len(metadata.AgentControlDefinitions))
 
 	// Create HTTP request
 	fmt.Println("::debug::Creating HTTP POST request...")

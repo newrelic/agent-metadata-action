@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"agent-metadata-action/internal/config"
 	"agent-metadata-action/internal/testutil"
 	"encoding/base64"
 	"fmt"
@@ -15,7 +16,7 @@ import (
 func TestReadConfigurationDefinitions_Success(t *testing.T) {
 	// Create temporary directory structure
 	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, ".fleetControl")
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
 	schemasDir := filepath.Join(configDir, "schemas")
 	err := os.MkdirAll(schemasDir, 0755)
 	require.NoError(t, err)
@@ -27,7 +28,7 @@ func TestReadConfigurationDefinitions_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create test config file
-	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
 	testYAML := `configurationDefinitions:
   - platform: linux
     description: Test configuration
@@ -67,11 +68,11 @@ func TestReadConfigurationDefinitions_FileNotFound(t *testing.T) {
 
 func TestReadConfigurationDefinitions_InvalidYAML(t *testing.T) {
 	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, ".fleetControl")
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
 	err := os.MkdirAll(configDir, 0755)
 	require.NoError(t, err)
 
-	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
 	invalidYAML := `invalid: yaml: content: [unclosed`
 	err = os.WriteFile(configFile, []byte(invalidYAML), 0644)
 	require.NoError(t, err)
@@ -85,12 +86,12 @@ func TestReadConfigurationDefinitions_InvalidYAML(t *testing.T) {
 func TestReadConfigurationDefinitions_SchemaFileNotFound(t *testing.T) {
 	// Create temporary directory structure without schema file
 	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, ".fleetControl")
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
 	err := os.MkdirAll(configDir, 0755)
 	require.NoError(t, err)
 
 	// Create test config file that references non-existent schema
-	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
 	testYAML := `configurationDefinitions:
   - platform: linux
     description: Test configuration
@@ -117,7 +118,7 @@ func TestReadConfigurationDefinitions_SchemaFileNotFound(t *testing.T) {
 func TestReadConfigurationDefinitions_EmptySchemaFile(t *testing.T) {
 	// Create temporary directory structure with empty schema file
 	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, ".fleetControl")
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
 	schemasDir := filepath.Join(configDir, "schemas")
 	err := os.MkdirAll(schemasDir, 0755)
 	require.NoError(t, err)
@@ -128,7 +129,7 @@ func TestReadConfigurationDefinitions_EmptySchemaFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create test config file that references empty schema
-	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
 	testYAML := `configurationDefinitions:
   - platform: linux
     description: Test configuration
@@ -155,7 +156,7 @@ func TestReadConfigurationDefinitions_EmptySchemaFile(t *testing.T) {
 func TestReadConfigurationDefinitions_InvalidJSONSchema(t *testing.T) {
 	// Create temporary directory structure with invalid JSON schema file
 	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, ".fleetControl")
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
 	schemasDir := filepath.Join(configDir, "schemas")
 	err := os.MkdirAll(schemasDir, 0755)
 	require.NoError(t, err)
@@ -166,7 +167,7 @@ func TestReadConfigurationDefinitions_InvalidJSONSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create test config file that references invalid schema
-	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
 	testYAML := `configurationDefinitions:
   - platform: linux
     description: Test configuration
@@ -193,7 +194,7 @@ func TestReadConfigurationDefinitions_InvalidJSONSchema(t *testing.T) {
 func TestReadConfigurationDefinitions_MultipleConfigs(t *testing.T) {
 	// Create temporary directory structure
 	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, ".fleetControl")
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
 	schemasDir := filepath.Join(configDir, "schemas")
 	err := os.MkdirAll(schemasDir, 0755)
 	require.NoError(t, err)
@@ -215,7 +216,7 @@ func TestReadConfigurationDefinitions_MultipleConfigs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create test config file with multiple configs
-	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
 	testYAML := `configurationDefinitions:
   - platform: linux
     description: First configuration
@@ -265,12 +266,12 @@ func TestReadConfigurationDefinitions_ValidationIntegration(t *testing.T) {
 	// is properly wired up when reading config files.
 	// Comprehensive field validation is tested in models_test.go
 	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, ".fleetControl")
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
 	err := os.MkdirAll(configDir, 0755)
 	require.NoError(t, err)
 
 	// Test that schema is optional (will be required in the future)
-	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
 	yamlContent := `configurationDefinitions:
   - version: 1.2.3
     platform: linux
@@ -292,12 +293,12 @@ func TestReadConfigurationDefinitions_ValidationIntegration(t *testing.T) {
 func TestReadConfigurationDefinitions_EmptyArray(t *testing.T) {
 	// Create temporary directory structure
 	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, ".fleetControl")
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
 	err := os.MkdirAll(configDir, 0755)
 	require.NoError(t, err)
 
 	// Create test config file with empty array
-	configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
 	testYAML := `configurationDefinitions: []`
 
 	err = os.WriteFile(configFile, []byte(testYAML), 0644)
@@ -336,12 +337,12 @@ func TestReadConfigurationDefinitions_DirectoryTraversal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			configDir := filepath.Join(tmpDir, ".fleetControl")
+			configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
 			err := os.MkdirAll(configDir, 0755)
 			require.NoError(t, err)
 
 			// Create config file with malicious schema path
-			configFile := filepath.Join(configDir, "configurationDefinitions.yml")
+			configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
 			testYAML := fmt.Sprintf(`configurationDefinitions:
   - version: 1.0.0
     platform: linux
@@ -365,71 +366,4 @@ func TestReadConfigurationDefinitions_DirectoryTraversal(t *testing.T) {
 			assert.Contains(t, outputStr, "directory traversal")
 		})
 	}
-}
-
-func TestReadAgentControl_Success(t *testing.T) {
-	// Create temporary directory structure
-	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, ".fleetControl")
-	agentControlDir := filepath.Join(configDir, "agentControl")
-	err := os.MkdirAll(agentControlDir, 0755)
-	require.NoError(t, err)
-
-	// Create test agent control file
-	agentControlContent := `schema:
-  type: object
-  properties:
-    setting1:
-      type: string
-    setting2:
-      type: boolean`
-	agentControlFile := filepath.Join(agentControlDir, "agent-schema-for-agent-control.yml")
-	err = os.WriteFile(agentControlFile, []byte(agentControlContent), 0644)
-	require.NoError(t, err)
-
-	// Test reading the agent control
-	agentControl, err := LoadAndEncodeAgentControl(tmpDir)
-	require.NoError(t, err)
-	assert.Len(t, agentControl, 1)
-	assert.Equal(t, AGENT_CONTROL_PLATFORM, agentControl[0].Platform)
-	assert.NotEmpty(t, agentControl[0].Content)
-
-	// Verify content was base64 encoded
-	expectedEncoded := base64.StdEncoding.EncodeToString([]byte(agentControlContent))
-	assert.Equal(t, expectedEncoded, agentControl[0].Content)
-
-	// Verify we can decode it back
-	decoded, err := base64.StdEncoding.DecodeString(agentControl[0].Content)
-	require.NoError(t, err)
-	assert.Equal(t, agentControlContent, string(decoded))
-}
-
-func TestReadAgentControl_FileNotFound(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	agentControl, err := LoadAndEncodeAgentControl(tmpDir)
-	assert.Error(t, err)
-	assert.Nil(t, agentControl)
-	assert.Contains(t, err.Error(), "failed to read agent control file")
-}
-
-func TestReadAgentControl_EmptyFile(t *testing.T) {
-	// Create temporary directory structure with empty agent control file
-	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, ".fleetControl")
-	agentControlDir := filepath.Join(configDir, "agentControl")
-	err := os.MkdirAll(agentControlDir, 0755)
-	require.NoError(t, err)
-
-	// Create empty agent control file
-	agentControlFile := filepath.Join(agentControlDir, "agent-schema-for-agent-control.yml")
-	err = os.WriteFile(agentControlFile, []byte(""), 0644)
-	require.NoError(t, err)
-
-	// Test reading the agent control - should fail
-	agentControl, err := LoadAndEncodeAgentControl(tmpDir)
-	assert.Error(t, err)
-	assert.Nil(t, agentControl)
-	assert.Contains(t, err.Error(), "agent control file")
-	assert.Contains(t, err.Error(), "is empty")
 }

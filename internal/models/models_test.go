@@ -90,7 +90,7 @@ func TestAgentMetadata_JSONMarshaling(t *testing.T) {
 			"bugs":     []string{"bug1"},
 			"security": []string{"CVE-1"},
 		},
-		AgentControl: []AgentControl{
+		AgentControlDefinitions: []AgentControlDefinition{
 			{
 				Platform: "all",
 				Content:  "base64content",
