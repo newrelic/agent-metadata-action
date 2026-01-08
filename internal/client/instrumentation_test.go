@@ -64,7 +64,7 @@ func TestSendMetadata_Success(t *testing.T) {
 			"version": "1.2.3",
 		},
 		ConfigurationDefinitions: []models.ConfigurationDefinition{},
-		AgentControl:             []models.AgentControl{},
+		AgentControlDefinitions:  []models.AgentControlDefinition{},
 	}
 
 	getStdout, getStderr := testutil.CaptureOutput(t)
@@ -192,7 +192,7 @@ func TestSendMetadata_HTTPErrors(t *testing.T) {
 					"version": "1.2.3",
 				},
 				ConfigurationDefinitions: []models.ConfigurationDefinition{},
-				AgentControl:             []models.AgentControl{},
+				AgentControlDefinitions:  []models.AgentControlDefinition{},
 			}
 
 			getStdout, _ := testutil.CaptureOutput(t)
@@ -224,7 +224,7 @@ func TestSendMetadata_LargeResponseBodyTruncation(t *testing.T) {
 			"version": "1.2.3",
 		},
 		ConfigurationDefinitions: []models.ConfigurationDefinition{},
-		AgentControl:             []models.AgentControl{},
+		AgentControlDefinitions:  []models.AgentControlDefinition{},
 	}
 
 	getStdout, _ := testutil.CaptureOutput(t)
@@ -247,7 +247,7 @@ func TestSendMetadata_NetworkError(t *testing.T) {
 			"version": "1.2.3",
 		},
 		ConfigurationDefinitions: []models.ConfigurationDefinition{},
-		AgentControl:             []models.AgentControl{},
+		AgentControlDefinitions:  []models.AgentControlDefinition{},
 	}
 
 	getStdout, _ := testutil.CaptureOutput(t)
@@ -276,7 +276,7 @@ func TestSendMetadata_ContextCancellation(t *testing.T) {
 			"version": "1.2.3",
 		},
 		ConfigurationDefinitions: []models.ConfigurationDefinition{},
-		AgentControl:             []models.AgentControl{},
+		AgentControlDefinitions:  []models.AgentControlDefinition{},
 	}
 
 	// Create cancelled context
@@ -308,7 +308,7 @@ func TestSendMetadata_SuccessWithResponseBody(t *testing.T) {
 			"version": "1.2.3",
 		},
 		ConfigurationDefinitions: []models.ConfigurationDefinition{},
-		AgentControl:             []models.AgentControl{},
+		AgentControlDefinitions:  []models.AgentControlDefinition{},
 	}
 
 	getStdout, _ := testutil.CaptureOutput(t)
@@ -336,7 +336,7 @@ func TestSendMetadata_WithConfigurationDefinitionsAndAgentControl(t *testing.T) 
 
 		// Verify data is present
 		assert.Len(t, metadata.ConfigurationDefinitions, 2)
-		assert.Len(t, metadata.AgentControl, 1)
+		assert.Len(t, metadata.AgentControlDefinitions, 1)
 
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -366,7 +366,7 @@ func TestSendMetadata_WithConfigurationDefinitionsAndAgentControl(t *testing.T) 
 				"schema":      "schema2",
 			},
 		},
-		AgentControl: []models.AgentControl{
+		AgentControlDefinitions: []models.AgentControlDefinition{
 			{
 				Platform: "all",
 				Content:  "base64content",

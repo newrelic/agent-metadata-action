@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"agent-metadata-action/internal/client"
 	"agent-metadata-action/internal/config"
@@ -59,9 +60,9 @@ func run() error {
 
 	if agentType != "" && agentVersion != "" { // Scenario 1: Agent repo flow
 		fmt.Println("::debug::Agent scenario")
-		fleetControlPath := workspace + "/.fleetControl"
+		fleetControlPath := filepath.Join(workspace, config.GetRootFolderForAgentRepo())
 		if _, err := os.Stat(fleetControlPath); err != nil {
-			return fmt.Errorf("error ./fleetControl folder does not exist: %s", fleetControlPath)
+			return fmt.Errorf("error expected root folder does not exist: %s", fleetControlPath)
 		} else {
 			fmt.Printf("::debug::Reading config from workspace: %s\n", workspace)
 
@@ -73,12 +74,11 @@ func run() error {
 			fmt.Println("::notice::Successfully read configs file")
 			fmt.Printf("::debug::Found %d configs\n", len(configs))
 
-			// @todo need to update this to read a list of files for future use
-			agentControl, err := loader.LoadAndEncodeAgentControl(workspace)
+			agentControl, err := loader.ReadAgentControlDefinitions(workspace)
 			if err != nil {
-				fmt.Printf("::debug::Unable to read agent control file: %s\n", workspace)
+				fmt.Println("::debug::Unable to read agent control files")
 			} else {
-				fmt.Println("::notice::Successfully read agent control file")
+				fmt.Println("::notice::Successfully read agent control files")
 			}
 
 			metadata := loader.LoadMetadataForAgents(agentVersion)
@@ -88,7 +88,7 @@ func run() error {
 			agentMetadata := models.AgentMetadata{
 				ConfigurationDefinitions: configs,
 				Metadata:                 metadata,
-				AgentControl:             agentControl,
+				AgentControlDefinitions:  agentControl,
 			}
 
 			printJSON("Agent Metadata", agentMetadata)
