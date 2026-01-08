@@ -26,14 +26,14 @@ const (
 )
 
 var SubjectToAgentTypeMapping = map[Subject]string{
-	DotNet:   "DotnetAgent",
-	Infra:    "InfrastructureAgent",
-	InfraK8s: "InfrastructureK8sAgent",
-	Java:     "JavaAgent",
-	Node:     "NodeAgent",
-	NRDot:    "NrdotAgent",
-	Python:   "PythonAgent",
-	Ruby:     "RubyAgent",
+	DotNet:   "dotnet-agent",
+	Infra:    "infra-host-agent",
+	InfraK8s: "infra-k8s-agent",
+	Java:     "java-agent",
+	Node:     "node-agent",
+	NRDot:    "nrdot-agent",
+	Python:   "python-agent",
+	Ruby:     "ruby-agent",
 }
 
 // ParseMDXFile reads an MDX file and extracts the YAML frontmatter

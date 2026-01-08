@@ -103,7 +103,7 @@ bugs:
 	assert.Len(t, metadata, 2, "Should load 2 MDX files")
 
 	// Verify first file's metadata
-	assert.Equal(t, "JavaAgent", metadata[0].AgentType)
+	assert.Equal(t, "java-agent", metadata[0].AgentType)
 	assert.Equal(t, "1.5.0", metadata[0].AgentMetadataFromDocs["version"])
 	assert.Equal(t, []interface{}{"Added new monitoring capability", "Improved performance"}, metadata[0].AgentMetadataFromDocs["features"])
 	assert.Equal(t, []interface{}{"Fixed memory leak"}, metadata[0].AgentMetadataFromDocs["bugs"])
@@ -113,7 +113,7 @@ bugs:
 	assert.Equal(t, "2025-12-31", metadata[0].AgentMetadataFromDocs["eol"])
 
 	// Verify second file's metadata
-	assert.Equal(t, "NodeAgent", metadata[1].AgentType)
+	assert.Equal(t, "node-agent", metadata[1].AgentType)
 	assert.Equal(t, "1.6.0", metadata[1].AgentMetadataFromDocs["version"])
 	assert.Equal(t, []interface{}{"New dashboard feature"}, metadata[1].AgentMetadataFromDocs["features"])
 	assert.Equal(t, []interface{}{"Fixed crash on startup"}, metadata[1].AgentMetadataFromDocs["bugs"])
