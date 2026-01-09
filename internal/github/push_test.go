@@ -298,7 +298,6 @@ func TestIsValidGitSHA(t *testing.T) {
 	}
 }
 
-/*
 func TestGetChangedMDXFiles_InvalidSHA(t *testing.T) {
 	// Create a temporary event file with invalid SHA
 	tmpFile := filepath.Join(t.TempDir(), "event.json")
@@ -319,8 +318,8 @@ func TestGetChangedMDXFiles_InvalidSHA(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error for invalid SHA, got nil")
 	}
-	if !strings.Contains(err.Error(), "invalid base SHA format") {
-		t.Errorf("Expected error about invalid base SHA, got: %v", err)
+	if !strings.Contains(err.Error(), "invalid before SHA format") {
+		t.Errorf("Expected error about invalid before SHA, got: %v", err)
 	}
 }
 
@@ -344,8 +343,7 @@ func TestGetChangedMDXFiles_CommandInjectionAttempt(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error for command injection attempt, got nil")
 	}
-	if !strings.Contains(err.Error(), "invalid head SHA format") {
-		t.Errorf("Expected error about invalid head SHA, got: %v", err)
+	if !strings.Contains(err.Error(), "invalid after SHA format") {
+		t.Errorf("Expected error about invalid after SHA, got: %v", err)
 	}
 }
-*/
