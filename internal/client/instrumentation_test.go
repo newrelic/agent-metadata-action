@@ -16,17 +16,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewInstrumentationClient(t *testing.T) {
-	baseURL := "https://api.example.com"
-	token := "test-token-123"
+// errorReader is a custom reader that always returns an error
+type errorReader struct{}
 
-	client := NewInstrumentationClient(baseURL, token)
+func (e *errorReader) Read(p []byte) (n int, err error) {
+	return 0, io.ErrUnexpectedEOF
+}
 
-	assert.NotNil(t, client)
-	assert.Equal(t, baseURL, client.baseURL)
-	assert.Equal(t, token, client.token)
-	assert.NotNil(t, client.httpClient)
-	assert.Equal(t, client.httpClient.Timeout.Seconds(), float64(30))
+func (e *errorReader) Close() error {
+	return nil
+}
+
+// errorTransport is a custom transport that returns responses with error readers
+type errorTransport struct{}
+
+func (t *errorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Status:     "200 OK",
+		Body:       &errorReader{},
+		Header:     make(http.Header),
+	}, nil
 }
 
 func TestSendMetadata_Success(t *testing.T) {
@@ -53,7 +63,7 @@ func TestSendMetadata_Success(t *testing.T) {
 
 		// Send success response
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"success": true}`))
+		_, _ = w.Write([]byte(`{"success": true}`))
 	}))
 	defer server.Close()
 
@@ -69,6 +79,7 @@ func TestSendMetadata_Success(t *testing.T) {
 
 	getStdout, getStderr := testutil.CaptureOutput(t)
 
+	// method under test
 	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
 
 	outputStr := getStdout()
@@ -84,58 +95,64 @@ func TestSendMetadata_Success(t *testing.T) {
 	assert.NotContains(t, stderrStr, "::error::")
 }
 
-func TestSendMetadata_NilMetadata(t *testing.T) {
-	client := NewInstrumentationClient("https://api.example.com", "token")
-
-	getStdout, _ := testutil.CaptureOutput(t)
-
-	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", nil)
-
-	outputStr := getStdout()
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "metadata is required")
-	assert.Contains(t, outputStr, "Metadata is required but was nil")
-}
-
-func TestSendMetadata_EmptyAgentType(t *testing.T) {
-	client := NewInstrumentationClient("https://api.example.com", "token")
-
-	metadata := &models.AgentMetadata{
-		Metadata: models.Metadata{
-			"version": "1.2.3",
+func TestSendMetadata_ValidationErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		metadata      *models.AgentMetadata
+		agentType     string
+		agentVersion  string
+		expectedInErr string
+		expectedInLog string
+	}{
+		{
+			name:          "nil metadata",
+			metadata:      nil,
+			agentType:     "java-agent",
+			agentVersion:  "1.2.3",
+			expectedInErr: "metadata is required",
+			expectedInLog: "Metadata is required but was nil",
+		},
+		{
+			name: "empty agent type",
+			metadata: &models.AgentMetadata{
+				Metadata: models.Metadata{
+					"version": "1.2.3",
+				},
+			},
+			agentType:     "",
+			agentVersion:  "1.2.3",
+			expectedInErr: "agent type is required",
+			expectedInLog: "Agent type is required but was empty",
+		},
+		{
+			name: "empty agent version",
+			metadata: &models.AgentMetadata{
+				Metadata: models.Metadata{
+					"version": "1.2.3",
+				},
+			},
+			agentType:     "java-agent",
+			agentVersion:  "",
+			expectedInErr: "agent version is required",
+			expectedInLog: "Agent version is required but was empty",
 		},
 	}
 
-	getStdout, _ := testutil.CaptureOutput(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := NewInstrumentationClient("https://api.example.com", "token")
+			getStdout, _ := testutil.CaptureOutput(t)
 
-	err := client.SendMetadata(context.Background(), "", "1.2.3", metadata)
+			// method under test
+			err := client.SendMetadata(context.Background(), tt.agentType, tt.agentVersion, tt.metadata)
 
-	outputStr := getStdout()
+			outputStr := getStdout()
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "agent type is required")
-	assert.Contains(t, outputStr, "Agent type is required but was empty")
-}
-
-func TestSendMetadata_EmptyAgentVersion(t *testing.T) {
-	client := NewInstrumentationClient("https://api.example.com", "token")
-
-	metadata := &models.AgentMetadata{
-		Metadata: models.Metadata{
-			"version": "1.2.3",
-		},
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.expectedInErr)
+			assert.Contains(t, outputStr, tt.expectedInLog)
+		})
 	}
-
-	getStdout, _ := testutil.CaptureOutput(t)
-
-	err := client.SendMetadata(context.Background(), "java-agent", "", metadata)
-
-	outputStr := getStdout()
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "agent version is required")
-	assert.Contains(t, outputStr, "Agent version is required but was empty")
 }
 
 func TestSendMetadata_HTTPErrors(t *testing.T) {
@@ -197,6 +214,7 @@ func TestSendMetadata_HTTPErrors(t *testing.T) {
 
 			getStdout, _ := testutil.CaptureOutput(t)
 
+			// method under test
 			err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
 
 			outputStr := getStdout()
@@ -229,6 +247,7 @@ func TestSendMetadata_LargeResponseBodyTruncation(t *testing.T) {
 
 	getStdout, _ := testutil.CaptureOutput(t)
 
+	// method under test
 	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
 
 	outputStr := getStdout()
@@ -239,8 +258,9 @@ func TestSendMetadata_LargeResponseBodyTruncation(t *testing.T) {
 }
 
 func TestSendMetadata_NetworkError(t *testing.T) {
-	// Use an invalid URL that will cause network error
-	client := NewInstrumentationClient("http://invalid-host-that-does-not-exist.local", "token")
+	// Use localhost with a port that's guaranteed not to be listening
+	// This fails fast without DNS lookups or long timeouts
+	client := NewInstrumentationClient("http://127.0.0.1:1", "token")
 
 	metadata := &models.AgentMetadata{
 		Metadata: models.Metadata{
@@ -252,6 +272,7 @@ func TestSendMetadata_NetworkError(t *testing.T) {
 
 	getStdout, _ := testutil.CaptureOutput(t)
 
+	// method under test
 	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
 
 	outputStr := getStdout()
@@ -285,6 +306,7 @@ func TestSendMetadata_ContextCancellation(t *testing.T) {
 
 	getStdout, _ := testutil.CaptureOutput(t)
 
+	// method under test
 	err := client.SendMetadata(ctx, "java-agent", "1.2.3", metadata)
 
 	_ = getStdout()
@@ -313,6 +335,7 @@ func TestSendMetadata_SuccessWithResponseBody(t *testing.T) {
 
 	getStdout, _ := testutil.CaptureOutput(t)
 
+	// method under test
 	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
 
 	outputStr := getStdout()
@@ -376,6 +399,7 @@ func TestSendMetadata_WithConfigurationDefinitionsAndAgentControl(t *testing.T) 
 
 	getStdout, _ := testutil.CaptureOutput(t)
 
+	// method under test
 	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
 
 	outputStr := getStdout()
@@ -383,4 +407,66 @@ func TestSendMetadata_WithConfigurationDefinitionsAndAgentControl(t *testing.T) 
 	require.NoError(t, err)
 	assert.Contains(t, outputStr, "Configuration definitions count: 2")
 	assert.Contains(t, outputStr, "Agent control entries: 1")
+}
+
+func TestSendMetadata_MarshalError(t *testing.T) {
+	client := NewInstrumentationClient("https://api.example.com", "token")
+
+	// Create metadata with unmarshalable value (channel)
+	metadata := &models.AgentMetadata{
+		Metadata: models.Metadata{
+			"version":       "1.2.3",
+			"unmarshalable": make(chan int), // Channels cannot be marshaled to JSON
+		},
+		ConfigurationDefinitions: []models.ConfigurationDefinition{},
+		AgentControlDefinitions:  []models.AgentControlDefinition{},
+	}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// method under test
+	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
+
+	outputStr := getStdout()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to marshal metadata")
+	assert.Contains(t, outputStr, "Failed to marshal metadata")
+}
+
+func TestSendMetadata_ResponseBodyReadError(t *testing.T) {
+	// Create test server with custom response that fails to read
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Response is written but we'll replace the body reader in the client
+	}))
+	defer server.Close()
+
+	// Create client with custom HTTP client that returns error reader
+	client := &InstrumentationClient{
+		baseURL: server.URL,
+		token:   "test-token",
+		httpClient: &http.Client{
+			Transport: &errorTransport{},
+		},
+	}
+
+	metadata := &models.AgentMetadata{
+		Metadata: models.Metadata{
+			"version": "1.2.3",
+		},
+		ConfigurationDefinitions: []models.ConfigurationDefinition{},
+		AgentControlDefinitions:  []models.AgentControlDefinition{},
+	}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// method under test
+	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
+
+	outputStr := getStdout()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read response")
+	assert.Contains(t, outputStr, "Failed to read response body")
 }

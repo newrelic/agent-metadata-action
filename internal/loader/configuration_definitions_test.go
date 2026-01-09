@@ -57,138 +57,134 @@ func TestReadConfigurationDefinitions_Success(t *testing.T) {
 	assert.Equal(t, schemaContent, string(decoded))
 }
 
-func TestReadConfigurationDefinitions_FileNotFound(t *testing.T) {
-	tmpDir := t.TempDir()
+func TestReadConfigurationDefinitions_ErrorCases(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupFunc      func(t *testing.T, tmpDir string)
+		expectedErrMsg string
+	}{
+		{
+			name: "file not found",
+			setupFunc: func(t *testing.T, tmpDir string) {
+				// Don't create the config file
+			},
+			expectedErrMsg: "failed to read config file",
+		},
+		{
+			name: "invalid YAML",
+			setupFunc: func(t *testing.T, tmpDir string) {
+				configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+				require.NoError(t, os.MkdirAll(configDir, 0755))
 
-	configs, err := ReadConfigurationDefinitions(tmpDir)
-	assert.Error(t, err)
-	assert.Nil(t, configs)
-	assert.Contains(t, err.Error(), "failed to read config file")
+				configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
+				invalidYAML := `invalid: yaml: content: [unclosed`
+				require.NoError(t, os.WriteFile(configFile, []byte(invalidYAML), 0644))
+			},
+			expectedErrMsg: "failed to parse YAML",
+		},
+		{
+			name: "empty array",
+			setupFunc: func(t *testing.T, tmpDir string) {
+				configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+				require.NoError(t, os.MkdirAll(configDir, 0755))
+
+				configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
+				testYAML := `configurationDefinitions: []`
+				require.NoError(t, os.WriteFile(configFile, []byte(testYAML), 0644))
+			},
+			expectedErrMsg: "configurationDefinitions cannot be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			tt.setupFunc(t, tmpDir)
+
+			// method under test
+			configs, err := ReadConfigurationDefinitions(tmpDir)
+
+			require.Error(t, err)
+			assert.Nil(t, configs)
+			assert.Contains(t, err.Error(), tt.expectedErrMsg)
+		})
+	}
 }
 
-func TestReadConfigurationDefinitions_InvalidYAML(t *testing.T) {
-	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
-	err := os.MkdirAll(configDir, 0755)
-	require.NoError(t, err)
+func TestReadConfigurationDefinitions_SchemaLoadingWarnings(t *testing.T) {
+	tests := []struct {
+		name            string
+		setupFunc       func(t *testing.T, tmpDir string) string // returns schema path for config
+		expectedWarning string
+	}{
+		{
+			name: "schema file not found",
+			setupFunc: func(t *testing.T, tmpDir string) string {
+				// Don't create schema file
+				return "./schemas/nonexistent.json"
+			},
+			expectedWarning: "failed to load schema",
+		},
+		{
+			name: "empty schema file",
+			setupFunc: func(t *testing.T, tmpDir string) string {
+				configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+				schemasDir := filepath.Join(configDir, "schemas")
+				require.NoError(t, os.MkdirAll(schemasDir, 0755))
 
-	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
-	invalidYAML := `invalid: yaml: content: [unclosed`
-	err = os.WriteFile(configFile, []byte(invalidYAML), 0644)
-	require.NoError(t, err)
+				schemaFile := filepath.Join(schemasDir, "empty.json")
+				require.NoError(t, os.WriteFile(schemaFile, []byte(""), 0644))
+				return "./schemas/empty.json"
+			},
+			expectedWarning: "failed to load schema",
+		},
+		{
+			name: "invalid JSON schema",
+			setupFunc: func(t *testing.T, tmpDir string) string {
+				configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+				schemasDir := filepath.Join(configDir, "schemas")
+				require.NoError(t, os.MkdirAll(schemasDir, 0755))
 
-	configs, err := ReadConfigurationDefinitions(tmpDir)
-	assert.Error(t, err)
-	assert.Nil(t, configs)
-	assert.Contains(t, err.Error(), "failed to parse YAML")
-}
+				schemaFile := filepath.Join(schemasDir, "invalid.json")
+				require.NoError(t, os.WriteFile(schemaFile, []byte(`{invalid json content`), 0644))
+				return "./schemas/invalid.json"
+			},
+			expectedWarning: "failed to load schema",
+		},
+	}
 
-func TestReadConfigurationDefinitions_SchemaFileNotFound(t *testing.T) {
-	// Create temporary directory structure without schema file
-	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
-	err := os.MkdirAll(configDir, 0755)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+			require.NoError(t, os.MkdirAll(configDir, 0755))
 
-	// Create test config file that references non-existent schema
-	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
-	testYAML := `configurationDefinitions:
+			schemaPath := tt.setupFunc(t, tmpDir)
+
+			// Create test config file that references the schema
+			configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
+			testYAML := fmt.Sprintf(`configurationDefinitions:
   - platform: linux
     description: Test configuration
     type: test-config
     version: 1.0.0
     format: yaml
-    schema: ./schemas/nonexistent.json`
+    schema: %s`, schemaPath)
 
-	err = os.WriteFile(configFile, []byte(testYAML), 0644)
-	require.NoError(t, err)
+			require.NoError(t, os.WriteFile(configFile, []byte(testYAML), 0644))
 
-	getStdout, _ := testutil.CaptureOutput(t)
+			getStdout, _ := testutil.CaptureOutput(t)
 
-	// Test reading the config - should not fail if schema can't be loaded
-	configs, err := ReadConfigurationDefinitions(tmpDir)
+			// method under test - should not fail if schema can't be loaded
+			configs, err := ReadConfigurationDefinitions(tmpDir)
 
-	outputStr := getStdout()
+			outputStr := getStdout()
 
-	require.NoError(t, err)
-	assert.NotNil(t, configs)
-	assert.Contains(t, outputStr, "failed to load schema")
-}
-
-func TestReadConfigurationDefinitions_EmptySchemaFile(t *testing.T) {
-	// Create temporary directory structure with empty schema file
-	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
-	schemasDir := filepath.Join(configDir, "schemas")
-	err := os.MkdirAll(schemasDir, 0755)
-	require.NoError(t, err)
-
-	// Create empty schema file
-	schemaFile := filepath.Join(schemasDir, "empty.json")
-	err = os.WriteFile(schemaFile, []byte(""), 0644)
-	require.NoError(t, err)
-
-	// Create test config file that references empty schema
-	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
-	testYAML := `configurationDefinitions:
-  - platform: linux
-    description: Test configuration
-    type: test-config
-    version: 1.0.0
-    format: yaml
-    schema: ./schemas/empty.json`
-
-	err = os.WriteFile(configFile, []byte(testYAML), 0644)
-	require.NoError(t, err)
-
-	getStdout, _ := testutil.CaptureOutput(t)
-
-	// Test reading the config - should not fail if schema can't be loaded
-	configs, err := ReadConfigurationDefinitions(tmpDir)
-
-	outputStr := getStdout()
-
-	require.NoError(t, err)
-	assert.NotNil(t, configs)
-	assert.Contains(t, outputStr, "failed to load schema")
-}
-
-func TestReadConfigurationDefinitions_InvalidJSONSchema(t *testing.T) {
-	// Create temporary directory structure with invalid JSON schema file
-	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
-	schemasDir := filepath.Join(configDir, "schemas")
-	err := os.MkdirAll(schemasDir, 0755)
-	require.NoError(t, err)
-
-	// Create schema file with invalid JSON
-	schemaFile := filepath.Join(schemasDir, "invalid.json")
-	err = os.WriteFile(schemaFile, []byte(`{invalid json content`), 0644)
-	require.NoError(t, err)
-
-	// Create test config file that references invalid schema
-	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
-	testYAML := `configurationDefinitions:
-  - platform: linux
-    description: Test configuration
-    type: test-config
-    version: 1.0.0
-    format: yaml
-    schema: ./schemas/invalid.json`
-
-	err = os.WriteFile(configFile, []byte(testYAML), 0644)
-	require.NoError(t, err)
-
-	getStdout, _ := testutil.CaptureOutput(t)
-
-	// Test reading the config - should not fail if schema can't be loaded
-	configs, err := ReadConfigurationDefinitions(tmpDir)
-
-	outputStr := getStdout()
-
-	require.NoError(t, err)
-	assert.NotNil(t, configs)
-	assert.Contains(t, outputStr, "failed to load schema")
+			require.NoError(t, err)
+			assert.NotNil(t, configs)
+			assert.Contains(t, outputStr, tt.expectedWarning)
+		})
+	}
 }
 
 func TestReadConfigurationDefinitions_MultipleConfigs(t *testing.T) {
@@ -288,27 +284,6 @@ func TestReadConfigurationDefinitions_ValidationIntegration(t *testing.T) {
 	// Schema is nil when not provided
 	schema, _ := configs[0]["schema"]
 	assert.Nil(t, schema)
-}
-
-func TestReadConfigurationDefinitions_EmptyArray(t *testing.T) {
-	// Create temporary directory structure
-	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
-	err := os.MkdirAll(configDir, 0755)
-	require.NoError(t, err)
-
-	// Create test config file with empty array
-	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
-	testYAML := `configurationDefinitions: []`
-
-	err = os.WriteFile(configFile, []byte(testYAML), 0644)
-	require.NoError(t, err)
-
-	// Test reading the config - should error
-	configs, err := ReadConfigurationDefinitions(tmpDir)
-	assert.Error(t, err)
-	assert.Nil(t, configs)
-	assert.Contains(t, err.Error(), "configurationDefinitions cannot be empty")
 }
 
 func TestReadConfigurationDefinitions_DirectoryTraversal(t *testing.T) {

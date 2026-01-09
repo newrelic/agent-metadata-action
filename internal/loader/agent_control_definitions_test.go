@@ -13,158 +13,274 @@ import (
 )
 
 func TestReadAgentControlDefinitions_Success(t *testing.T) {
-	// Create temporary directory structure
-	tmpDir := t.TempDir()
-	agentControlDir := filepath.Join(tmpDir, config.GetAgentControlFolderForAgentRepo())
-	err := os.MkdirAll(agentControlDir, 0755)
-	require.NoError(t, err)
-
-	// Create test agent control file
-	agentControlContent := `schema:
+	tests := []struct {
+		name          string
+		files         map[string]string // filename -> content
+		expectedCount int
+	}{
+		{
+			name: "single yml file",
+			files: map[string]string{
+				"control.yml": `schema:
   type: object
   properties:
     setting1:
-      type: string
-    setting2:
-      type: boolean`
-	agentControlFile := filepath.Join(agentControlDir, "agent-schema-for-agent-control.yml")
-	err = os.WriteFile(agentControlFile, []byte(agentControlContent), 0644)
-	require.NoError(t, err)
-
-	// Test reading the agent control
-	agentControl, err := ReadAgentControlDefinitions(tmpDir)
-	require.NoError(t, err)
-	assert.Len(t, agentControl, 1)
-	assert.Equal(t, AgentControlPlatform, agentControl[0].Platform)
-	assert.NotEmpty(t, agentControl[0].Content)
-
-	// Verify content was base64 encoded
-	expectedEncoded := base64.StdEncoding.EncodeToString([]byte(agentControlContent))
-	assert.Equal(t, expectedEncoded, agentControl[0].Content)
-
-	// Verify we can decode it back
-	decoded, err := base64.StdEncoding.DecodeString(agentControl[0].Content)
-	require.NoError(t, err)
-	assert.Equal(t, agentControlContent, string(decoded))
-}
-
-func TestReadAgentControlDefinitions_DirectoryNotFound(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	agentControl, err := ReadAgentControlDefinitions(tmpDir)
-	assert.NoError(t, err)
-	assert.NotNil(t, agentControl)
-	assert.Empty(t, agentControl)
-}
-
-func TestReadAgentControlDefinitions_EmptyFile(t *testing.T) {
-	// Create temporary directory structure with empty agent control file
-	tmpDir := t.TempDir()
-	agentControlDir := filepath.Join(tmpDir, config.GetAgentControlFolderForAgentRepo())
-	err := os.MkdirAll(agentControlDir, 0755)
-	require.NoError(t, err)
-
-	// Create empty agent control file
-	agentControlFile := filepath.Join(agentControlDir, "agent-schema-for-agent-control.yml")
-	err = os.WriteFile(agentControlFile, []byte(""), 0644)
-	require.NoError(t, err)
-
-	getStdout, _ := testutil.CaptureOutput(t)
-
-	// Test reading the agent control - should not fail if file can't be loaded
-	agentControl, err := ReadAgentControlDefinitions(tmpDir)
-
-	outputStr := getStdout()
-
-	require.NoError(t, err)
-	assert.NotNil(t, agentControl)
-	assert.Contains(t, outputStr, "failed to load agent control file")
-}
-
-func TestReadAgentControlDefinitions_SkipNonYAMLFiles(t *testing.T) {
-	// Create temporary directory structure
-	tmpDir := t.TempDir()
-	agentControlDir := filepath.Join(tmpDir, config.GetAgentControlFolderForAgentRepo())
-	err := os.MkdirAll(agentControlDir, 0755)
-	require.NoError(t, err)
-
-	// Create a subdirectory that should be skipped by glob
-	subDir := filepath.Join(agentControlDir, "subdir")
-	err = os.MkdirAll(subDir, 0755)
-	require.NoError(t, err)
-
-	// Create non-YAML files that should be skipped by glob
-	txtFile := filepath.Join(agentControlDir, "readme.txt")
-	err = os.WriteFile(txtFile, []byte("text file"), 0644)
-	require.NoError(t, err)
-
-	jsonFile := filepath.Join(agentControlDir, "config.json")
-	err = os.WriteFile(jsonFile, []byte(`{"key": "value"}`), 0644)
-	require.NoError(t, err)
-
-	// Create a valid agent control file
-	agentControlContent := `schema:
-  type: object`
-	agentControlFile := filepath.Join(agentControlDir, "agent-control.yml")
-	err = os.WriteFile(agentControlFile, []byte(agentControlContent), 0644)
-	require.NoError(t, err)
-
-	// Test reading - should skip non-YAML files and only read YAML file
-	agentControl, err := ReadAgentControlDefinitions(tmpDir)
-	require.NoError(t, err)
-	assert.Len(t, agentControl, 1, "Should only have 1 entry, non-YAML files should be skipped")
-	assert.Equal(t, AgentControlPlatform, agentControl[0].Platform)
-	assert.NotEmpty(t, agentControl[0].Content)
-}
-
-func TestReadAgentControlDefinitions_MultipleFiles(t *testing.T) {
-	// Create temporary directory structure
-	tmpDir := t.TempDir()
-	agentControlDir := filepath.Join(tmpDir, config.GetAgentControlFolderForAgentRepo())
-	err := os.MkdirAll(agentControlDir, 0755)
-	require.NoError(t, err)
-
-	// Create multiple agent control files
-	file1Content := `schema:
+      type: string`,
+			},
+			expectedCount: 1,
+		},
+		{
+			name: "single yaml file",
+			files: map[string]string{
+				"control.yaml": `schema:
+  type: object`,
+			},
+			expectedCount: 1,
+		},
+		{
+			name: "multiple files",
+			files: map[string]string{
+				"control1.yml": `schema:
   type: object
   properties:
     field1:
-      type: string`
-	file1 := filepath.Join(agentControlDir, "control1.yml")
-	err = os.WriteFile(file1, []byte(file1Content), 0644)
-	require.NoError(t, err)
-
-	file2Content := `schema:
+      type: string`,
+				"control2.yaml": `schema:
   type: object
   properties:
     field2:
-      type: number`
-	file2 := filepath.Join(agentControlDir, "control2.yaml")
-	err = os.WriteFile(file2, []byte(file2Content), 0644)
-	require.NoError(t, err)
-
-	file3Content := `schema:
+      type: number`,
+				"control3.yml": `schema:
   type: object
   properties:
     field3:
-      type: boolean`
-	file3 := filepath.Join(agentControlDir, "control3.yml")
-	err = os.WriteFile(file3, []byte(file3Content), 0644)
-	require.NoError(t, err)
-
-	// Test reading the agent control files
-	agentControl, err := ReadAgentControlDefinitions(tmpDir)
-	require.NoError(t, err)
-	assert.Len(t, agentControl, 3)
-
-	// Verify all entries have correct platform and content
-	for _, control := range agentControl {
-		assert.Equal(t, AgentControlPlatform, control.Platform)
-		assert.NotEmpty(t, control.Content)
+      type: boolean`,
+			},
+			expectedCount: 3,
+		},
 	}
 
-	// Verify at least one can be decoded
-	decoded, err := base64.StdEncoding.DecodeString(agentControl[0].Content)
-	require.NoError(t, err)
-	assert.NotEmpty(t, string(decoded))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			agentControlDir := filepath.Join(tmpDir, config.GetAgentControlFolderForAgentRepo())
+			require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+
+			// Create all test files
+			for filename, content := range tt.files {
+				filePath := filepath.Join(agentControlDir, filename)
+				require.NoError(t, os.WriteFile(filePath, []byte(content), 0644))
+			}
+
+			// method under test
+			agentControl, err := ReadAgentControlDefinitions(tmpDir)
+
+			require.NoError(t, err)
+			assert.Len(t, agentControl, tt.expectedCount)
+
+			// Verify all entries have correct platform and content
+			for _, control := range agentControl {
+				assert.Equal(t, AgentControlPlatform, control.Platform)
+				assert.NotEmpty(t, control.Content)
+
+				// Verify content can be decoded
+				decoded, err := base64.StdEncoding.DecodeString(control.Content)
+				require.NoError(t, err)
+				assert.NotEmpty(t, string(decoded))
+			}
+
+			// For single file tests, verify exact content
+			if tt.expectedCount == 1 {
+				var expectedContent string
+				for _, content := range tt.files {
+					expectedContent = content
+					break
+				}
+				expectedEncoded := base64.StdEncoding.EncodeToString([]byte(expectedContent))
+				assert.Equal(t, expectedEncoded, agentControl[0].Content)
+			}
+		})
+	}
+}
+
+func TestReadAgentControlDefinitions_ErrorCases(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupFunc      func(t *testing.T, tmpDir string)
+		expectedCount  int
+		expectWarning  bool
+		warningMessage string
+	}{
+		{
+			name: "directory not found",
+			setupFunc: func(t *testing.T, tmpDir string) {
+				// Don't create the directory
+			},
+			expectedCount: 0,
+			expectWarning: false,
+		},
+		{
+			name: "empty file",
+			setupFunc: func(t *testing.T, tmpDir string) {
+				agentControlDir := filepath.Join(tmpDir, config.GetAgentControlFolderForAgentRepo())
+				require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+				agentControlFile := filepath.Join(agentControlDir, "empty.yml")
+				require.NoError(t, os.WriteFile(agentControlFile, []byte(""), 0644))
+			},
+			expectedCount:  0,
+			expectWarning:  true,
+			warningMessage: "failed to load agent control file",
+		},
+		{
+			name: "skip non-YAML files",
+			setupFunc: func(t *testing.T, tmpDir string) {
+				agentControlDir := filepath.Join(tmpDir, config.GetAgentControlFolderForAgentRepo())
+				require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+
+				// Create non-YAML files that should be skipped
+				require.NoError(t, os.WriteFile(filepath.Join(agentControlDir, "readme.txt"), []byte("text"), 0644))
+				require.NoError(t, os.WriteFile(filepath.Join(agentControlDir, "config.json"), []byte("{}"), 0644))
+
+				// Create one valid YAML file
+				require.NoError(t, os.WriteFile(filepath.Join(agentControlDir, "valid.yml"), []byte("test: data"), 0644))
+			},
+			expectedCount: 1,
+			expectWarning: false,
+		},
+		{
+			name: "unreadable file",
+			setupFunc: func(t *testing.T, tmpDir string) {
+				agentControlDir := filepath.Join(tmpDir, config.GetAgentControlFolderForAgentRepo())
+				require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+
+				// Create a file with no read permissions
+				unreadableFile := filepath.Join(agentControlDir, "unreadable.yml")
+				require.NoError(t, os.WriteFile(unreadableFile, []byte("test: data"), 0644))
+				require.NoError(t, os.Chmod(unreadableFile, 0000))
+			},
+			expectedCount:  0,
+			expectWarning:  true,
+			warningMessage: "failed to load agent control file",
+		},
+		{
+			name: "partial success with some failing files",
+			setupFunc: func(t *testing.T, tmpDir string) {
+				agentControlDir := filepath.Join(tmpDir, config.GetAgentControlFolderForAgentRepo())
+				require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+
+				// Create one valid file
+				require.NoError(t, os.WriteFile(filepath.Join(agentControlDir, "valid.yml"), []byte("test: data"), 0644))
+
+				// Create one empty file (should warn and skip)
+				require.NoError(t, os.WriteFile(filepath.Join(agentControlDir, "empty.yml"), []byte(""), 0644))
+			},
+			expectedCount:  1,
+			expectWarning:  true,
+			warningMessage: "failed to load agent control file",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			tt.setupFunc(t, tmpDir)
+
+			getStdout, _ := testutil.CaptureOutput(t)
+
+			// method under test
+			agentControl, err := ReadAgentControlDefinitions(tmpDir)
+
+			outputStr := getStdout()
+
+			require.NoError(t, err)
+			assert.NotNil(t, agentControl)
+			assert.Len(t, agentControl, tt.expectedCount)
+
+			if tt.expectWarning {
+				assert.Contains(t, outputStr, tt.warningMessage)
+			}
+		})
+	}
+}
+
+func TestLoadAndEncodeAgentControl(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupFunc   func(t *testing.T, tmpDir string, filename string)
+		filename    string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "success",
+			setupFunc: func(t *testing.T, tmpDir string, filename string) {
+				agentControlDir := filepath.Join(tmpDir, config.GetAgentControlFolderForAgentRepo())
+				require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+				filePath := filepath.Join(agentControlDir, filename)
+				require.NoError(t, os.WriteFile(filePath, []byte("test: data"), 0644))
+			},
+			filename: "test.yml",
+			wantErr:  false,
+		},
+		{
+			name: "file does not exist",
+			setupFunc: func(t *testing.T, tmpDir string, filename string) {
+				// Don't create the file
+				agentControlDir := filepath.Join(tmpDir, config.GetAgentControlFolderForAgentRepo())
+				require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+			},
+			filename:    "nonexistent.yml",
+			wantErr:     true,
+			errContains: "failed to read agent control file",
+		},
+		{
+			name: "empty file",
+			setupFunc: func(t *testing.T, tmpDir string, filename string) {
+				agentControlDir := filepath.Join(tmpDir, config.GetAgentControlFolderForAgentRepo())
+				require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+				filePath := filepath.Join(agentControlDir, filename)
+				require.NoError(t, os.WriteFile(filePath, []byte(""), 0644))
+			},
+			filename:    "empty.yml",
+			wantErr:     true,
+			errContains: "is empty",
+		},
+		{
+			name: "unreadable file",
+			setupFunc: func(t *testing.T, tmpDir string, filename string) {
+				agentControlDir := filepath.Join(tmpDir, config.GetAgentControlFolderForAgentRepo())
+				require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+				filePath := filepath.Join(agentControlDir, filename)
+				require.NoError(t, os.WriteFile(filePath, []byte("test: data"), 0644))
+				require.NoError(t, os.Chmod(filePath, 0000))
+			},
+			filename:    "unreadable.yml",
+			wantErr:     true,
+			errContains: "failed to read agent control file",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			tt.setupFunc(t, tmpDir, tt.filename)
+
+			// method under test
+			result, err := loadAndEncodeAgentControl(tmpDir, tt.filename)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, AgentControlPlatform, result.Platform)
+				assert.NotEmpty(t, result.Content)
+
+				// Verify content is base64 encoded
+				decoded, err := base64.StdEncoding.DecodeString(result.Content)
+				require.NoError(t, err)
+				assert.NotEmpty(t, string(decoded))
+			}
+		})
+	}
 }
