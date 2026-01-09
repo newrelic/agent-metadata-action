@@ -1,6 +1,7 @@
 package github
 
 import (
+	"agent-metadata-action/internal/config"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -34,7 +35,7 @@ func TestGetChangedMDXFiles(t *testing.T) {
 	}
 
 	// Create initial commit (without MDX files)
-	releaseNotesDir := filepath.Join(workspace, ROOT_RELEASE_NOTES_DIR, "agent-release-notes", "java-release-notes")
+	releaseNotesDir := filepath.Join(workspace, config.GetReleaseNotesDirectory(), "agent-release-notes", "java-release-notes")
 	if err := os.MkdirAll(releaseNotesDir, 0755); err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
@@ -138,13 +139,13 @@ bugs:
 		t.Logf("Found changed file: %s", file)
 
 		// Verify it's under ROOT_RELEASE_NOTES_DIR
-		if !strings.Contains(file, ROOT_RELEASE_NOTES_DIR) {
-			t.Errorf("File %s is not under %s", file, ROOT_RELEASE_NOTES_DIR)
+		if !strings.Contains(file, config.GetReleaseNotesDirectory()) {
+			t.Errorf("File %s is not under %s", file, config.GetReleaseNotesDirectory())
 		}
 
 		// Verify it's an .mdx file
-		if filepath.Ext(file) != RELEASE_NOTES_FILE_EXTENSION {
-			t.Errorf("File %s is not a %s file", file, RELEASE_NOTES_FILE_EXTENSION)
+		if filepath.Ext(file) != ReleaseNotesFileExtension {
+			t.Errorf("File %s is not a %s file", file, ReleaseNotesFileExtension)
 		}
 
 		// Verify it's not in the ignored list
