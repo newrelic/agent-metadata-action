@@ -2,7 +2,9 @@
 
 # Agent Metadata Action
 
-A GitHub Action that reads agent configuration metadata from the calling repository. This action parses the `.fleetControl/configurationDefinitions.yml` file and makes the configuration data available in New Relic.
+A GitHub Action that reads agent configuration metadata from the calling repository. There are 2 scearios to use this action:
+1. An agent release - This action parses the `.fleetControl/configurationDefinitions.yml` file and makes the configuration data and metadata available in New Relic.
+2. A docs update for an agent release - This action parses the frontmatter of the docs mdx files and makes the metadata available in New Relic.
 
 ## Installation
 
@@ -25,13 +27,14 @@ This action requires OAuth credentials to authenticate with New Relic services. 
 These must be passed as action inputs using the `with:` parameter in your workflow.
 
 ### Example Workflow For Releasing a New Agent Version
-This action automatically checks out your repository at the specified version tag, then reads the `.fleetControl/configurationDefinitions.yml` file and other associated files in `/fleetControl` and saves the agent information in New Relic. The action handles the checkout internally, so you don't need to include a separate `actions/checkout` step. If you do not want to use this action, you can call New Relic directly to add the agent information.
+This action automatically checks out your repository at the specified version tag, then reads the `.fleetControl/configurationDefinitions.yml` file and other associated files in `/fleetControl` and saves the agent information in New Relic. 
 
 ```yaml
 name: Process Agent Metadata
 on:
-  push:
-    branches: [main]
+  release:
+    types:
+      - published
 
 jobs:
   read-metadata:
@@ -42,14 +45,13 @@ jobs:
         with:
           newrelic-client-id: ${{ secrets.OAUTH_CLIENT_ID }}
           newrelic-private-key: ${{ secrets.OAUTH_CLIENT_SECRET }}
-          agent-type: dotnet # Required: The type of agent (e.g., dotnet, java, python)
-          version: 1.0.0 # Required: will be used to check out appropriate release tag
+          agent-type: dotnet-agent # Required for agent release workflow: The type of agent (e.g., nodejs-agent, java-agent)
+          version: 1.0.0 # Required for agent release workflow: will be used to check out appropriate release tag
           cache: true  # Optional: Enable Go build cache (default: true)
 ```
 
-### Example Workflow For Updating Docs Metadata on an Existing Agent Version
-This action automatically checks out the calling repo's commit, detects the changed release notes and saves the agent metadata in New Relic. The action handles the checkout internally, so you don't need to include a separate `actions/checkout` step. If you do not want to use this action, you can call New Relic directly to add the agent metadata.
-
+### Example Workflow For Updating Docs Metadata for a new/existing Agent Version
+This action should be triggered on a push to the main docs branch. It will automatically detect the changed release notes in the push and save the agent metadata in New Relic.
 
 ```yaml
 name: Process Agent Metadata
@@ -75,15 +77,14 @@ For the agent scenario, the action expects a YAML file at `.fleetControl/configu
 
 ```yaml
 configurationDefinitions:
-  - platform: "kubernetes"  # or "host" or "all" if there is no distinction
+  - platform: "KUBERNETESCLUSTER"  # or "HOST" or "ALL" if there is no distinction
     description: "Description of the configuration"
-    type: "config-type"
+    type: "agent-config"
     version: "1.0.0" -- config schema version
-    format: "json"   -- format of the agent config file
+    format: "yml"   -- format of the agent config file
     schema: "./schemas/config-schema.json"
 ```
 
-**All fields are required.** The action validates each configuration entry and will fail with a clear error message if any required field is missing (version, platform, description, type, format, schema).
 
 **Dec 2025 - schema temporarily optional until full functionality is ready
 
@@ -91,14 +92,9 @@ configurationDefinitions:
 
 ## Building
 
-To build the action locally:
-
 ```bash
 # Build the binary
 go build -o agent-metadata-action ./cmd/agent-metadata-action
-
-# Run locally
-/bin/bash /Users/mvick/IdeaProjects/agent-metadata-action/run_local.sh 
 ```
 
 ## Testing
