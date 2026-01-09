@@ -13,10 +13,9 @@ import (
 	"agent-metadata-action/internal/config"
 )
 
-const ROOT_RELEASE_NOTES_DIR = "src/content/docs/release-notes"
-const RELEASE_NOTES_FILE_EXTENSION = ".mdx"
+const ReleaseNotesFileExtension = ".mdx"
 
-var IGNORED_FILENAMES = []string{"index.mdx"}
+var IgnoredFilenames = []string{"index.mdx"}
 
 // gitSHARegex validates Git SHA-1 hashes (40 hexadecimal characters)
 var gitSHARegex = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -28,14 +27,14 @@ type PushEvent struct {
 	Ref    string `json:"ref"`
 }
 
-// GetChangedMDXFiles returns RELEASE_NOTES_FILE_EXTENSION type files changed in the PR under ROOT_RELEASE_NOTES_DIR, excluding IGNORED_FILENAMES
+// GetChangedMDXFiles returns ReleaseNotesFileExtension type files changed in the PR under the expected release notes direcotry, excluding IgnoredFilenames
 func GetChangedMDXFiles() ([]string, error) {
 	return GetChangedMDXFilesFunc()
 }
 
 // isIgnoredFilename checks if the filename should be ignored
 func isIgnoredFilename(filename string) bool {
-	for _, ignored := range IGNORED_FILENAMES {
+	for _, ignored := range IgnoredFilenames {
 		if filename == ignored {
 			return true
 		}
@@ -105,13 +104,13 @@ func getChangedMDXFilesImpl() ([]string, error) {
 	var mdxFiles []string
 	for _, line := range strings.Split(out.String(), "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" || !strings.HasSuffix(line, RELEASE_NOTES_FILE_EXTENSION) {
+		if line == "" || !strings.HasSuffix(line, ReleaseNotesFileExtension) {
 			continue
 		}
 		if isIgnoredFilename(filepath.Base(line)) {
 			continue
 		}
-		if strings.Contains(line, ROOT_RELEASE_NOTES_DIR) {
+		if strings.Contains(line, config.GetReleaseNotesDirectory()) {
 			// Convert to absolute path if workspace is set
 			if workspace != "" {
 				line = filepath.Join(workspace, line)

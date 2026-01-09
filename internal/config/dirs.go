@@ -20,3 +20,7 @@ func GetConfigurationDefinitionsFilename() string {
 func GetAgentControlFolderForAgentRepo() string {
 	return filepath.Join(GetRootFolderForAgentRepo(), "agentControl")
 }
+
+func GetReleaseNotesDirectory() string {
+	return "src/content/docs/release-notes"
+}
