@@ -4,9 +4,14 @@ import (
 	"os"
 )
 
-// GetWorkspace loads the workspace path from environment variables
+// GetWorkspace loads the GH workspace path from environment variables
 func GetWorkspace() string {
 	return os.Getenv("GITHUB_WORKSPACE")
+}
+
+// GetRepo loads the GH repo from environment variables
+func GetRepo() string {
+	return os.Getenv("GITHUB_REPOSITORY")
 }
 
 // GetAgentType loads the agent type from environment variables

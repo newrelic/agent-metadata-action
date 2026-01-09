@@ -22,7 +22,7 @@ type ServiceURLs struct {
 func GetMetadataURL() string {
 	// Only allow override in the action's own repository for testing
 	if url := os.Getenv("METADATA_SERVICE_URL"); url != "" {
-		repo := os.Getenv("GITHUB_REPOSITORY")
+		repo := GetRepo()
 		if repo == "newrelic/agent-metadata-action" {
 			return url
 		}

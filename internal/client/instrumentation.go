@@ -32,7 +32,7 @@ func NewInstrumentationClient(baseURL, token string) *InstrumentationClient {
 
 // SendMetadata sends agent metadata to the instrumentation service
 // POST /v1/agents/{agentType}/versions/{agentVersion}
-func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType string, metadata *models.AgentMetadata) error {
+func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType string, agentVersion string, metadata *models.AgentMetadata) error {
 	fmt.Println("::group::Sending metadata to instrumentation service")
 	defer fmt.Println("::endgroup::")
 
@@ -46,15 +46,15 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 		fmt.Println("::error::Agent type is required but was empty")
 		return fmt.Errorf("agent type is required")
 	}
-	if metadata.Metadata["version"] == "" {
-		fmt.Println("::error::Agent version is required but was empty in metadata")
-		return fmt.Errorf("agent version is required in metadata")
+	if agentVersion == "" {
+		fmt.Println("::error::Agent version is required but was empty")
+		return fmt.Errorf("agent version is required")
 	}
 	fmt.Printf("::debug::Agent type: %s\n", agentType)
-	fmt.Printf("::debug::Agent version: %s\n", metadata.Metadata["version"])
+	fmt.Printf("::debug::Agent version: %s\n", agentVersion)
 
 	// Construct URL
-	url := fmt.Sprintf("%s/v1/agents/%s/versions/%s", c.baseURL, "TestAgent", metadata.Metadata["version"]) // @todo update TestAgent after testing
+	url := fmt.Sprintf("%s/v1/agents/%s/versions/%s", c.baseURL, "TestAgent", agentVersion) // @todo update TestAgent after testing
 	fmt.Printf("::debug::Target URL: %s\n", url)
 	fmt.Printf("::debug::Base URL: %s\n", c.baseURL)
 
@@ -67,7 +67,7 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 	}
 	fmt.Printf("::debug::JSON payload size: %d bytes\n", len(jsonBody))
 	fmt.Printf("::debug::Configuration definitions count: %d\n", len(metadata.ConfigurationDefinitions))
-	fmt.Printf("::debug::Agent control entries: %d\n", len(metadata.AgentControl))
+	fmt.Printf("::debug::Agent control entries: %d\n", len(metadata.AgentControlDefinitions))
 
 	// Create HTTP request
 	fmt.Println("::debug::Creating HTTP POST request...")

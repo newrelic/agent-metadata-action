@@ -4,7 +4,7 @@ package models
 type AgentMetadata struct {
 	ConfigurationDefinitions []ConfigurationDefinition `json:"configurationDefinitions"`
 	Metadata                 Metadata                  `json:"metadata"`
-	AgentControl             []AgentControl            `json:"agentControl"`
+	AgentControlDefinitions  []AgentControlDefinition  `json:"agentControlDefinitions"`
 }
 
 // ConfigurationDefinition represents a configuration that can be read from YAML and sent as JSON.
@@ -17,8 +17,8 @@ type ConfigurationDefinition map[string]interface{}
 // YAML/JSON fields are automatically translated.
 type Metadata map[string]interface{}
 
-// AgentControl represents agent control content for a platform
-type AgentControl struct {
+// AgentControlDefinition represents agent control content for a platform
+type AgentControlDefinition struct {
 	Platform string `json:"platform"`
 	Content  string `json:"content"` // base64 encoded
 }
