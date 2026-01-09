@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -119,31 +120,38 @@ bugs:
 	assert.Equal(t, []interface{}{"Fixed crash on startup"}, metadata[1].AgentMetadataFromDocs["bugs"])
 }
 
-func TestLoadMetadata_NoMDXFiles_ReturnsEmptyMetadata(t *testing.T) {
-	// Don't set GITHUB_EVENT_PATH - simulates no PR context
-	err := os.Unsetenv("GITHUB_EVENT_PATH")
-	if err != nil {
-		return
-	}
+func TestLoadMetadataForDocs_ErrorCases(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupFunc     func(t *testing.T) (tmpWorkspace string, mdxFiles []string)
+		expectError   bool
+		expectedInErr string
+		expectedInLog string
+	}{
+		{
+			name: "github GetChangedMDXFiles returns error",
+			setupFunc: func(t *testing.T) (string, []string) {
+				// Mock to return error
+				originalFunc := github.GetChangedMDXFilesFunc
+				github.GetChangedMDXFilesFunc = func() ([]string, error) {
+					return nil, fmt.Errorf("git error")
+				}
+				t.Cleanup(func() {
+					github.GetChangedMDXFilesFunc = originalFunc
+				})
+				return "", nil
+			},
+			expectError:   true,
+			expectedInErr: "could not get changed files",
+		},
+		{
+			name: "blank version",
+			setupFunc: func(t *testing.T) (string, []string) {
+				tmpWorkspace := t.TempDir()
+				releaseNotesDir := filepath.Join(tmpWorkspace, "src/content/docs/release-notes/agent-release-notes")
+				require.NoError(t, os.MkdirAll(releaseNotesDir, 0755))
 
-	metadata, err := LoadMetadataForDocs()
-	require.Error(t, err)
-	assert.Nil(t, metadata)
-}
-
-func TestLoadMetadata_MDXFileWithBlankVersion_ReturnsError(t *testing.T) {
-	getStdout, _ := testutil.CaptureOutput(t)
-
-	// Create a temporary workspace
-	tmpWorkspace := t.TempDir()
-
-	// Create the release notes directory structure
-	releaseNotesDir := filepath.Join(tmpWorkspace, "src/content/docs/release-notes/agent-release-notes")
-	err := os.MkdirAll(releaseNotesDir, 0755)
-	require.NoError(t, err)
-
-	// Create test MDX file with blank version
-	mdxContent := `---
+				mdxContent := `---
 subject: Java agent
 releaseDate: '2024-01-15'
 version: ""
@@ -153,28 +161,149 @@ features:
 
 # Test Release Notes
 `
+				mdxFile := filepath.Join(releaseNotesDir, "test-agent.mdx")
+				require.NoError(t, os.WriteFile(mdxFile, []byte(mdxContent), 0644))
+				return tmpWorkspace, []string{mdxFile}
+			},
+			expectError:   true,
+			expectedInErr: "unable to load metadata for any",
+			expectedInLog: "Version is required",
+		},
+		{
+			name: "missing subject",
+			setupFunc: func(t *testing.T) (string, []string) {
+				tmpWorkspace := t.TempDir()
+				releaseNotesDir := filepath.Join(tmpWorkspace, "src/content/docs/release-notes/agent-release-notes")
+				require.NoError(t, os.MkdirAll(releaseNotesDir, 0755))
 
-	mdxFile := filepath.Join(releaseNotesDir, "test-agent.mdx")
-	err = os.WriteFile(mdxFile, []byte(mdxContent), 0644)
-	require.NoError(t, err)
+				mdxContent := `---
+releaseDate: '2024-01-15'
+version: 1.2.3
+features:
+  - New feature
+---
 
-	// Mock GetChangedMDXFiles to return our test file
+# Test Release Notes
+`
+				mdxFile := filepath.Join(releaseNotesDir, "test-agent.mdx")
+				require.NoError(t, os.WriteFile(mdxFile, []byte(mdxContent), 0644))
+				return tmpWorkspace, []string{mdxFile}
+			},
+			expectError:   true,
+			expectedInErr: "unable to load metadata for any",
+			expectedInLog: "Subject (to derive agent type) is required",
+		},
+		{
+			name: "empty subject",
+			setupFunc: func(t *testing.T) (string, []string) {
+				tmpWorkspace := t.TempDir()
+				releaseNotesDir := filepath.Join(tmpWorkspace, "src/content/docs/release-notes/agent-release-notes")
+				require.NoError(t, os.MkdirAll(releaseNotesDir, 0755))
+
+				mdxContent := `---
+subject: ""
+releaseDate: '2024-01-15'
+version: 1.2.3
+features:
+  - New feature
+---
+
+# Test Release Notes
+`
+				mdxFile := filepath.Join(releaseNotesDir, "test-agent.mdx")
+				require.NoError(t, os.WriteFile(mdxFile, []byte(mdxContent), 0644))
+				return tmpWorkspace, []string{mdxFile}
+			},
+			expectError:   true,
+			expectedInErr: "unable to load metadata for any",
+			expectedInLog: "Subject (to derive agent type) is required",
+		},
+		{
+			name: "malformed MDX file",
+			setupFunc: func(t *testing.T) (string, []string) {
+				tmpWorkspace := t.TempDir()
+				releaseNotesDir := filepath.Join(tmpWorkspace, "src/content/docs/release-notes/agent-release-notes")
+				require.NoError(t, os.MkdirAll(releaseNotesDir, 0755))
+
+				// Invalid YAML frontmatter
+				mdxContent := `---
+subject: Java agent
+invalid yaml: [unclosed
+version: 1.2.3
+---
+
+# Test Release Notes
+`
+				mdxFile := filepath.Join(releaseNotesDir, "test-agent.mdx")
+				require.NoError(t, os.WriteFile(mdxFile, []byte(mdxContent), 0644))
+				return tmpWorkspace, []string{mdxFile}
+			},
+			expectError:   true,
+			expectedInErr: "unable to load metadata for any",
+			expectedInLog: "Failed to parse MDX file",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			getStdout, _ := testutil.CaptureOutput(t)
+
+			tmpWorkspace, mdxFiles := tt.setupFunc(t)
+
+			// Mock GetChangedMDXFiles if files provided
+			if mdxFiles != nil {
+				originalFunc := github.GetChangedMDXFilesFunc
+				github.GetChangedMDXFilesFunc = func() ([]string, error) {
+					return mdxFiles, nil
+				}
+				defer func() {
+					github.GetChangedMDXFilesFunc = originalFunc
+				}()
+			}
+
+			if tmpWorkspace != "" {
+				t.Setenv("GITHUB_WORKSPACE", tmpWorkspace)
+			}
+
+			// method under test
+			metadata, err := LoadMetadataForDocs()
+
+			stdout := getStdout()
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Nil(t, metadata)
+				if tt.expectedInErr != "" {
+					assert.Contains(t, err.Error(), tt.expectedInErr)
+				}
+				if tt.expectedInLog != "" {
+					assert.Contains(t, stdout, tt.expectedInLog)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestLoadMetadataForDocs_NoChangedFiles(t *testing.T) {
+	// Mock GetChangedMDXFiles to return empty list (not error)
 	originalFunc := github.GetChangedMDXFilesFunc
 	github.GetChangedMDXFilesFunc = func() ([]string, error) {
-		return []string{mdxFile}, nil
+		return []string{}, nil
 	}
 	defer func() {
 		github.GetChangedMDXFilesFunc = originalFunc
 	}()
 
-	t.Setenv("GITHUB_WORKSPACE", tmpWorkspace)
+	getStdout, _ := testutil.CaptureOutput(t)
 
-	// Load metadata - should fail due to blank version
-	_, err = LoadMetadataForDocs()
+	// method under test
+	metadata, err := LoadMetadataForDocs()
 
 	stdout := getStdout()
 
-	assert.Error(t, err)
-	assert.ErrorContains(t, err, "unable to load metadata for any")
-	assert.Contains(t, stdout, "Version is required")
+	require.NoError(t, err)
+	assert.Nil(t, metadata)
+	assert.Contains(t, stdout, "no changed files detected")
 }

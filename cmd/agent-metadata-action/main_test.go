@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"agent-metadata-action/internal/github"
+	"agent-metadata-action/internal/loader"
 	"agent-metadata-action/internal/models"
 	"agent-metadata-action/internal/testutil"
 
@@ -22,7 +23,25 @@ func (m *mockMetadataClient) SendMetadata(ctx context.Context, agentType string,
 	return nil
 }
 
-func TestRun_AgentRepoFlow(t *testing.T) {
+type mockFailingMetadataClient struct{}
+
+func (m *mockFailingMetadataClient) SendMetadata(ctx context.Context, agentType string, agentVersion string, metadata *models.AgentMetadata) error {
+	return assert.AnError
+}
+
+type mockSelectiveFailClient struct {
+	callCount *int
+}
+
+func (m *mockSelectiveFailClient) SendMetadata(ctx context.Context, agentType string, agentVersion string, metadata *models.AgentMetadata) error {
+	*m.callCount++
+	if *m.callCount == 1 {
+		return assert.AnError
+	}
+	return nil
+}
+
+func TestMain_AgentRepoFlow(t *testing.T) {
 	// Override client creation with mock
 	originalCreateClient := createMetadataClientFunc
 	createMetadataClientFunc = func(baseURL, token string) metadataClient {
@@ -43,18 +62,13 @@ func TestRun_AgentRepoFlow(t *testing.T) {
 	t.Setenv("GITHUB_WORKSPACE", workspace)
 	t.Setenv("NEWRELIC_TOKEN", "mock-token-for-testing")
 
-	// Capture stdout and stderr
 	getStdout, getStderr := testutil.CaptureOutput(t)
 
-	// Call run
-	err = run()
+	// Method under test
+	main()
 
-	// Retrieve captured output
 	outputStr := getStdout()
 	stderrStr := getStderr()
-
-	// Verify no error
-	require.NoError(t, err)
 
 	// Verify output
 	assert.Contains(t, outputStr, "\"metadata\":")
@@ -69,7 +83,7 @@ func TestRun_AgentRepoFlow(t *testing.T) {
 	}
 }
 
-func TestRun_DocsFlow(t *testing.T) {
+func TestMain_DocsFlow(t *testing.T) {
 	// Override client creation with mock
 	originalCreateClient := createMetadataClientFunc
 	createMetadataClientFunc = func(baseURL, token string) metadataClient {
@@ -119,13 +133,11 @@ Release notes content here.
 
 	getStdout, getStderr := testutil.CaptureOutput(t)
 
-	err := run()
+	// Method under test
+	main()
 
 	outputStr := getStdout()
 	stderrStr := getStderr()
-
-	// Verify no error
-	require.NoError(t, err)
 
 	// Verify docs scenario was triggered
 	assert.Contains(t, outputStr, "Running documentation flow")
@@ -139,7 +151,7 @@ Release notes content here.
 	assert.Contains(t, outputStr, "Security fix 1")
 }
 
-func TestRun_InvalidWorkspace(t *testing.T) {
+func TestRun_InvalidEnvironment(t *testing.T) {
 	// Override client creation with mock
 	originalCreateClient := createMetadataClientFunc
 	createMetadataClientFunc = func(baseURL, token string) metadataClient {
@@ -155,7 +167,270 @@ func TestRun_InvalidWorkspace(t *testing.T) {
 	t.Setenv("GITHUB_WORKSPACE", "/nonexistent/path")
 	t.Setenv("NEWRELIC_TOKEN", "mock-token-for-testing")
 
+	// Method under test
 	err := run()
+
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "workspace directory does not exist")
+}
+
+func TestValidateEnvironment(t *testing.T) {
+	tests := []struct {
+		name          string
+		workspace     string
+		token         string
+		setupFunc     func(t *testing.T) string // returns actual workspace path
+		wantErr       bool
+		errContains   string
+		wantWorkspace string
+		wantToken     string
+	}{
+		{
+			name:        "missing workspace",
+			workspace:   "",
+			token:       "mock-token",
+			wantErr:     true,
+			errContains: "GITHUB_WORKSPACE is required",
+		},
+		{
+			name:        "workspace directory does not exist",
+			workspace:   "/nonexistent/path",
+			token:       "mock-token",
+			wantErr:     true,
+			errContains: "workspace directory does not exist",
+		},
+		{
+			name: "missing token",
+			setupFunc: func(t *testing.T) string {
+				return t.TempDir()
+			},
+			token:       "",
+			wantErr:     true,
+			errContains: "NEWRELIC_TOKEN is required",
+		},
+		{
+			name: "success",
+			setupFunc: func(t *testing.T) string {
+				return t.TempDir()
+			},
+			token:     "test-token",
+			wantErr:   false,
+			wantToken: "test-token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			workspace := tt.workspace
+			if tt.setupFunc != nil {
+				workspace = tt.setupFunc(t)
+			}
+
+			t.Setenv("GITHUB_WORKSPACE", workspace)
+			t.Setenv("NEWRELIC_TOKEN", tt.token)
+
+			// Method under test
+			gotWorkspace, gotToken, err := validateEnvironment()
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, workspace, gotWorkspace)
+				assert.Equal(t, tt.wantToken, gotToken)
+			}
+		})
+	}
+}
+
+func TestRunAgentFlow_MissingFleetControl(t *testing.T) {
+	workspace := t.TempDir()
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	// Method under test
+	err := runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), ".fleetControl directory does not exist")
+}
+
+func TestRunAgentFlow_InvalidConfigDefinitions(t *testing.T) {
+	workspace := t.TempDir()
+	fleetControlPath := filepath.Join(workspace, ".fleetControl")
+	require.NoError(t, os.MkdirAll(fleetControlPath, 0755))
+
+	configFile := filepath.Join(fleetControlPath, "configurationDefinitions.yml")
+	require.NoError(t, os.WriteFile(configFile, []byte("invalid: yaml: ["), 0644))
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	// Method under test
+	err := runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read configuration definitions")
+}
+
+func TestRunAgentFlow_SendMetadataFails(t *testing.T) {
+	projectRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	workspace := filepath.Join(projectRoot, "integration-test", "agent-flow")
+
+	ctx := context.Background()
+	mockClient := &mockFailingMetadataClient{}
+
+	// method under test
+	err = runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to send metadata")
+}
+
+func TestRunDocsFlow_LoadMetadataError(t *testing.T) {
+	originalFunc := github.GetChangedMDXFilesFunc
+	github.GetChangedMDXFilesFunc = func() ([]string, error) {
+		return nil, assert.AnError
+	}
+	defer func() {
+		github.GetChangedMDXFilesFunc = originalFunc
+	}()
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	// method under test
+	err := runDocsFlow(ctx, mockClient)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to load metadata from docs")
+}
+
+func TestRunDocsFlow_NoMetadataChanges(t *testing.T) {
+	originalFunc := github.GetChangedMDXFilesFunc
+	github.GetChangedMDXFilesFunc = func() ([]string, error) {
+		return []string{}, nil
+	}
+	defer func() {
+		github.GetChangedMDXFilesFunc = originalFunc
+	}()
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	// method under test
+	err := runDocsFlow(ctx, mockClient)
+
+	assert.NoError(t, err)
+
+	outputStr := getStdout()
+	assert.Contains(t, outputStr, "No metadata changes detected")
+}
+
+func TestRunDocsFlow_PartialFailure(t *testing.T) {
+	workspace := t.TempDir()
+	mdxDir := filepath.Join(workspace, "src/content/docs/release-notes/agent-release-notes/java-release-notes")
+	require.NoError(t, os.MkdirAll(mdxDir, 0755))
+
+	testMDXFile1 := filepath.Join(mdxDir, "java-agent-130.mdx")
+	mdxContent1 := `---
+subject: Java agent
+releaseDate: '2024-01-15'
+version: 1.3.0
+---
+
+# Java Agent 1.3.0
+`
+	require.NoError(t, os.WriteFile(testMDXFile1, []byte(mdxContent1), 0644))
+
+	testMDXFile2 := filepath.Join(mdxDir, "java-agent-131.mdx")
+	mdxContent2 := `---
+subject: Java agent
+releaseDate: '2024-01-16'
+version: 1.3.1
+---
+
+# Java Agent 1.3.1
+`
+	require.NoError(t, os.WriteFile(testMDXFile2, []byte(mdxContent2), 0644))
+
+	originalFunc := github.GetChangedMDXFilesFunc
+	github.GetChangedMDXFilesFunc = func() ([]string, error) {
+		return []string{testMDXFile1, testMDXFile2}, nil
+	}
+	defer func() {
+		github.GetChangedMDXFilesFunc = originalFunc
+	}()
+
+	t.Setenv("GITHUB_WORKSPACE", workspace)
+
+	callCount := 0
+	ctx := context.Background()
+	mockClient := &mockSelectiveFailClient{callCount: &callCount}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// method under test
+	err := runDocsFlow(ctx, mockClient)
+
+	assert.NoError(t, err)
+
+	outputStr := getStdout()
+
+	assert.Contains(t, outputStr, "Successfully sent 1 of 2 metadata entries")
+	assert.Contains(t, outputStr, "::warn::Failed to send metadata")
+}
+
+func TestSendDocsMetadata(t *testing.T) {
+	tests := []struct {
+		name    string
+		entry   loader.MetadataForDocs
+		client  metadataClient
+		wantErr bool
+	}{
+		{
+			name: "success",
+			entry: loader.MetadataForDocs{
+				AgentType: "java-agent",
+				AgentMetadataFromDocs: map[string]any{
+					"version":     "1.2.3",
+					"releaseDate": "2024-01-15",
+				},
+			},
+			client:  &mockMetadataClient{},
+			wantErr: false,
+		},
+		{
+			name: "send error",
+			entry: loader.MetadataForDocs{
+				AgentType: "java-agent",
+				AgentMetadataFromDocs: map[string]any{
+					"version": "1.2.3",
+				},
+			},
+			client:  &mockFailingMetadataClient{},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			// method under test
+			err := sendDocsMetadata(ctx, tt.client, tt.entry)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
