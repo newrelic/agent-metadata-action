@@ -11,7 +11,7 @@ import (
 // LoadMetadataForAgents loads metadata with only version populated
 func LoadMetadataForAgents(version string) models.Metadata {
 	return models.Metadata{
-		Version: version,
+		"version": version,
 	}
 }
 
@@ -38,27 +38,19 @@ func LoadMetadataForDocs() ([]MetadataForDocs, error) {
 				continue
 			}
 
-			if frontMatter.Version == "" {
+			if frontMatter["version"] == "" {
 				fmt.Printf("::warn::Version is required in metadata for file %s - skipping\n", filepath)
 				continue
 			}
 
-			agentType := parser.SubjectToAgentTypeMapping[parser.Subject(frontMatter.Subject)]
-
-			if agentType == "" {
+			if frontMatter["subject"] == nil || frontMatter["subject"] == "" {
 				fmt.Printf("::warn::Subject (to derive agent type) is required in metadata for file %s - skipping\n", filepath)
 				continue
 			}
+			agentType := parser.SubjectToAgentTypeMapping[parser.Subject(frontMatter["subject"].(string))]
 
-			metadata := models.Metadata{
-				Version:                   frontMatter.Version,
-				Features:                  frontMatter.Features,
-				Bugs:                      frontMatter.Bugs,
-				Security:                  frontMatter.Security,
-				Deprecations:              frontMatter.Deprecations,
-				SupportedOperatingSystems: frontMatter.SupportedOperatingSystems,
-				EOL:                       frontMatter.EOL,
-			}
+			// Convert frontMatter directly to Metadata (both are maps)
+			metadata := models.Metadata(frontMatter)
 
 			metadataForDocs = append(metadataForDocs, MetadataForDocs{
 				AgentType:             agentType,

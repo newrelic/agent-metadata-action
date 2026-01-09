@@ -132,7 +132,7 @@ Release notes content here.
 	assert.Contains(t, stderrStr, "::notice::Loaded metadata for 1 out of 1 changed MDX files")
 
 	// Verify output contains agent metadata
-	assert.Contains(t, outputStr, "JavaAgent")
+	assert.Contains(t, outputStr, "java-agent")
 	assert.Contains(t, outputStr, "1.3.0")
 	assert.Contains(t, outputStr, "New feature 1")
 	assert.Contains(t, outputStr, "Bug fix 1")
