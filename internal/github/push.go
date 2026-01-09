@@ -76,14 +76,13 @@ func getChangedMDXFilesImpl() ([]string, error) {
 	fmt.Printf("::debug::GH SHAs: before %s and after %s\n", event.Before, event.After)
 
 	// Validate SHAs to prevent command injection
-	/*
-	   if !isValidGitSHA(event.Before) {
-	   		return nil, fmt.Errorf("invalid before SHA format: must be 40 hexadecimal characters")
-	   	}
-	   	if !isValidGitSHA(event.After) {
-	   		return nil, fmt.Errorf("invalid after SHA format: must be 40 hexadecimal characters")
-	   	}
-	*/
+	if !isValidGitSHA(event.Before) {
+		return nil, fmt.Errorf("invalid before SHA format: must be 40 hexadecimal characters")
+	}
+	if !isValidGitSHA(event.After) {
+		return nil, fmt.Errorf("invalid after SHA format: must be 40 hexadecimal characters")
+	}
+
 	cmd := exec.Command("git", "diff", "--diff-filter=ACMR", "--name-only",
 		fmt.Sprintf("%s...%s", event.Before, event.After))
 
