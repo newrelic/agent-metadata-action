@@ -23,17 +23,19 @@ const (
 	NRDot    Subject = "NRDOT"
 	Python   Subject = "Python agent"
 	Ruby     Subject = "Ruby agent"
+	//EBPF   Subject = "" @todo update once eBPF is publishing release notes
 )
 
 var SubjectToAgentTypeMapping = map[Subject]string{
-	DotNet:   "dotnet-agent",
-	Infra:    "infra-host-agent",
-	InfraK8s: "infra-k8s-agent",
-	Java:     "java-agent",
-	Node:     "node-agent",
-	NRDot:    "nrdot-agent",
-	Python:   "python-agent",
-	Ruby:     "ruby-agent",
+	DotNet:   "NRDotNetAgent",
+	Infra:    "NRInfra", // maps to the same agent type for k8s & host
+	InfraK8s: "NRInfra", // maps to the same agent type for k8s & host
+	Java:     "NRJavaAgent",
+	Node:     "NRNodeAgent",
+	NRDot:    "NRDOT",
+	Python:   "NRPythonAgent",
+	Ruby:     "NRRubyAgent",
+	// EBPF: "NReBPFAgent" @todo update once eBPF is publishing release notes
 }
 
 // ParseMDXFile reads an MDX file and extracts the YAML frontmatter
