@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"agent-metadata-action/internal/config"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -13,15 +14,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const FLEET_CONTROL_DIR = ".fleetControl"
-const CONFIG_FILE_PATH = "configurationDefinitions.yml"
-const AGENT_CONTROL_DIR = "agentControl"
-const AGENT_CONTROL_FILE = "agent-schema-for-agent-control.yml"
-const AGENT_CONTROL_PLATFORM = "ALL"
+const AGENT_CONTROL_FILE = "agent-schema-for-agent-control.yml" // @todo move out of this file
+const AGENT_CONTROL_PLATFORM = "ALL"                            // @todo move out of this file
 
 // ReadConfigurationDefinitions reads and parses the configurationDefinitions file
 func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationDefinition, error) {
-	fullPath := filepath.Join(workspacePath, FLEET_CONTROL_DIR, CONFIG_FILE_PATH)
+	fullPath := filepath.Join(workspacePath, config.GetConfigurationDefinitionsFilepath())
 
 	data, err := os.ReadFile(fullPath)
 	if err != nil {
@@ -69,23 +67,23 @@ func loadAndEncodeSchema(workspacePath, schemaPath string) (string, error) {
 		return "", fmt.Errorf("invalid schema path: contains directory traversal")
 	}
 
-	// Schema paths are relative to the .fleetControl directory
-	fullPath := filepath.Join(workspacePath, FLEET_CONTROL_DIR, schemaPath)
+	// Schema paths are relative to the expected root directory
+	fullPath := filepath.Join(workspacePath, config.GetRootFolderForAgentRepo(), schemaPath)
 
-	// Additional security check: ensure the resolved path is within .fleetControl
-	fleetControlDir := filepath.Join(workspacePath, FLEET_CONTROL_DIR)
+	// Additional security check: ensure the resolved path is within the expected root directory
+	expectedRootDir := filepath.Join(workspacePath, config.GetRootFolderForAgentRepo())
 	resolvedPath, err := filepath.Abs(fullPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve schema path: %w", err)
 	}
 
-	resolvedFleetControl, err := filepath.Abs(fleetControlDir)
+	resolvedRootDirectory, err := filepath.Abs(expectedRootDir)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve fleet control directory: %w", err)
+		return "", fmt.Errorf("failed to resolve expected root directory:%s %w", expectedRootDir, err)
 	}
 
-	if !strings.HasPrefix(resolvedPath, resolvedFleetControl+string(filepath.Separator)) && resolvedPath != resolvedFleetControl {
-		return "", fmt.Errorf("invalid schema path: must be within .fleetControl directory")
+	if !strings.HasPrefix(resolvedPath, resolvedRootDirectory+string(filepath.Separator)) && resolvedPath != resolvedRootDirectory {
+		return "", fmt.Errorf("invalid schema path: must be within expected root directory: %s\n", expectedRootDir)
 	}
 
 	data, err := os.ReadFile(fullPath)
@@ -108,8 +106,8 @@ func loadAndEncodeSchema(workspacePath, schemaPath string) (string, error) {
 // @todo break this out into a different file
 // LoadAndEncodeAgentControl reads and encodes the agent control content
 // Returns a single entry with platform AGENT_CONTROL_PLATFORM
-func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControl, error) {
-	agentControlPath := filepath.Join(workspacePath, FLEET_CONTROL_DIR, AGENT_CONTROL_DIR, AGENT_CONTROL_FILE)
+func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControlDefinition, error) {
+	agentControlPath := filepath.Join(workspacePath, config.GetAgentControlFolderForAgentRepo(), AGENT_CONTROL_FILE)
 
 	data, err := os.ReadFile(agentControlPath)
 	if err != nil {
@@ -122,7 +120,7 @@ func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControl, err
 
 	encoded := base64.StdEncoding.EncodeToString(data)
 
-	return []models.AgentControl{
+	return []models.AgentControlDefinition{
 		{
 			Platform: AGENT_CONTROL_PLATFORM,
 			Content:  encoded,
