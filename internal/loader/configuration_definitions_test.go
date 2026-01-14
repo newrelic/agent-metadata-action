@@ -342,3 +342,24 @@ func TestReadConfigurationDefinitions_DirectoryTraversal(t *testing.T) {
 		})
 	}
 }
+
+func TestReadConfigurationDefinitions_EmptyArray(t *testing.T) {
+	// Create temporary directory structure
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	err := os.MkdirAll(configDir, 0755)
+	require.NoError(t, err)
+
+	// Create test config file with empty array
+	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
+	testYAML := `configurationDefinitions: []`
+
+	err = os.WriteFile(configFile, []byte(testYAML), 0644)
+	require.NoError(t, err)
+
+	// Test reading the config - should error
+	configs, err := ReadConfigurationDefinitions(tmpDir)
+	assert.Error(t, err)
+	assert.Nil(t, configs)
+	assert.Contains(t, err.Error(), "configurationDefinitions cannot be empty")
+}

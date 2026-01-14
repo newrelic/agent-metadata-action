@@ -14,6 +14,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const AGENT_CONTROL_FILE = "agent-schema-for-agent-control.yml" // @todo move out of this file
+const AGENT_CONTROL_PLATFORM = "ALL"                            // @todo move out of this file
+
 // ReadConfigurationDefinitions reads and parses the configurationDefinitions file
 func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationDefinition, error) {
 	fullPath := filepath.Join(workspacePath, config.GetConfigurationDefinitionsFilepath())
@@ -98,4 +101,29 @@ func loadAndEncodeSchema(workspacePath, schemaPath string) (string, error) {
 
 	encoded := base64.StdEncoding.EncodeToString(data)
 	return encoded, nil
+}
+
+// @todo break this out into a different file
+// LoadAndEncodeAgentControl reads and encodes the agent control content
+// Returns a single entry with platform AGENT_CONTROL_PLATFORM
+func LoadAndEncodeAgentControl(workspacePath string) ([]models.AgentControlDefinition, error) {
+	agentControlPath := filepath.Join(workspacePath, config.GetAgentControlFolderForAgentRepo(), AGENT_CONTROL_FILE)
+
+	data, err := os.ReadFile(agentControlPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read agent control file at %s: %w", agentControlPath, err)
+	}
+
+	if len(data) == 0 {
+		return nil, fmt.Errorf("agent control file at %s is empty", agentControlPath)
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(data)
+
+	return []models.AgentControlDefinition{
+		{
+			Platform: AGENT_CONTROL_PLATFORM,
+			Content:  encoded,
+		},
+	}, nil
 }
