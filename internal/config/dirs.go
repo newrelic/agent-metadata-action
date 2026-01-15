@@ -16,9 +16,13 @@ func GetConfigurationDefinitionsFilename() string {
 	return "configurationDefinitions.yml"
 }
 
-// GetAgentControlFolderForAgentRepo loads the folder holding the agent control definitions
-func GetAgentControlFolderForAgentRepo() string {
-	return filepath.Join(GetRootFolderForAgentRepo(), "agentControl")
+// GetAgentControlDefinitionsFilepath returns the path to the agentControlDefinitions.yml file
+func GetAgentControlDefinitionsFilepath() string {
+	return filepath.Join(GetRootFolderForAgentRepo(), GetAgentControlDefinitionsFilename())
+}
+
+func GetAgentControlDefinitionsFilename() string {
+	return "agentControlDefinitions.yml"
 }
 
 func GetReleaseNotesDirectory() string {

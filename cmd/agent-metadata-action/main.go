@@ -90,12 +90,13 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	}
 	fmt.Printf("::notice::Loaded %d configuration definitions\n", len(configs))
 
-	// Load agent control (optional)
-	agentControl, err := loader.LoadAndEncodeAgentControl(workspace)
+	// Load agent control definitions (optional)
+	agentControl, err := loader.ReadAgentControlDefinitions(workspace)
 	if err != nil {
-		fmt.Println("::warn::Unable to load agent control files - continuing without them")
+		fmt.Printf("::warn::Unable to load agent control definitions: %v - continuing without them\n", err)
+		agentControl = nil
 	} else {
-		fmt.Printf("::notice::Loaded %d agent control files\n", len(agentControl))
+		fmt.Printf("::notice::Loaded %d agent control definitions\n", len(agentControl))
 	}
 
 	// Build metadata

@@ -92,8 +92,8 @@ func TestAgentMetadata_JSONMarshaling(t *testing.T) {
 		},
 		AgentControlDefinitions: []AgentControlDefinition{
 			{
-				Platform: "all",
-				Content:  "base64content",
+				"platform": "all",
+				"content":  "base64content",
 			},
 		},
 	}

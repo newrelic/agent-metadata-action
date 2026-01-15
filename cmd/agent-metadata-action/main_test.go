@@ -387,6 +387,40 @@ version: 1.3.1
 	assert.Contains(t, outputStr, "::warn::Failed to send metadata")
 }
 
+func TestRunAgentFlow_AgentControlDefinitionsError(t *testing.T) {
+	workspace := t.TempDir()
+	fleetControlPath := filepath.Join(workspace, ".fleetControl")
+	require.NoError(t, os.MkdirAll(fleetControlPath, 0755))
+
+	// Create valid configurationDefinitions.yml
+	configFile := filepath.Join(fleetControlPath, "configurationDefinitions.yml")
+	configContent := `configurationDefinitions:
+  - name: test-config
+    type: string
+`
+	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
+
+	// Create invalid agentControlDefinitions.yml (invalid YAML)
+	agentControlFile := filepath.Join(fleetControlPath, "agentControlDefinitions.yml")
+	require.NoError(t, os.WriteFile(agentControlFile, []byte("invalid: yaml: ["), 0644))
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// method under test
+	err := runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+
+	// Should succeed despite agentControlDefinitions error
+	assert.NoError(t, err)
+
+	// Verify warning was logged
+	outputStr := getStdout()
+	assert.Contains(t, outputStr, "::warn::Unable to load agent control definitions")
+	assert.Contains(t, outputStr, "continuing without them")
+}
+
 func TestSendDocsMetadata(t *testing.T) {
 	tests := []struct {
 		name    string
