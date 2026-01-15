@@ -48,18 +48,6 @@ func NewClient(registry, username, password string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) Ping(ctx context.Context) error {
-	err := c.repo.Tags(ctx, "", func(tags []string) error {
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("registry not accessible at %s: %w", c.registry, err)
-	}
-
-	return nil
-}
-
 func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, error) {
 	tempDir, err := os.MkdirTemp("", "oras-upload-*")
 	if err != nil {

@@ -24,13 +24,6 @@ func HandleUploads(ociConfig *models.OCIConfig, workspace, agentType, version st
 	}
 
 	ctx := context.Background()
-
-	fmt.Println("::notice::Verifying registry connectivity...")
-	if err := client.Ping(ctx); err != nil {
-		return fmt.Errorf("registry connectivity check failed for %s: %w", ociConfig.Registry, err)
-	}
-	fmt.Println("::notice::Registry is accessible")
-
 	uploadResults := UploadArtifacts(ctx, client, ociConfig, workspace, agentType, version)
 
 	for _, result := range uploadResults {
