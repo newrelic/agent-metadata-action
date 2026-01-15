@@ -59,11 +59,6 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 	}
 	defer fs.Close()
 
-	fileInfo, err := os.Stat(artifactPath)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to stat file: %w", err)
-	}
-
 	layerAnnotations := CreateLayerAnnotations(artifact, version)
 
 	layerDesc, err := fs.Add(ctx, artifact.Name, artifact.GetMediaType(), artifactPath)
@@ -80,6 +75,10 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 		MediaType: "application/vnd.oci.empty.v1+json",
 		Digest:    digest.FromBytes(emptyConfig),
 		Size:      int64(len(emptyConfig)),
+	}
+
+	if err = fs.Push(ctx, emptyConfigDesc, bytes.NewReader(emptyConfig)); err != nil {
+		return "", 0, fmt.Errorf("failed to push empty config: %w", err)
 	}
 
 	artifactType := artifact.GetArtifactType()
@@ -109,7 +108,7 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 		return "", 0, fmt.Errorf("failed to copy artifact to registry: %w", err)
 	}
 
-	return manifestDesc.Digest.String(), fileInfo.Size(), nil
+	return manifestDesc.Digest.String(), manifestDesc.Size, nil
 }
 
 func (c *Client) CreateManifestIndex(ctx context.Context, uploadResults []models.ArtifactUploadResult, version string) (string, error) {

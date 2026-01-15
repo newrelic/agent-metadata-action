@@ -28,7 +28,7 @@ func HandleUploads(ociConfig *models.OCIConfig, workspace, agentType, version st
 
 	for _, result := range uploadResults {
 		if result.Uploaded {
-			fmt.Printf("::notice::Uploaded %s: %s (os: %s, arch: %s, digest: %s, size: %d bytes)\n",
+			fmt.Printf("::notice::Uploaded %s: %s (os: %s, arch: %s, digest: %s, manifest size: %d bytes)\n",
 				result.Name, result.Path, result.OS, result.Arch, result.Digest, result.Size)
 		} else {
 			fmt.Fprintf(os.Stderr, "::error::Failed to upload %s (%s): %s\n",
