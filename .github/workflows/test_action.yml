@@ -167,7 +167,7 @@ jobs:
           oci-registry: ${{ secrets.DOCKERHUB_TEST_REGISTRY }}
           oci-username: ${{ secrets.DOCKERHUB_TEST_USERNAME }}
           oci-password: ${{ secrets.DOCKERHUB_TEST_PASSWORD }}
-          binaries: '[{"name": "linux-amd64-tar", "path": "./dist/test-agent-binary.tar.gz", "os": "linux", "arch": "amd64", "format": "tar+gzip"}]'
+          binaries: '[{"name": "test-readme", "path": "./README.md", "os": "linux", "arch": "amd64", "format": "tar+gzip"}]'
 
       - name: Show mock server logs
         if: always()
