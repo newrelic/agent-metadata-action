@@ -103,6 +103,11 @@ jobs:
     needs: setup-test-tag
     name: Test Agent Repository Flow with "v" prefixed version
     runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     steps:
       - name: Checkout action repository
         uses: actions/checkout@v4
@@ -163,11 +168,44 @@ jobs:
           agent-type: 'myagent'
           version: 'v0.0.0'
           cache: false
-          # OCI-specific inputs for testing binary uploads
-          oci-registry: ${{ secrets.DOCKERHUB_TEST_REGISTRY }}
-          oci-username: ${{ secrets.DOCKERHUB_TEST_USERNAME }}
-          oci-password: ${{ secrets.DOCKERHUB_TEST_PASSWORD }}
+          oci-registry: 'localhost:5000/test-agents'
+          oci-username: ''
+          oci-password: ''
           binaries: '[{"name": "test-readme", "path": "./README.md", "os": "linux", "arch": "amd64", "format": "tar+gzip"}]'
+
+      - name: Setup ORAS CLI
+        uses: oras-project/setup-oras@v1
+
+      - name: Verify OCI upload to local registry
+        run: |
+          echo "::group::Verifying uploaded artifact in local registry"
+
+          # Check if the manifest exists in the registry
+          MANIFEST_URL="http://localhost:5000/v2/test-agents/manifests/v0.0.0"
+
+          if curl -f -s "$MANIFEST_URL" > /dev/null; then
+            echo "✓ Manifest found for version v0.0.0"
+          else
+            echo "✗ Manifest not found at $MANIFEST_URL"
+            exit 1
+          fi
+
+          echo ""
+          echo "=== Manifest Index (v0.0.0 tag) ==="
+          oras manifest fetch localhost:5000/test-agents:v0.0.0 --pretty
+
+          # Extract the digest of the actual artifact from the index
+          ARTIFACT_DIGEST=$(oras manifest fetch localhost:5000/test-agents:v0.0.0 | jq -r '.manifests[0].digest')
+
+          if [ -n "$ARTIFACT_DIGEST" ] && [ "$ARTIFACT_DIGEST" != "null" ]; then
+            echo ""
+            echo "=== Artifact Manifest ($ARTIFACT_DIGEST) ==="
+            oras manifest fetch localhost:5000/test-agents@$ARTIFACT_DIGEST --pretty
+          else
+            echo "Warning: Could not extract artifact digest from index"
+          fi
+
+          echo "::endgroup::"
 
       - name: Show mock server logs
         if: always()
