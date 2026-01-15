@@ -3,10 +3,11 @@
 !integration-test/agent-flow/.fleetControl/
 
 # Build output
-agent-metadata-action
+./agent-metadata-action
 
 # Go coverage
 coverage.out
 
 # IDE
 .idea/
+dist/

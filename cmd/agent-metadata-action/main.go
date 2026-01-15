@@ -11,6 +11,7 @@ import (
 	"agent-metadata-action/internal/config"
 	"agent-metadata-action/internal/loader"
 	"agent-metadata-action/internal/models"
+	"agent-metadata-action/internal/oci"
 )
 
 // metadataClient interface for testing
@@ -113,6 +114,17 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	}
 
 	fmt.Printf("::notice::Successfully sent metadata for %s version %s\n", agentType, agentVersion)
+
+	// Handle OCI binary uploads (optional)
+	ociConfig, err := oci.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("error loading OCI config: %w", err)
+	}
+
+	if err := oci.HandleUploads(&ociConfig, workspace, agentType, agentVersion); err != nil {
+		return fmt.Errorf("binary upload failed: %w", err)
+	}
+
 	return nil
 }
 

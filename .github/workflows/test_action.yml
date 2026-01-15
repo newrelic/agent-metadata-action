@@ -137,6 +137,21 @@ jobs:
           which newrelic-auth-cli
           newrelic-auth-cli --help || echo "Mock CLI is ready"
 
+      - name: Create test binary artifacts
+        run: |
+          echo "::group::Creating test binary files"
+          mkdir -p dist
+
+          # Create a temporary directory with test content to tar
+          mkdir -p /tmp/test-agent
+          echo "This is a test binary for OCI upload - $(date)" > /tmp/test-agent/README.txt
+          echo "agent_version: v0.0.0" > /tmp/test-agent/metadata.txt
+
+          # Create actual tar.gz archive
+          tar -czf dist/test-agent-binary.tar.gz -C /tmp test-agent
+
+          echo "::endgroup::"
+
       - name: Run Agent Metadata Action (with configs)
         uses: ./
         env:
@@ -148,6 +163,11 @@ jobs:
           agent-type: 'myagent'
           version: 'v0.0.0'
           cache: false
+          # OCI-specific inputs for testing binary uploads
+          oci-registry: ${{ secrets.DOCKERHUB_TEST_REGISTRY }}
+          oci-username: ${{ secrets.DOCKERHUB_TEST_USERNAME }}
+          oci-password: ${{ secrets.DOCKERHUB_TEST_PASSWORD }}
+          binaries: '[{"name": "linux-amd64-tar", "path": "./dist/test-agent-binary.tar.gz", "os": "linux", "arch": "amd64", "format": "tar+gzip"}]'
 
       - name: Show mock server logs
         if: always()
