@@ -40,10 +40,24 @@ func NewClient(registry, username, password string) (*Client, error) {
 		repo.PlainHTTP = true
 	}
 
+	fmt.Printf("::debug::OCI client configured: registry=%s, plainHTTP=%v\n", registry, repo.PlainHTTP)
+
 	return &Client{
 		repo:     repo,
 		registry: registry,
 	}, nil
+}
+
+func (c *Client) Ping(ctx context.Context) error {
+	err := c.repo.Tags(ctx, "", func(tags []string) error {
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("registry not accessible at %s: %w", c.registry, err)
+	}
+
+	return nil
 }
 
 func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, error) {
@@ -104,6 +118,7 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 
 	copyOpts := oras.CopyOptions{}
 	digestRef := manifestDesc.Digest.String()
+	fmt.Printf("::debug::Copying artifact %s to registry (digest: %s)\n", artifact.Name, digestRef)
 	if _, err = oras.Copy(copyCtx, fs, tempTag, c.repo, digestRef, copyOpts); err != nil {
 		return "", 0, fmt.Errorf("failed to copy artifact to registry: %w", err)
 	}
@@ -167,10 +182,19 @@ func (c *Client) CreateManifestIndex(ctx context.Context, uploadResults []models
 		Size:      int64(len(indexBytes)),
 	}
 
+	fmt.Printf("::debug::Pushing manifest index to %s with tag %s (size: %d bytes)\n",
+		c.registry, version, len(indexBytes))
+	fmt.Printf("::debug::Index contains %d manifests\n", len(manifests))
+	fmt.Printf("::debug::Attempting to push reference: %s\n", version)
+
 	err = c.repo.PushReference(ctx, indexDesc, bytes.NewReader(indexBytes), version)
 	if err != nil {
-		return "", fmt.Errorf("failed to push index: %w", err)
+		return "", fmt.Errorf("failed to push manifest index to %s:%s - %w",
+			c.registry, version, err)
 	}
+
+	fmt.Printf("::debug::Successfully pushed reference: %s\n", version)
+	fmt.Printf("::debug::Manifest index push completed successfully\n")
 
 	return indexDesc.Digest.String(), nil
 }
