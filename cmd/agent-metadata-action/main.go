@@ -38,6 +38,9 @@ func initNewRelic() *newrelic.Application {
 	app, err := newrelic.NewApplication(
 		newrelic.ConfigAppName("agent-metadata-action"),
 		newrelic.ConfigLicense(licenseKey),
+		newrelic.ConfigDebugLogger(os.Stdout),
+		newrelic.ConfigDistributedTracerEnabled(true),
+		newrelic.ConfigAppLogForwardingEnabled(true),
 	)
 
 	if err != nil {
@@ -45,7 +48,15 @@ func initNewRelic() *newrelic.Application {
 		return nil
 	}
 
-	fmt.Println("::notice::New Relic APM enabled")
+	fmt.Println("::notice::New Relic APM enabled - waiting for connection...")
+
+	// Wait for the app to connect (max 10 seconds)
+	if err := app.WaitForConnection(10 * time.Second); err != nil {
+		fmt.Printf("::warn::New Relic connection timeout: %v - will try to send data anyway\n", err)
+	} else {
+		fmt.Println("::notice::New Relic connected successfully")
+	}
+
 	return app
 }
 
@@ -58,7 +69,9 @@ func main() {
 	}
 
 	if nrApp != nil {
-		nrApp.Shutdown(10 * time.Second)
+		fmt.Println("::notice::Shutting down New Relic - waiting up to 15 seconds to send data...")
+		nrApp.Shutdown(15 * time.Second)
+		fmt.Println("::notice::New Relic shutdown complete")
 	}
 }
 
@@ -67,7 +80,11 @@ func run(nrApp *newrelic.Application) error {
 	var txn *newrelic.Transaction
 	if nrApp != nil {
 		txn = nrApp.StartTransaction("agent-metadata-action")
-		defer txn.End()
+		fmt.Println("::debug::New Relic transaction started")
+		defer func() {
+			txn.End()
+			fmt.Println("::debug::New Relic transaction ended")
+		}()
 	}
 	// Validate required environment and setup
 	workspace, token, err := validateEnvironment()
