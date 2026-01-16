@@ -5,7 +5,11 @@ import (
 	"context"
 )
 
-func UploadArtifacts(ctx context.Context, client *Client, config *models.OCIConfig, workspacePath, agentType, version string) []models.ArtifactUploadResult {
+type ArtifactUploader interface {
+	UploadArtifact(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, error)
+}
+
+func UploadArtifacts(ctx context.Context, client ArtifactUploader, config *models.OCIConfig, workspacePath, agentType, version string) []models.ArtifactUploadResult {
 	results := make([]models.ArtifactUploadResult, 0, len(config.Artifacts))
 
 	for _, artifact := range config.Artifacts {

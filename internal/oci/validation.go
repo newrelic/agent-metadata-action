@@ -61,6 +61,7 @@ func ValidateAllArtifacts(workspacePath string, config *models.OCIConfig) error 
 			return fmt.Errorf("validation failed for artifact '%s': %w", artifact.Name, err)
 		}
 	}
+	fmt.Println("::debug::All artifact validations passed")
 	return nil
 }
 
