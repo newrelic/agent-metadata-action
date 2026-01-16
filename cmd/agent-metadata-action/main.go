@@ -11,6 +11,7 @@ import (
 	"agent-metadata-action/internal/client"
 	"agent-metadata-action/internal/config"
 	"agent-metadata-action/internal/loader"
+	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
@@ -76,24 +77,27 @@ func main() {
 }
 
 func run(nrApp *newrelic.Application) error {
+	// Create context
+	ctx := context.Background()
+
 	// Start transaction if New Relic is enabled
-	var txn *newrelic.Transaction
 	if nrApp != nil {
-		txn = nrApp.StartTransaction("agent-metadata-action")
-		fmt.Println("::debug::New Relic transaction started")
-		defer func() {
-			txn.End()
-			fmt.Println("::debug::New Relic transaction ended")
-		}()
+		txn := nrApp.StartTransaction("agent-metadata-action")
+		defer txn.End()
+
+		// Add transaction to context for logging
+		ctx = newrelic.NewContext(ctx, txn)
+		logging.Debug(ctx, "New Relic transaction started")
+		defer logging.Debug(ctx, "New Relic transaction ended")
 	}
+
 	// Validate required environment and setup
-	workspace, token, err := validateEnvironment()
+	workspace, token, err := validateEnvironment(ctx)
 	if err != nil {
 		return err
 	}
 
 	// Create metadataClient
-	ctx := context.Background()
 	metadataClient := createMetadataClientFunc(config.GetMetadataURL(), token)
 
 	// Determine which flow to execute
@@ -108,7 +112,7 @@ func run(nrApp *newrelic.Application) error {
 }
 
 // validateEnvironment checks required environment variables and workspace
-func validateEnvironment() (workspace string, token string, err error) {
+func validateEnvironment(ctx context.Context) (workspace string, token string, err error) {
 	workspace = config.GetWorkspace()
 	if workspace == "" {
 		return "", "", fmt.Errorf("GITHUB_WORKSPACE is required but not set")
@@ -123,13 +127,13 @@ func validateEnvironment() (workspace string, token string, err error) {
 		return "", "", fmt.Errorf("NEWRELIC_TOKEN is required but not set")
 	}
 
-	fmt.Println("::notice::Environment validated successfully")
+	logging.Notice(ctx, "Environment validated successfully")
 	return workspace, token, nil
 }
 
 // runAgentFlow handles the agent repository workflow
 func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentType, agentVersion string) error {
-	fmt.Println("::debug::Running agent repository flow")
+	logging.Debug(ctx, "Running agent repository flow")
 
 	// Check for .fleetControl directory
 	fleetControlPath := filepath.Join(workspace, config.GetRootFolderForAgentRepo())
@@ -142,15 +146,15 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	if err != nil {
 		return fmt.Errorf("failed to read configuration definitions: %w", err)
 	}
-	fmt.Printf("::notice::Loaded %d configuration definitions\n", len(configs))
+	logging.Noticef(ctx, "Loaded %d configuration definitions", len(configs))
 
 	// Load agent control definitions (optional)
 	agentControl, err := loader.ReadAgentControlDefinitions(workspace)
 	if err != nil {
-		fmt.Printf("::warn::Unable to load agent control definitions: %v - continuing without them\n", err)
+		logging.Warnf(ctx, "Unable to load agent control definitions: %v - continuing without them", err)
 		agentControl = nil
 	} else {
-		fmt.Printf("::notice::Loaded %d agent control definitions\n", len(agentControl))
+		logging.Noticef(ctx, "Loaded %d agent control definitions", len(agentControl))
 	}
 
 	// Build metadata
@@ -167,13 +171,13 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 		return fmt.Errorf("failed to send metadata for %s: %w", agentType, err)
 	}
 
-	fmt.Printf("::notice::Successfully sent metadata for %s version %s\n", agentType, agentVersion)
+	logging.Noticef(ctx, "Successfully sent metadata for %s version %s", agentType, agentVersion)
 	return nil
 }
 
 // runDocsFlow handles the documentation repository workflow
 func runDocsFlow(ctx context.Context, client metadataClient) error {
-	fmt.Println("::debug::Running documentation flow")
+	logging.Debug(ctx, "Running documentation flow")
 
 	// Load metadata from changed MDX files
 	metadataList, err := loader.LoadMetadataForDocs()
@@ -182,23 +186,23 @@ func runDocsFlow(ctx context.Context, client metadataClient) error {
 	}
 
 	if len(metadataList) == 0 {
-		fmt.Println("::notice::No metadata changes detected")
+		logging.Notice(ctx, "No metadata changes detected")
 		return nil
 	}
 
-	fmt.Printf("::notice::Processing %d metadata entries\n", len(metadataList))
+	logging.Noticef(ctx, "Processing %d metadata entries", len(metadataList))
 
 	// Send each metadata entry separately
 	successCount := 0
 	for _, entry := range metadataList {
 		if err := sendDocsMetadata(ctx, client, entry); err != nil {
-			fmt.Printf("::warn::Failed to send metadata for %s: %v\n", entry.AgentType, err)
+			logging.Warnf(ctx, "Failed to send metadata for %s: %v", entry.AgentType, err)
 			continue
 		}
 		successCount++
 	}
 
-	fmt.Printf("::notice::Successfully sent %d of %d metadata entries\n", successCount, len(metadataList))
+	logging.Noticef(ctx, "Successfully sent %d of %d metadata entries", successCount, len(metadataList))
 	return nil
 }
 
@@ -216,7 +220,7 @@ func sendDocsMetadata(ctx context.Context, client metadataClient, entry loader.M
 		return err
 	}
 
-	fmt.Printf("::notice::Sent metadata for %s version %s\n", entry.AgentType, version)
+	logging.Noticef(ctx, "Sent metadata for %s version %s", entry.AgentType, version)
 	return nil
 }
 
