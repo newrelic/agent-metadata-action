@@ -16,7 +16,7 @@ type ArtifactDefinition struct {
 
 func (a *ArtifactDefinition) Validate() error {
 	if a.Name == "" {
-		return fmt.Errorf("name is required")
+		return fmt.Errorf("name is required for artifact")
 	}
 
 	namePattern := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
