@@ -29,17 +29,21 @@ var createMetadataClientFunc = func(baseURL, token string) metadataClient {
 }
 
 // initNewRelic initializes the New Relic application
-// Returns nil if NEW_RELIC_LICENSE_KEY is not set (silent no-op mode)
+// Returns nil if APM_CONTROL_NR_LICENSE_KEY is not set (silent no-op mode)
 func initNewRelic() *newrelic.Application {
-	licenseKey := os.Getenv("NEW_RELIC_LICENSE_KEY")
+	licenseKey := os.Getenv("APM_CONTROL_NR_LICENSE_KEY")
 	if licenseKey == "" {
-		return nil // Silent no-op
+		_, _ = fmt.Fprintln(os.Stderr, "::warn::Failed to init New Relic - missing license key")
+		return nil
 	}
 
-	// Support staging environment via NEW_RELIC_HOST env var
-	if host := os.Getenv("NEW_RELIC_HOST"); host != "" {
-		fmt.Printf("::notice::Using New Relic host: %s\n", host)
+	// Hardcode staging environment
+	err := config.SetNRHost()
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "::warn::Failed to init New Relic, missing host: %v\n", err)
+		return nil
 	}
+	fmt.Println("::notice::Using New Relic staging environment")
 
 	app, err := newrelic.NewApplication(
 		newrelic.ConfigAppName("agent-metadata-action"),
@@ -47,7 +51,10 @@ func initNewRelic() *newrelic.Application {
 		newrelic.ConfigDebugLogger(os.Stdout),
 		newrelic.ConfigDistributedTracerEnabled(true),
 		newrelic.ConfigAppLogForwardingEnabled(true),
-		newrelic.ConfigFromEnvironment(), // This reads NEW_RELIC_HOST automatically
+		newrelic.ConfigFromEnvironment(), // This reads NEW_RELIC_HOST
+		newrelic.ConfigLabels(map[string]string{
+			"team": "APM Control Team",
+		}),
 	)
 
 	if err != nil {

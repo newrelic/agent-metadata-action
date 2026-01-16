@@ -32,3 +32,11 @@ func GetEventPath() string {
 func GetToken() string {
 	return os.Getenv("NEWRELIC_TOKEN")
 }
+
+func SetNRHost() error {
+	err := os.Setenv("NEW_RELIC_HOST", "staging-collector.newrelic.com")
+	if err != nil {
+		return err
+	}
+	return nil
+}
