@@ -31,14 +31,14 @@ var createMetadataClientFunc = func(baseURL, token string) metadataClient {
 // initNewRelic initializes the New Relic application
 // Returns nil if APM_CONTROL_NR_LICENSE_KEY is not set (silent no-op mode)
 func initNewRelic() *newrelic.Application {
-	licenseKey := os.Getenv("APM_CONTROL_NR_LICENSE_KEY")
+	licenseKey := config.GetNRAgentLicenseKey()
 	if licenseKey == "" {
 		_, _ = fmt.Fprintln(os.Stderr, "::warn::Failed to init New Relic - missing license key")
 		return nil
 	}
 
 	// Hardcode staging environment
-	err := config.SetNRHost()
+	err := config.SetNRAgentHost()
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "::warn::Failed to init New Relic, missing host: %v\n", err)
 		return nil
