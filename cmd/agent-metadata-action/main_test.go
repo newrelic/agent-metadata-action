@@ -61,6 +61,7 @@ func TestMain_AgentRepoFlow(t *testing.T) {
 	t.Setenv("INPUT_VERSION", "1.2.3")
 	t.Setenv("GITHUB_WORKSPACE", workspace)
 	t.Setenv("NEWRELIC_TOKEN", "mock-token-for-testing")
+	t.Setenv("INPUT_OCI_REGISTRY", "") // Disable OCI for this test
 
 	getStdout, getStderr := testutil.CaptureOutput(t)
 
@@ -467,4 +468,74 @@ func TestSendDocsMetadata(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRunAgentFlow_OCIDisabled(t *testing.T) {
+	projectRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	workspace := filepath.Join(projectRoot, "integration-test", "agent-flow")
+
+	t.Setenv("INPUT_OCI_REGISTRY", "")
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	// method under test
+	err = runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+
+	assert.NoError(t, err, "OCI should be skipped when registry is not configured")
+}
+
+func TestRunAgentFlow_OCIInvalidConfig(t *testing.T) {
+	projectRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	workspace := filepath.Join(projectRoot, "integration-test", "agent-flow")
+
+	t.Setenv("INPUT_OCI_REGISTRY", "ghcr.io/newrelic/agents")
+	t.Setenv("INPUT_BINARIES", "") // Empty binaries when registry is set = invalid
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	// method under test
+	err = runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "error loading OCI config")
+}
+
+func TestRunAgentFlow_OCIInvalidBinariesJSON(t *testing.T) {
+	projectRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	workspace := filepath.Join(projectRoot, "integration-test", "agent-flow")
+
+	t.Setenv("INPUT_OCI_REGISTRY", "docker.io/newrelic/agents")
+	t.Setenv("INPUT_BINARIES", "not valid json")
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	// method under test
+	err = runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "error loading OCI config")
+}
+
+func TestRunAgentFlow_OCIMissingBinaryFile(t *testing.T) {
+	projectRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	workspace := filepath.Join(projectRoot, "integration-test", "agent-flow")
+
+	t.Setenv("INPUT_OCI_REGISTRY", "ghcr.io/newrelic/agents")
+	t.Setenv("INPUT_BINARIES", `[{"name":"test","path":"./nonexistent.tar.gz","os":"linux","arch":"amd64","format":"tar+gzip"}]`)
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	// method under test
+	err = runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "binary upload failed")
 }

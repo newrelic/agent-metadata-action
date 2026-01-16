@@ -10,3 +10,4 @@ coverage.out
 
 # IDE
 .idea/
+dist/
