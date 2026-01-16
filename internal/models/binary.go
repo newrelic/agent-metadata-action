@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -74,8 +75,7 @@ func (a *ArtifactDefinition) GetPlatformString() string {
 }
 
 func (a *ArtifactDefinition) GetFilename() string {
-	parts := strings.Split(a.Path, "/")
-	return parts[len(parts)-1]
+	return filepath.Base(a.Path)
 }
 
 type OCIConfig struct {
