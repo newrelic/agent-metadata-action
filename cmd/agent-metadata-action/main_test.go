@@ -230,7 +230,7 @@ func TestValidateEnvironment(t *testing.T) {
 			t.Setenv("NEWRELIC_TOKEN", tt.token)
 
 			// Method under test
-			gotWorkspace, gotToken, err := validateEnvironment()
+			gotWorkspace, gotToken, err := validateEnvironment(context.Background())
 
 			if tt.wantErr {
 				assert.Error(t, err)
