@@ -168,7 +168,7 @@ func TestRun_InvalidEnvironment(t *testing.T) {
 	t.Setenv("NEWRELIC_TOKEN", "mock-token-for-testing")
 
 	// Method under test
-	err := run()
+	err := run(nil)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "workspace directory does not exist")
@@ -230,7 +230,7 @@ func TestValidateEnvironment(t *testing.T) {
 			t.Setenv("NEWRELIC_TOKEN", tt.token)
 
 			// Method under test
-			gotWorkspace, gotToken, err := validateEnvironment()
+			gotWorkspace, gotToken, err := validateEnvironment(context.Background())
 
 			if tt.wantErr {
 				assert.Error(t, err)

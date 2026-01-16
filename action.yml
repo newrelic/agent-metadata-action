@@ -23,6 +23,10 @@ inputs:
     description: 'Enable Go build cache'
     required: false
     default: 'true'
+  apm-control-nr-license-key:
+    description: 'New Relic APM license key for instrumentation of this action (optional, pass from secrets)'
+    required: false
+    default: ''
 runs:
   using: 'composite'
   steps:
@@ -157,6 +161,7 @@ runs:
         INPUT_AGENT_TYPE: ${{ inputs.agent-type }}
         INPUT_VERSION: ${{ inputs.version }}
         NEWRELIC_TOKEN: ${{ steps.newrelic-auth.outputs.token }}
+        APM_CONTROL_NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
       run: |
         set -e
         cd ${{ github.action_path }}
