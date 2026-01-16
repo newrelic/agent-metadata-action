@@ -48,6 +48,15 @@ jobs:
           agent-type: dotnet-agent # Required for agent release workflow: The type of agent (e.g., nodejs-agent, java-agent)
           version: 1.0.0 # Required for agent release workflow: will be used to check out appropriate release tag
           cache: true  # Optional: Enable Go build cache (default: true)
+          oci-registry: docker.io/newrelic/agents  # Optional: OCI registry URL for binary uploads
+          oci-username: ${{ github.actor }}  # Optional: OCI registry username
+          oci-password: ${{ secrets.GITHUB_TOKEN }}  # Optional: OCI registry password/token
+          binaries: |  # Optional: JSON array with artifact definitions for binary upload
+            [
+              {"name": "dotnet-agent", "path": "./dotnet-agent_amd64.tar.gz", "os": "linux", "arch": "amd64", "format": "tar+gzip"},
+              {"name": "dotnet-agent", "path": "./dotnet-agent_arm64.tar.gz", "os": "linux", "arch": "arm64", "format": "tar+gzip"},
+              {"name": "dotnet-agent", "path": "./NewRelicDotNetAgent.zip", "os": "windows", "arch": "amd64", "format": "zip"}
+            ]
 ```
 
 ### Example Workflow For Updating Docs Metadata for a new/existing Agent Version
@@ -89,6 +98,27 @@ configurationDefinitions:
 **Dec 2025 - schema temporarily optional until full functionality is ready
 
 **Schema paths must be relative to the `.fleetControl` directory and cannot use directory traversal (`..`) for security.
+
+
+#### Artifact Upload
+
+The agent release workflow supports uploading agent binaries to an OCI registry. This feature is optional and only applies to agent releases (when both `agent-type` and `version` are provided).
+
+To enable binary uploads, provide the following inputs:
+- `oci-registry`: OCI registry URL (e.g., `ghcr.io/newrelic/agents`)
+- `oci-username`: Registry username for authentication
+- `oci-password`: Registry password or token for authentication
+- `binaries`: JSON array defining the binaries to upload
+
+**Binaries JSON Format:**
+
+Each entry in the `binaries` array must include:
+- `name`: Binary artifact name
+- `path`: Path to the binary file (relative to repository root)
+- `os`: Operating system (e.g., `linux`, `darwin`, `windows`)
+- `arch`: Architecture (e.g., `amd64`, `arm64`)
+- `format`: Archive format - supported values: `tar`, `tar+gzip`, `zip`
+```
 
 ## Building
 
