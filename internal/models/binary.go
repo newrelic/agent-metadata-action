@@ -32,7 +32,7 @@ func (a *ArtifactDefinition) Validate() error {
 		return fmt.Errorf("os is required for artifact '%s'", a.Name)
 	}
 
-	if a.OS != "any" {
+	if !strings.EqualFold(a.OS, "any") {
 		osPattern := regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 		if !osPattern.MatchString(a.OS) {
 			return fmt.Errorf("invalid os '%s' for artifact '%s': must be alphanumeric or 'any'", a.OS, a.Name)
@@ -43,7 +43,7 @@ func (a *ArtifactDefinition) Validate() error {
 		return fmt.Errorf("arch is required for artifact '%s'", a.Name)
 	}
 
-	if a.Arch != "any" {
+	if !strings.EqualFold(a.Arch, "any") {
 		archPattern := regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 		if !archPattern.MatchString(a.Arch) {
 			return fmt.Errorf("invalid arch '%s' for artifact '%s': must be alphanumeric or 'any'", a.Arch, a.Name)
@@ -54,7 +54,7 @@ func (a *ArtifactDefinition) Validate() error {
 		return fmt.Errorf("format is required for artifact '%s'", a.Name)
 	}
 
-	if a.Format != "tar" && a.Format != "tar+gzip" && a.Format != "zip" {
+	if !strings.EqualFold(a.Format, "tar") && !strings.EqualFold(a.Format, "tar+gzip") && !strings.EqualFold(a.Format, "zip") {
 		return fmt.Errorf("invalid format '%s' for artifact '%s': must be 'tar', 'tar+gzip', or 'zip'", a.Format, a.Name)
 	}
 
