@@ -79,6 +79,7 @@ jobs:
           METADATA_SERVICE_URL: http://127.0.0.1:8080
           MOCK_NEWRELIC_AUTH_CLI: true
           NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+          NEW_RELIC_HOST: staging-collector.newrelic.com
         with:
           newrelic-client-id: fake-client-id-for-testing
           newrelic-private-key: ZmFrZS1wcml2YXRlLWtleS1mb3ItdGVzdGluZwo=
@@ -144,6 +145,7 @@ jobs:
           METADATA_SERVICE_URL: http://127.0.0.1:8080
           MOCK_NEWRELIC_AUTH_CLI: true
           NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+          NEW_RELIC_HOST: staging-collector.newrelic.com
         with:
           newrelic-client-id: fake-client-id-for-testing
           newrelic-private-key: ZmFrZS1wcml2YXRlLWtleS1mb3ItdGVzdGluZwo=
@@ -214,6 +216,7 @@ jobs:
           METADATA_SERVICE_URL: http://127.0.0.1:8080
           NEWRELIC_TOKEN: fake-token-for-testing
           NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+          NEW_RELIC_HOST: staging-collector.newrelic.com
         run: |
           echo "::group::Create fake commits"
           # Create two isolated commits: one without MDX files, one with them

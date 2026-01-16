@@ -36,12 +36,18 @@ func initNewRelic() *newrelic.Application {
 		return nil // Silent no-op
 	}
 
+	// Support staging environment via NEW_RELIC_HOST env var
+	if host := os.Getenv("NEW_RELIC_HOST"); host != "" {
+		fmt.Printf("::notice::Using New Relic host: %s\n", host)
+	}
+
 	app, err := newrelic.NewApplication(
 		newrelic.ConfigAppName("agent-metadata-action"),
 		newrelic.ConfigLicense(licenseKey),
 		newrelic.ConfigDebugLogger(os.Stdout),
 		newrelic.ConfigDistributedTracerEnabled(true),
 		newrelic.ConfigAppLogForwardingEnabled(true),
+		newrelic.ConfigFromEnvironment(), // This reads NEW_RELIC_HOST automatically
 	)
 
 	if err != nil {
