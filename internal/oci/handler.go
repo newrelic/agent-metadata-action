@@ -9,6 +9,7 @@ import (
 
 func HandleUploads(ociConfig *models.OCIConfig, workspace, agentType, version string) error {
 	if !ociConfig.IsEnabled() {
+		fmt.Println("::debug::OCI upload is not enabled")
 		return nil
 	}
 
@@ -36,12 +37,6 @@ func HandleUploads(ociConfig *models.OCIConfig, workspace, agentType, version st
 		}
 	}
 
-	if HasFailures(uploadResults) {
-		return fmt.Errorf("one or more binary uploads failed")
-	}
-
-	fmt.Println("::notice::All binaries uploaded successfully")
-
 	// Create manifest index to tag uploaded artifacts with version
 	if len(uploadResults) > 0 {
 		fmt.Println("::notice::Creating multi-platform manifest index...")
@@ -51,6 +46,12 @@ func HandleUploads(ociConfig *models.OCIConfig, workspace, agentType, version st
 		}
 		fmt.Printf("::notice::Created manifest index with tag '%s' (digest: %s)\n", version, indexDigest)
 	}
+
+	if HasFailures(uploadResults) {
+		return fmt.Errorf("one or more binary uploads failed")
+	}
+
+	fmt.Println("::notice::All binaries uploaded successfully")
 
 	return nil
 }
