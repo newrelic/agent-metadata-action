@@ -3,17 +3,17 @@ package oci
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
+	"agent-metadata-action/internal/config"
 	"agent-metadata-action/internal/models"
 )
 
 func LoadConfig() (models.OCIConfig, error) {
-	registry := os.Getenv("INPUT_OCI_REGISTRY")
-	username := os.Getenv("INPUT_OCI_USERNAME")
-	password := os.Getenv("INPUT_OCI_PASSWORD")
-	binariesJSON := os.Getenv("INPUT_BINARIES")
+	registry := config.GetOCIRegistry()
+	username := config.GetOCIUsername()
+	password := config.GetOCIPassword()
+	binariesJSON := config.GetBinaries()
 
 	config := models.OCIConfig{
 		Registry:  strings.TrimSpace(registry),
