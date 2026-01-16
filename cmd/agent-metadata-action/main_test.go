@@ -168,7 +168,7 @@ func TestRun_InvalidEnvironment(t *testing.T) {
 	t.Setenv("NEWRELIC_TOKEN", "mock-token-for-testing")
 
 	// Method under test
-	err := run()
+	err := run(nil)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "workspace directory does not exist")

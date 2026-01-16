@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"agent-metadata-action/internal/client"
 	"agent-metadata-action/internal/config"
 	"agent-metadata-action/internal/loader"
 	"agent-metadata-action/internal/models"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 // metadataClient interface for testing
@@ -24,14 +27,48 @@ var createMetadataClientFunc = func(baseURL, token string) metadataClient {
 	return client.NewInstrumentationClient(baseURL, token)
 }
 
+// initNewRelic initializes the New Relic application
+// Returns nil if NEW_RELIC_LICENSE_KEY is not set (silent no-op mode)
+func initNewRelic() *newrelic.Application {
+	licenseKey := os.Getenv("NEW_RELIC_LICENSE_KEY")
+	if licenseKey == "" {
+		return nil // Silent no-op
+	}
+
+	app, err := newrelic.NewApplication(
+		newrelic.ConfigAppName("agent-metadata-action"),
+		newrelic.ConfigLicense(licenseKey),
+	)
+
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "::warn::Failed to init New Relic: %v\n", err)
+		return nil
+	}
+
+	fmt.Println("::notice::New Relic APM enabled")
+	return app
+}
+
 func main() {
-	if err := run(); err != nil {
+	nrApp := initNewRelic()
+
+	if err := run(nrApp); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "::error::%v\n", err)
 		os.Exit(1)
 	}
+
+	if nrApp != nil {
+		nrApp.Shutdown(10 * time.Second)
+	}
 }
 
-func run() error {
+func run(nrApp *newrelic.Application) error {
+	// Start transaction if New Relic is enabled
+	var txn *newrelic.Transaction
+	if nrApp != nil {
+		txn = nrApp.StartTransaction("agent-metadata-action")
+		defer txn.End()
+	}
 	// Validate required environment and setup
 	workspace, token, err := validateEnvironment()
 	if err != nil {
