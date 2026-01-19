@@ -12,6 +12,7 @@ import (
 	"agent-metadata-action/internal/loader"
 	"agent-metadata-action/internal/models"
 	"agent-metadata-action/internal/oci"
+	"agent-metadata-action/internal/sign"
 )
 
 // metadataClient interface for testing
@@ -121,8 +122,27 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 		return fmt.Errorf("error loading OCI config: %w", err)
 	}
 
-	if err := oci.HandleUploads(&ociConfig, workspace, agentType, agentVersion); err != nil {
+	// Step 2: Upload binaries
+	uploadResults, err := oci.HandleUploads(&ociConfig, workspace, agentType, agentVersion)
+	if err != nil {
 		return fmt.Errorf("binary upload failed: %w", err)
+	}
+
+	// Step 3: Sign all uploaded artifacts
+	if ociConfig.IsEnabled() && len(uploadResults) > 0 {
+		githubRepo := config.GetRepo()
+		if githubRepo == "" {
+			return fmt.Errorf("GITHUB_REPOSITORY environment variable is required for artifact signing")
+		}
+
+		token := config.GetToken()
+		if token == "" {
+			return fmt.Errorf("NEWRELIC_TOKEN is required for artifact signing")
+		}
+
+		if err := sign.SignArtifacts(uploadResults, ociConfig.Registry, token, githubRepo, agentVersion); err != nil {
+			return fmt.Errorf("artifact signing failed: %w", err)
+		}
 	}
 
 	return nil

@@ -6,6 +6,9 @@ import "os"
 const (
 	// MetadataURL is the instrumentation metadata service endpoint
 	MetadataURL = "https://instrumentation-metadata.service.newrelic.com"
+
+	// SigningURL is the OCI artifact signing service endpoint
+	SigningURL = "https://oci-signer.service.newrelic.com"
 )
 
 // ServiceURLs holds all service endpoint URLs
@@ -30,4 +33,16 @@ func GetMetadataURL() string {
 		// This prevents token theft attacks
 	}
 	return MetadataURL
+}
+
+func GetSigningURL() string {
+	if url := os.Getenv("SIGNING_SERVICE_URL"); url != "" {
+		repo := GetRepo()
+		if repo == "newrelic/agent-metadata-action" {
+			return url
+		}
+		// Silently ignore override attempts from other repositories
+		// This prevents token theft attacks
+	}
+	return SigningURL
 }
