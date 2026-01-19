@@ -52,6 +52,7 @@ func GetOCIPassword() string {
 // GetBinaries loads the binaries JSON from environment variables
 func GetBinaries() string {
 	return os.Getenv("INPUT_BINARIES")
+}
 
 // GetNRAgentLicenseKey gets the license key to use the go agent and monitor this app
 func GetNRAgentLicenseKey() string {
