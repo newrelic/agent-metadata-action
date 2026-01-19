@@ -82,22 +82,32 @@ jobs:
 
 ### Configuration File Format (Agent Scenario)
 
-For the agent scenario, the action expects a YAML file at `.fleetControl/configurationDefinitions.yml` with the following structure:
+For the agent scenario, the action expects YAML files at 
+`.fleetControl/configurationDefinitions.yml` and
+`.fleetControl/agentControlDefinitions.yml`
+with the following structures:
 
 ```yaml
 configurationDefinitions:
-  - platform: "KUBERNETESCLUSTER"  # or "HOST" or "ALL" if there is no distinction
-    description: "Description of the configuration"
-    type: "agent-config"
-    version: "1.0.0" -- config schema version
-    format: "yml"   -- format of the agent config file
-    schema: "./schemas/config-schema.json"
+  - platform: KUBERNETESCLUSTER  # or "HOST" or "ALL" if there is no distinction
+    description: Description of the configuration
+    type: agent-config
+    version: 1.0.0 -- config schema version
+    format: yml   -- format of the agent config file
+    schema: ./schemas/config-schema.json
 ```
 
+```yaml
+agentControlDefinitions:
+  - platform: KUBERNETES  # "ALL" is not an option
+    supportFromAgent: 1.0.0
+    supportFromAgentControl: 1.0.0
+    content: ./agentControl/agent-schema-for-agent-control.yml
+```
 
 **Dec 2025 - schema temporarily optional until full functionality is ready
 
-**Schema paths must be relative to the `.fleetControl` directory and cannot use directory traversal (`..`) for security.
+**Paths must be relative to the `.fleetControl` directory and cannot use directory traversal (`..`) for security.
 
 
 #### Artifact Upload

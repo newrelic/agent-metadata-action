@@ -169,7 +169,7 @@ func TestRun_InvalidEnvironment(t *testing.T) {
 	t.Setenv("NEWRELIC_TOKEN", "mock-token-for-testing")
 
 	// Method under test
-	err := run()
+	err := run(nil)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "workspace directory does not exist")
@@ -231,7 +231,7 @@ func TestValidateEnvironment(t *testing.T) {
 			t.Setenv("NEWRELIC_TOKEN", tt.token)
 
 			// Method under test
-			gotWorkspace, gotToken, err := validateEnvironment()
+			gotWorkspace, gotToken, err := validateEnvironment(context.Background())
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -386,6 +386,40 @@ version: 1.3.1
 
 	assert.Contains(t, outputStr, "Successfully sent 1 of 2 metadata entries")
 	assert.Contains(t, outputStr, "::warn::Failed to send metadata")
+}
+
+func TestRunAgentFlow_AgentControlDefinitionsError(t *testing.T) {
+	workspace := t.TempDir()
+	fleetControlPath := filepath.Join(workspace, ".fleetControl")
+	require.NoError(t, os.MkdirAll(fleetControlPath, 0755))
+
+	// Create valid configurationDefinitions.yml
+	configFile := filepath.Join(fleetControlPath, "configurationDefinitions.yml")
+	configContent := `configurationDefinitions:
+  - name: test-config
+    type: string
+`
+	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
+
+	// Create invalid agentControlDefinitions.yml (invalid YAML)
+	agentControlFile := filepath.Join(fleetControlPath, "agentControlDefinitions.yml")
+	require.NoError(t, os.WriteFile(agentControlFile, []byte("invalid: yaml: ["), 0644))
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// method under test
+	err := runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+
+	// Should succeed despite agentControlDefinitions error
+	assert.NoError(t, err)
+
+	// Verify warning was logged
+	outputStr := getStdout()
+	assert.Contains(t, outputStr, "::warn::Unable to load agent control definitions")
+	assert.Contains(t, outputStr, "continuing without them")
 }
 
 func TestSendDocsMetadata(t *testing.T) {

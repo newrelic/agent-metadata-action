@@ -391,8 +391,8 @@ func TestSendMetadata_WithConfigurationDefinitionsAndAgentControl(t *testing.T) 
 		},
 		AgentControlDefinitions: []models.AgentControlDefinition{
 			{
-				Platform: "all",
-				Content:  "base64content",
+				"platform": "all",
+				"content":  "base64content",
 			},
 		},
 	}
