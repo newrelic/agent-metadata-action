@@ -14,6 +14,7 @@ import (
 	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
 	"agent-metadata-action/internal/oci"
+
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
@@ -30,20 +31,20 @@ var createMetadataClientFunc = func(baseURL, token string) metadataClient {
 
 // initNewRelic initializes the New Relic application
 // Returns nil if APM_CONTROL_NR_LICENSE_KEY is not set (silent no-op mode)
-func initNewRelic() *newrelic.Application {
+func initNewRelic(ctx context.Context) *newrelic.Application {
 	licenseKey := config.GetNRAgentLicenseKey()
 	if licenseKey == "" {
-		_, _ = fmt.Fprintln(os.Stderr, "::warn::Failed to init New Relic - missing license key")
+		logging.Warn(ctx, "Failed to init New Relic - missing license key")
 		return nil
 	}
 
 	// Hardcode staging environment
 	err := config.SetNRAgentHost()
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "::warn::Failed to init New Relic, missing host: %v\n", err)
+		logging.Warnf(ctx, "Failed to init New Relic, missing host: %v", err)
 		return nil
 	}
-	fmt.Println("::notice::Using New Relic staging environment")
+	logging.Notice(ctx, "Using New Relic staging environment")
 
 	app, err := newrelic.NewApplication(
 		newrelic.ConfigAppName("agent-metadata-action"),
@@ -58,34 +59,37 @@ func initNewRelic() *newrelic.Application {
 	)
 
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "::warn::Failed to init New Relic: %v\n", err)
+		logging.Warnf(ctx, "Failed to init New Relic: %v", err)
 		return nil
 	}
 
-	fmt.Println("::notice::New Relic APM enabled - waiting for connection...")
+	logging.Notice(ctx, "New Relic APM enabled - waiting for connection...")
 
 	// Wait for the app to connect (max 10 seconds)
 	if err := app.WaitForConnection(10 * time.Second); err != nil {
-		fmt.Printf("::warn::New Relic connection timeout: %v - will try to send data anyway\n", err)
+		logging.Warnf(ctx, "New Relic connection timeout: %v - will try to send data anyway", err)
 	} else {
-		fmt.Println("::notice::New Relic connected successfully")
+		logging.Notice(ctx, "New Relic connected successfully")
 	}
 
 	return app
 }
 
 func main() {
-	nrApp := initNewRelic()
+	// Create base context for early logging
+	ctx := context.Background()
+
+	nrApp := initNewRelic(ctx)
 
 	if err := run(nrApp); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "::error::%v\n", err)
+		logging.Errorf(ctx, "%v", err)
 		os.Exit(1)
 	}
 
 	if nrApp != nil {
-		fmt.Println("::notice::Shutting down New Relic - waiting up to 15 seconds to send data...")
+		logging.Notice(ctx, "Shutting down New Relic - waiting up to 15 seconds to send data...")
 		nrApp.Shutdown(15 * time.Second)
-		fmt.Println("::notice::New Relic shutdown complete")
+		logging.Notice(ctx, "New Relic shutdown complete")
 	}
 }
 
@@ -146,7 +150,7 @@ func validateEnvironment(ctx context.Context) (workspace string, token string, e
 
 // runAgentFlow handles the agent repository workflow
 func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentType, agentVersion string) error {
-	logging.Debug(ctx, "Running agent repository flow")
+	logging.Debugf(ctx, "Running agent repository flow for %s version %s", agentType, agentVersion)
 
 	// Check for .fleetControl directory
 	fleetControlPath := filepath.Join(workspace, config.GetRootFolderForAgentRepo())
@@ -155,14 +159,14 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	}
 
 	// Load configuration definitions (required)
-	configs, err := loader.ReadConfigurationDefinitions(workspace)
+	configs, err := loader.ReadConfigurationDefinitions(ctx, workspace)
 	if err != nil {
 		return fmt.Errorf("failed to read configuration definitions: %w", err)
 	}
 	logging.Noticef(ctx, "Loaded %d configuration definitions", len(configs))
 
 	// Load agent control definitions (optional)
-	agentControl, err := loader.ReadAgentControlDefinitions(workspace)
+	agentControl, err := loader.ReadAgentControlDefinitions(ctx, workspace)
 	if err != nil {
 		logging.Warnf(ctx, "Unable to load agent control definitions: %v - continuing without them", err)
 		agentControl = nil
@@ -177,7 +181,7 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 		AgentControlDefinitions:  agentControl,
 	}
 
-	printJSON("Agent Metadata", metadata)
+	printJSON(ctx, "Agent Metadata", metadata)
 
 	// Send to service
 	if err := client.SendMetadata(ctx, agentType, agentVersion, &metadata); err != nil {
@@ -190,7 +194,7 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 		return fmt.Errorf("error loading OCI config: %w", err)
 	}
 
-	if err := oci.HandleUploads(&ociConfig, workspace, agentType, agentVersion); err != nil {
+	if err := oci.HandleUploads(ctx, &ociConfig, workspace, agentType, agentVersion); err != nil {
 		return fmt.Errorf("binary upload failed: %w", err)
 	}
 
@@ -203,7 +207,7 @@ func runDocsFlow(ctx context.Context, client metadataClient) error {
 	logging.Debug(ctx, "Running documentation flow")
 
 	// Load metadata from changed MDX files
-	metadataList, err := loader.LoadMetadataForDocs()
+	metadataList, err := loader.LoadMetadataForDocs(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to load metadata from docs: %w", err)
 	}
@@ -219,7 +223,7 @@ func runDocsFlow(ctx context.Context, client metadataClient) error {
 	successCount := 0
 	for _, entry := range metadataList {
 		if err := sendDocsMetadata(ctx, client, entry); err != nil {
-			logging.Warnf(ctx, "Failed to send metadata for %s: %v", entry.AgentType, err)
+			logging.Errorf(ctx, "Failed to send metadata for %s: %v", entry.AgentType, err)
 			continue
 		}
 		successCount++
@@ -237,7 +241,7 @@ func sendDocsMetadata(ctx context.Context, client metadataClient, entry loader.M
 		Metadata: entry.AgentMetadataFromDocs,
 	}
 
-	printJSON(fmt.Sprintf("Docs Metadata (%s %s)", entry.AgentType, version), entry.AgentMetadataFromDocs)
+	printJSON(ctx, fmt.Sprintf("Docs Metadata (%s %s)", entry.AgentType, version), entry.AgentMetadataFromDocs)
 
 	if err := client.SendMetadata(ctx, entry.AgentType, version, &metadata); err != nil {
 		return err
@@ -248,11 +252,11 @@ func sendDocsMetadata(ctx context.Context, client metadataClient, entry loader.M
 }
 
 // printJSON marshals data to JSON and prints it with a debug annotation
-func printJSON(label string, data any) {
+func printJSON(ctx context.Context, label string, data any) {
 	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		fmt.Printf("::debug::Failed to marshal %s: %v\n", label, err)
+		logging.Debugf(ctx, "Failed to marshal %s: %v", label, err)
 		return
 	}
-	fmt.Printf("::debug::%s: %s\n", label, string(jsonData))
+	logging.Debugf(ctx, "%s: %s", label, string(jsonData))
 }

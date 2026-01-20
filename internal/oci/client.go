@@ -1,6 +1,7 @@
 package oci
 
 import (
+	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
 	"bytes"
 	"context"
@@ -23,7 +24,7 @@ type Client struct {
 	registry string
 }
 
-func NewClient(registry, username, password string) (*Client, error) {
+func NewClient(ctx context.Context, registry, username, password string) (*Client, error) {
 	repo, err := remote.NewRepository(registry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OCI repository: %w", err)
@@ -40,7 +41,7 @@ func NewClient(registry, username, password string) (*Client, error) {
 		repo.PlainHTTP = true
 	}
 
-	fmt.Printf("::debug::OCI client configured: registry=%s, plainHTTP=%v\n", registry, repo.PlainHTTP)
+	logging.Debugf(ctx, "OCI client configured: registry=%s, plainHTTP=%v", registry, repo.PlainHTTP)
 
 	return &Client{
 		repo:     repo,
@@ -106,7 +107,7 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 
 	copyOpts := oras.CopyOptions{}
 	digestRef := manifestDesc.Digest.String()
-	fmt.Printf("::debug::Copying artifact %s to registry (digest: %s)\n", artifact.Name, digestRef)
+	logging.Debugf(ctx, "Copying artifact %s to registry (digest: %s)", artifact.Name, digestRef)
 	if _, err = oras.Copy(copyCtx, fs, tempTag, c.repo, digestRef, copyOpts); err != nil {
 		return "", 0, fmt.Errorf("failed to copy artifact to registry: %w", err)
 	}
@@ -170,10 +171,10 @@ func (c *Client) CreateManifestIndex(ctx context.Context, uploadResults []models
 		Size:      int64(len(indexBytes)),
 	}
 
-	fmt.Printf("::debug::Pushing manifest index to %s with tag %s (size: %d bytes)\n",
+	logging.Debugf(ctx, "Pushing manifest index to %s with tag %s (size: %d bytes)",
 		c.registry, version, len(indexBytes))
-	fmt.Printf("::debug::Index contains %d manifests\n", len(manifests))
-	fmt.Printf("::debug::Attempting to push reference: %s\n", version)
+	logging.Debugf(ctx, "Index contains %d manifests", len(manifests))
+	logging.Debugf(ctx, "Attempting to push reference: %s", version)
 
 	err = c.repo.PushReference(ctx, indexDesc, bytes.NewReader(indexBytes), version)
 	if err != nil {
@@ -181,8 +182,8 @@ func (c *Client) CreateManifestIndex(ctx context.Context, uploadResults []models
 			c.registry, version, err)
 	}
 
-	fmt.Printf("::debug::Successfully pushed reference: %s\n", version)
-	fmt.Printf("::debug::Manifest index push completed successfully\n")
+	logging.Debugf(ctx, "Successfully pushed reference: %s", version)
+	logging.Debug(ctx, "Manifest index push completed successfully")
 
 	return indexDesc.Digest.String(), nil
 }

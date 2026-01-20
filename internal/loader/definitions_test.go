@@ -3,6 +3,7 @@ package loader
 import (
 	"agent-metadata-action/internal/config"
 	"agent-metadata-action/internal/testutil"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -41,7 +42,7 @@ func TestReadConfigurationDefinitions_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test reading the config
-	configs, err := ReadConfigurationDefinitions(tmpDir)
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
 	require.NoError(t, err)
 	assert.Len(t, configs, 1)
 	assert.Equal(t, "linux", configs[0]["platform"])
@@ -88,7 +89,7 @@ func TestReadAgentControlDefinitions_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test reading the agent control definitions
-	agentControls, err := ReadAgentControlDefinitions(tmpDir)
+	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
 	require.NoError(t, err)
 	assert.Len(t, agentControls, 1)
 	assert.Equal(t, "KUBERNETES", agentControls[0]["platform"])
@@ -150,7 +151,7 @@ func TestReadConfigurationDefinitions_ErrorCases(t *testing.T) {
 			tt.setupFunc(t, tmpDir)
 
 			// method under test
-			configs, err := ReadConfigurationDefinitions(tmpDir)
+			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
 
 			require.Error(t, err)
 			assert.Nil(t, configs)
@@ -204,7 +205,7 @@ func TestReadAgentControlDefinitions_ErrorCases(t *testing.T) {
 			tt.setupFunc(t, tmpDir)
 
 			// method under test
-			agentControls, err := ReadAgentControlDefinitions(tmpDir)
+			agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
 
 			require.Error(t, err)
 			assert.Nil(t, agentControls)
@@ -265,7 +266,7 @@ func TestReadConfigurationDefinitions_SchemaLoadingWarnings(t *testing.T) {
 			getStdout, _ := testutil.CaptureOutput(t)
 
 			// method under test - should not fail if schema can't be loaded
-			configs, err := ReadConfigurationDefinitions(tmpDir)
+			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
 
 			outputStr := getStdout()
 
@@ -326,7 +327,7 @@ func TestReadConfigurationDefinitions_MultipleConfigs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test reading the configs
-	configs, err := ReadConfigurationDefinitions(tmpDir)
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
 	require.NoError(t, err)
 	assert.Len(t, configs, 3)
 
@@ -367,7 +368,7 @@ func TestReadConfigurationDefinitions_ValidationIntegration(t *testing.T) {
 	err = os.WriteFile(configFile, []byte(yamlContent), 0644)
 	require.NoError(t, err)
 
-	configs, err := ReadConfigurationDefinitions(tmpDir)
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
 	require.NoError(t, err)
 	assert.Len(t, configs, 1)
 	// Schema is nil when not provided
@@ -421,7 +422,7 @@ func TestReadConfigurationDefinitions_DirectoryTraversal(t *testing.T) {
 			getStdout, _ := testutil.CaptureOutput(t)
 
 			// Test reading the config - should not fail if schema can't be loaded
-			configs, err := ReadConfigurationDefinitions(tmpDir)
+			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
 
 			outputStr := getStdout()
 
@@ -447,7 +448,7 @@ func TestReadConfigurationDefinitions_EmptyArray(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test reading the config - should error
-	configs, err := ReadConfigurationDefinitions(tmpDir)
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
 	assert.Error(t, err)
 	assert.Nil(t, configs)
 	assert.Contains(t, err.Error(), "configurationDefinitions cannot be empty")
@@ -471,7 +472,7 @@ func TestReadDefinitionsFile_ItemNotMap(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test reading the config - should error
-	configs, err := ReadConfigurationDefinitions(tmpDir)
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
 	require.Error(t, err)
 	assert.Nil(t, configs)
 	assert.Contains(t, err.Error(), "is not a map")
@@ -494,7 +495,7 @@ description: This file has no arrays`
 	require.NoError(t, err)
 
 	// Test reading the config - should error with "no array found"
-	configs, err := ReadConfigurationDefinitions(tmpDir)
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
 	require.Error(t, err)
 	assert.Nil(t, configs)
 	assert.Contains(t, err.Error(), "no array found in YAML file")
@@ -558,7 +559,7 @@ func TestReadAgentControlDefinitions_ContentLoadingWarnings(t *testing.T) {
 			getStdout, _ := testutil.CaptureOutput(t)
 
 			// method under test - should not fail if content can't be loaded
-			agentControls, err := ReadAgentControlDefinitions(tmpDir)
+			agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
 
 			outputStr := getStdout()
 
@@ -613,7 +614,7 @@ func TestReadAgentControlDefinitions_MultipleDefinitions(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test reading the agent control definitions
-	agentControls, err := ReadAgentControlDefinitions(tmpDir)
+	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
 	require.NoError(t, err)
 	assert.Len(t, agentControls, 3)
 
@@ -710,7 +711,7 @@ func TestReadConfigurationDefinitions_InvalidFieldTypes(t *testing.T) {
 			getStdout, _ := testutil.CaptureOutput(t)
 
 			// method under test
-			configs, err := ReadConfigurationDefinitions(tmpDir)
+			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
 
 			outputStr := getStdout()
 
@@ -794,7 +795,7 @@ func TestReadAgentControlDefinitions_InvalidFieldTypes(t *testing.T) {
 			getStdout, _ := testutil.CaptureOutput(t)
 
 			// method under test
-			agentControls, err := ReadAgentControlDefinitions(tmpDir)
+			agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
 
 			outputStr := getStdout()
 
@@ -879,7 +880,7 @@ func TestLoadAndEncodeFile_PathValidation(t *testing.T) {
 			require.NoError(t, os.WriteFile(configFile, []byte(testYAML), 0644))
 
 			// method under test
-			configs, err := ReadConfigurationDefinitions(workspace)
+			configs, err := ReadConfigurationDefinitions(context.Background(), workspace)
 
 			outputStr := getStdout()
 

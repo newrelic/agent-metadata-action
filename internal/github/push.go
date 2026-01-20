@@ -2,6 +2,7 @@ package github
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"agent-metadata-action/internal/config"
+	"agent-metadata-action/internal/logging"
 )
 
 const ReleaseNotesFileExtension = ".mdx"
@@ -29,7 +31,7 @@ type PushEvent struct {
 
 // GetChangedMDXFiles returns ReleaseNotesFileExtension type files changed in the PR under the expected release notes direcotry, excluding IgnoredFilenames
 func GetChangedMDXFiles() ([]string, error) {
-	return GetChangedMDXFilesFunc()
+	return GetChangedMDXFilesFunc(context.Background())
 }
 
 // isIgnoredFilename checks if the filename should be ignored
@@ -53,12 +55,12 @@ func isValidGitSHA(sha string) bool {
 var GetChangedMDXFilesFunc = getChangedMDXFilesImpl
 
 // getChangedMDXFilesImpl is the actual implementation
-func getChangedMDXFilesImpl() ([]string, error) {
+func getChangedMDXFilesImpl(ctx context.Context) ([]string, error) {
 	eventPath := config.GetEventPath()
 	if eventPath == "" {
 		return nil, fmt.Errorf("GITHUB_EVENT_PATH not set")
 	}
-	fmt.Printf("::debug::GH event path: %s\n", eventPath)
+	logging.Debugf(ctx, "GH event path: %s", eventPath)
 
 	data, err := os.ReadFile(eventPath)
 	if err != nil {
@@ -70,9 +72,9 @@ func getChangedMDXFilesImpl() ([]string, error) {
 		return nil, fmt.Errorf("failed to parse event payload: %w", err)
 	}
 
-	fmt.Printf("::debug::event payload %s\n", event)
-	fmt.Printf("::debug::GH branch name: %s\n", event.Ref)
-	fmt.Printf("::debug::GH SHAs: before %s and after %s\n", event.Before, event.After)
+	logging.Debugf(ctx, "event payload %s", event)
+	logging.Debugf(ctx, "GH branch name: %s", event.Ref)
+	logging.Debugf(ctx, "GH SHAs: before %s and after %s", event.Before, event.After)
 
 	// Validate SHAs to prevent command injection
 	if !isValidGitSHA(event.Before) {
@@ -90,7 +92,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 	if workspace != "" {
 		cmd.Dir = workspace
 	}
-	fmt.Printf("::debug::workspace: %s\n", workspace)
+	logging.Debugf(ctx, "workspace: %s", workspace)
 
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -99,7 +101,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 		return nil, fmt.Errorf("git diff failed: %w", err)
 	}
 
-	fmt.Printf("::debug::git diff output:\n%s\n", out.String())
+	logging.Debugf(ctx, "git diff output:\n%s", out.String())
 
 	var mdxFiles []string
 	for _, line := range strings.Split(out.String(), "\n") {
@@ -115,7 +117,7 @@ func getChangedMDXFilesImpl() ([]string, error) {
 			if workspace != "" {
 				line = filepath.Join(workspace, line)
 			}
-			fmt.Printf("::debug::mdx append line: %s\n", line)
+			logging.Debugf(ctx, "mdx append line: %s", line)
 			mdxFiles = append(mdxFiles, line)
 		}
 	}
