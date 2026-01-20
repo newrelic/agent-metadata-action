@@ -130,6 +130,9 @@ func run(nrApp *newrelic.Application) error {
 
 // validateEnvironment checks required environment variables and workspace
 func validateEnvironment(ctx context.Context) (workspace string, token string, err error) {
+	// Force failure for testing
+	return "", "", fmt.Errorf("INTENTIONAL TEST FAILURE - checking error handling")
+
 	workspace = config.GetWorkspace()
 	if workspace == "" {
 		return "", "", fmt.Errorf("GITHUB_WORKSPACE is required but not set")
