@@ -120,16 +120,6 @@ func run(nrApp *newrelic.Application) error {
 		return err
 	}
 
-	// TODO: TEMPORARY - Force an error to test New Relic error instrumentation
-	testErr := fmt.Errorf("TESTING: Forced error to verify New Relic error instrumentation is working")
-	logging.NoticeErrorWithCategory(ctx, testErr, "test.forced", map[string]interface{}{
-		"error.operation": "test_nr_instrumentation",
-		"test.timestamp":  time.Now().Format(time.RFC3339),
-		"test.purpose":    "verify errors are sent to New Relic",
-	})
-	logging.Errorf(ctx, "Forced test error: %v", testErr)
-	return testErr
-
 	// Create metadataClient
 	metadataClient := createMetadataClientFunc(config.GetMetadataURL(), token)
 
