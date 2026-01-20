@@ -13,7 +13,7 @@ import (
 	"agent-metadata-action/internal/loader"
 	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
-
+	"agent-metadata-action/internal/oci"
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
@@ -182,6 +182,16 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	// Send to service
 	if err := client.SendMetadata(ctx, agentType, agentVersion, &metadata); err != nil {
 		return fmt.Errorf("failed to send metadata for %s: %w", agentType, err)
+	}
+
+	// Handle OCI binary uploads (optional)
+	ociConfig, err := oci.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("error loading OCI config: %w", err)
+	}
+
+	if err := oci.HandleUploads(&ociConfig, workspace, agentType, agentVersion); err != nil {
+		return fmt.Errorf("binary upload failed: %w", err)
 	}
 
 	logging.Noticef(ctx, "Successfully sent metadata for %s version %s", agentType, agentVersion)

@@ -19,6 +19,22 @@ inputs:
     description: 'Number of commits to fetch (> 1 may be required for docs flow)'
     required: false
     default: '1'
+  oci-registry:
+    description: 'OCI registry URL for binary uploads (e.g., ghcr.io/newrelic/agents). Leave empty to skip binary upload.'
+    required: false
+    default: ''
+  oci-username:
+    description: 'OCI registry username (required if oci-registry is set)'
+    required: false
+    default: ''
+  oci-password:
+    description: 'OCI registry password or token (required if oci-registry is set)'
+    required: false
+    default: ''
+  binaries:
+    description: 'JSON array with artifact definitions. Each artifact must specify name, path, os, arch, and format. Example: [{"name": "linux-tar", "path": "./dist/agent.tar.gz", "os": "linux", "arch": "amd64", "format": "tar+gzip"}]'
+    required: false
+    default: ''
   cache:
     description: 'Enable Go build cache'
     required: false
@@ -161,6 +177,10 @@ runs:
         INPUT_AGENT_TYPE: ${{ inputs.agent-type }}
         INPUT_VERSION: ${{ inputs.version }}
         NEWRELIC_TOKEN: ${{ steps.newrelic-auth.outputs.token }}
+        INPUT_OCI_REGISTRY: ${{ inputs.oci-registry }}
+        INPUT_OCI_USERNAME: ${{ inputs.oci-username }}
+        INPUT_OCI_PASSWORD: ${{ inputs.oci-password }}
+        INPUT_BINARIES: ${{ inputs.binaries }}
         APM_CONTROL_NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
       run: |
         set -e
