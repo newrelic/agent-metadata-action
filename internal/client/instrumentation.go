@@ -63,6 +63,11 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 	logging.Debug(ctx, "Marshaling metadata to JSON...")
 	jsonBody, err := json.Marshal(metadata)
 	if err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
+			"error.operation": "marshal_metadata",
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+		})
 		logging.Errorf(ctx, "Failed to marshal metadata: %v", err)
 		return fmt.Errorf("failed to marshal metadata: %w", err)
 	}
@@ -74,6 +79,12 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 	logging.Debug(ctx, "Creating HTTP POST request...")
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
+			"error.operation": "create_http_request",
+			"http.url":        url,
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+		})
 		logging.Errorf(ctx, "Failed to create request: %v", err)
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -91,6 +102,13 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 	duration := time.Since(startTime)
 
 	if err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
+			"error.operation": "execute_http_request",
+			"http.url":        url,
+			"http.duration":   duration.String(),
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+		})
 		logging.Errorf(ctx, "HTTP request failed after %s: %v", duration, err)
 		return fmt.Errorf("failed to send metadata: %w", err)
 	}
@@ -110,16 +128,25 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 
 	// Check for non-2xx status codes
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		logging.Errorf(ctx, "Metadata submission failed with status %d", resp.StatusCode)
-
 		// Log response body for debugging, but truncate if too large
 		responsePreview := string(body)
 		if len(responsePreview) > 500 {
 			responsePreview = responsePreview[:500] + "... (truncated)"
 		}
+
+		err := fmt.Errorf("metadata submission failed with status %d: %s", resp.StatusCode, string(body))
+		logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
+			"error.operation":    "http_non_2xx_response",
+			"http.status_code":   resp.StatusCode,
+			"http.url":           url,
+			"http.response_body": responsePreview,
+			"agent.type":         agentType,
+			"agent.version":      agentVersion,
+		})
+		logging.Errorf(ctx, "Metadata submission failed with status %d", resp.StatusCode)
 		logging.Debugf(ctx, "Error response body: %s", responsePreview)
 
-		return fmt.Errorf("metadata submission failed with status %d: %s", resp.StatusCode, string(body))
+		return err
 	}
 
 	// Success logging

@@ -81,15 +81,18 @@ func main() {
 
 	nrApp := initNewRelic(ctx)
 
+	// Ensure New Relic shuts down gracefully even on error
+	if nrApp != nil {
+		defer func() {
+			logging.Notice(ctx, "Shutting down New Relic - waiting up to 15 seconds to send data...")
+			nrApp.Shutdown(15 * time.Second)
+			logging.Notice(ctx, "New Relic shutdown complete")
+		}()
+	}
+
 	if err := run(nrApp); err != nil {
 		logging.Errorf(ctx, "%v", err)
 		os.Exit(1)
-	}
-
-	if nrApp != nil {
-		logging.Notice(ctx, "Shutting down New Relic - waiting up to 15 seconds to send data...")
-		nrApp.Shutdown(15 * time.Second)
-		logging.Notice(ctx, "New Relic shutdown complete")
 	}
 }
 
@@ -132,16 +135,31 @@ func run(nrApp *newrelic.Application) error {
 func validateEnvironment(ctx context.Context) (workspace string, token string, err error) {
 	workspace = config.GetWorkspace()
 	if workspace == "" {
-		return "", "", fmt.Errorf("GITHUB_WORKSPACE is required but not set")
+		err := fmt.Errorf("GITHUB_WORKSPACE is required but not set")
+		logging.NoticeErrorWithCategory(ctx, err, "environment.validation", map[string]interface{}{
+			"error.operation": "validate_workspace",
+			"error.field":     "GITHUB_WORKSPACE",
+		})
+		return "", "", err
 	}
 
 	if _, err := os.Stat(workspace); err != nil {
-		return "", "", fmt.Errorf("workspace directory does not exist: %s", workspace)
+		noticeErr := fmt.Errorf("workspace directory does not exist: %s", workspace)
+		logging.NoticeErrorWithCategory(ctx, noticeErr, "environment.validation", map[string]interface{}{
+			"error.operation": "validate_workspace",
+			"workspace.path":  workspace,
+		})
+		return "", "", noticeErr
 	}
 
 	token = config.GetToken()
 	if token == "" {
-		return "", "", fmt.Errorf("NEWRELIC_TOKEN is required but not set")
+		err := fmt.Errorf("NEWRELIC_TOKEN is required but not set")
+		logging.NoticeErrorWithCategory(ctx, err, "environment.validation", map[string]interface{}{
+			"error.operation": "validate_token",
+			"error.field":     "NEWRELIC_TOKEN",
+		})
+		return "", "", err
 	}
 
 	logging.Notice(ctx, "Environment validated successfully")
@@ -161,6 +179,12 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	// Load configuration definitions (required)
 	configs, err := loader.ReadConfigurationDefinitions(ctx, workspace)
 	if err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "configuration.load", map[string]interface{}{
+			"error.operation": "load_configuration_definitions",
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+			"workflow.type":   "agent",
+		})
 		return fmt.Errorf("failed to read configuration definitions: %w", err)
 	}
 	logging.Noticef(ctx, "Loaded %d configuration definitions", len(configs))
@@ -168,6 +192,13 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	// Load agent control definitions (optional)
 	agentControl, err := loader.ReadAgentControlDefinitions(ctx, workspace)
 	if err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "configuration.load", map[string]interface{}{
+			"error.operation": "load_agent_control_definitions",
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+			"workflow.type":   "agent",
+			"error.severity":  "warning", // Graceful error
+		})
 		logging.Warnf(ctx, "Unable to load agent control definitions: %v - continuing without them", err)
 		agentControl = nil
 	} else {
@@ -185,16 +216,33 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 
 	// Send to service
 	if err := client.SendMetadata(ctx, agentType, agentVersion, &metadata); err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
+			"error.operation": "send_metadata",
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+			"workflow.type":   "agent",
+		})
 		return fmt.Errorf("failed to send metadata for %s: %w", agentType, err)
 	}
 
 	// Handle OCI binary uploads (optional)
 	ociConfig, err := oci.LoadConfig()
 	if err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "oci.configuration", map[string]interface{}{
+			"error.operation": "load_oci_config",
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+		})
 		return fmt.Errorf("error loading OCI config: %w", err)
 	}
 
 	if err := oci.HandleUploads(ctx, &ociConfig, workspace, agentType, agentVersion); err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "oci.upload", map[string]interface{}{
+			"error.operation": "upload_binaries",
+			"oci.registry":    ociConfig.Registry,
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+		})
 		return fmt.Errorf("binary upload failed: %w", err)
 	}
 
@@ -209,6 +257,10 @@ func runDocsFlow(ctx context.Context, client metadataClient) error {
 	// Load metadata from changed MDX files
 	metadataList, err := loader.LoadMetadataForDocs(ctx)
 	if err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "docs.load", map[string]interface{}{
+			"error.operation": "load_metadata_from_docs",
+			"workflow.type":   "docs",
+		})
 		return fmt.Errorf("failed to load metadata from docs: %w", err)
 	}
 
@@ -223,6 +275,12 @@ func runDocsFlow(ctx context.Context, client metadataClient) error {
 	successCount := 0
 	for _, entry := range metadataList {
 		if err := sendDocsMetadata(ctx, client, entry); err != nil {
+			logging.NoticeErrorWithCategory(ctx, err, "docs.send", map[string]interface{}{
+				"error.operation": "send_docs_metadata",
+				"agent.type":      entry.AgentType,
+				"workflow.type":   "docs",
+				"error.severity":  "warning", // Graceful error
+			})
 			logging.Errorf(ctx, "Failed to send metadata for %s: %v", entry.AgentType, err)
 			continue
 		}

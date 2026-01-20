@@ -107,3 +107,107 @@ func TestGetTraceID_WithTransaction(t *testing.T) {
 	// Trace ID might be empty in test environment, but function should not panic
 	t.Logf("Trace ID: %q", traceID)
 }
+
+func TestNoticeError_WithoutTransaction(t *testing.T) {
+	ctx := context.Background()
+	err := io.EOF
+
+	// Should not panic when transaction is nil
+	NoticeError(ctx, err, map[string]interface{}{
+		"test.key": "test.value",
+	})
+
+	// No assertions needed - just verify no panic
+	t.Log("NoticeError with nil transaction should be no-op")
+}
+
+func TestNoticeError_WithNilError(t *testing.T) {
+	ctx := context.Background()
+
+	// Should return early when error is nil
+	NoticeError(ctx, nil, map[string]interface{}{
+		"test.key": "test.value",
+	})
+
+	// No assertions needed - just verify no panic
+	t.Log("NoticeError with nil error should be no-op")
+}
+
+func TestNoticeError_WithTransaction(t *testing.T) {
+	// Create a test New Relic app
+	app, err := newrelic.NewApplication(
+		newrelic.ConfigAppName("test-app"),
+		newrelic.ConfigLicense("0000000000000000000000000000000000000000"),
+		newrelic.ConfigEnabled(false),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create test app: %v", err)
+	}
+
+	txn := app.StartTransaction("test-transaction")
+	defer txn.End()
+
+	ctx := newrelic.NewContext(context.Background(), txn)
+
+	// Notice an error with attributes
+	testErr := io.EOF
+	NoticeError(ctx, testErr, map[string]interface{}{
+		"error.operation": "test_operation",
+		"test.key":        "test.value",
+	})
+
+	// Cannot easily verify error was noticed in test, but verify no panic
+	t.Log("NoticeError with transaction should call txn.NoticeError")
+}
+
+func TestNoticeErrorWithCategory(t *testing.T) {
+	// Create a test New Relic app
+	app, err := newrelic.NewApplication(
+		newrelic.ConfigAppName("test-app"),
+		newrelic.ConfigLicense("0000000000000000000000000000000000000000"),
+		newrelic.ConfigEnabled(false),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create test app: %v", err)
+	}
+
+	txn := app.StartTransaction("test-transaction")
+	defer txn.End()
+
+	ctx := newrelic.NewContext(context.Background(), txn)
+
+	// Notice an error with category
+	testErr := io.EOF
+	NoticeErrorWithCategory(ctx, testErr, "test.category", map[string]interface{}{
+		"error.operation": "test_operation",
+		"test.key":        "test.value",
+	})
+
+	// Cannot easily verify error was noticed in test, but verify no panic
+	t.Log("NoticeErrorWithCategory should add error.category attribute")
+}
+
+func TestNoticeErrorWithCategory_WithoutTransaction(t *testing.T) {
+	ctx := context.Background()
+	testErr := io.EOF
+
+	// Should not panic when transaction is nil
+	NoticeErrorWithCategory(ctx, testErr, "test.category", map[string]interface{}{
+		"test.key": "test.value",
+	})
+
+	// No assertions needed - just verify no panic
+	t.Log("NoticeErrorWithCategory with nil transaction should be no-op")
+}
+
+func TestNoticeErrorWithCategory_WithNilError(t *testing.T) {
+	ctx := context.Background()
+
+	// Should return early when error is nil
+	NoticeErrorWithCategory(ctx, nil, "test.category", map[string]interface{}{
+		"test.key": "test.value",
+	})
+
+	// No assertions needed - just verify no panic
+	t.Log("NoticeErrorWithCategory with nil error should be no-op")
+}
