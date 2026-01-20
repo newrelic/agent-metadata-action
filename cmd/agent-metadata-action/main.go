@@ -81,16 +81,19 @@ func main() {
 
 	nrApp := initNewRelic(ctx)
 
-	// Ensure New Relic shuts down gracefully even on error
+	// Run the action
+	err := run(nrApp)
+
+	// Ensure New Relic shuts down gracefully (even on error)
+	// Must happen BEFORE os.Exit() since os.Exit bypasses defers
 	if nrApp != nil {
-		defer func() {
-			logging.Notice(ctx, "Shutting down New Relic - waiting up to 15 seconds to send data...")
-			nrApp.Shutdown(15 * time.Second)
-			logging.Notice(ctx, "New Relic shutdown complete")
-		}()
+		logging.Notice(ctx, "Shutting down New Relic - waiting up to 15 seconds to send data...")
+		nrApp.Shutdown(15 * time.Second)
+		logging.Notice(ctx, "New Relic shutdown complete")
 	}
 
-	if err := run(nrApp); err != nil {
+	// Exit with appropriate code
+	if err != nil {
 		logging.Errorf(ctx, "%v", err)
 		os.Exit(1)
 	}
