@@ -81,6 +81,7 @@ jobs:
         with:
           newrelic-client-id: fake-client-id-for-testing
           newrelic-private-key: ZmFrZS1wcml2YXRlLWtleS1mb3ItdGVzdGluZwo=
+          apm-control-nr-license-key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
           agent-type: 'myagent'
           version: '0.0.0'
           cache: false

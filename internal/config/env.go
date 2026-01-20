@@ -56,7 +56,7 @@ func GetBinaries() string {
 
 // GetNRAgentLicenseKey gets the license key to use the go agent and monitor this app
 func GetNRAgentLicenseKey() string {
-	return os.Getenv("{{APM_CONTROL_NR_LICENSE_KEY}}")
+	return os.Getenv("APM_CONTROL_NR_LICENSE_KEY")
 }
 
 // SetNRAgentHost sets the host to use for the go agent that will be used to monitor this app
