@@ -7,6 +7,8 @@ on:
   push:
     branches:
       - '**'
+  schedule:
+    - cron: '0 1 * * *' # This runs the workflow daily at 1am UTC
 
 jobs:
   setup-test-tag:
@@ -81,7 +83,6 @@ jobs:
         with:
           newrelic-client-id: fake-client-id-for-testing
           newrelic-private-key: ZmFrZS1wcml2YXRlLWtleS1mb3ItdGVzdGluZwo=
-          apm-control-nr-license-key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
           agent-type: 'myagent'
           version: '0.0.0'
           cache: false
@@ -166,7 +167,6 @@ jobs:
         with:
           newrelic-client-id: fake-client-id-for-testing
           newrelic-private-key: ZmFrZS1wcml2YXRlLWtleS1mb3ItdGVzdGluZwo=
-          apm-control-nr-license-key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
           agent-type: 'myagent'
           version: 'v0.0.0'
           cache: false
@@ -269,7 +269,6 @@ jobs:
           GITHUB_WORKSPACE: ${{ github.workspace }}
           METADATA_SERVICE_URL: http://127.0.0.1:8080
           NEWRELIC_TOKEN: fake-token-for-testing
-          APM_CONTROL_NR_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
         run: |
           echo "::group::Create fake commits"
           # Create two isolated commits: one without MDX files, one with them
