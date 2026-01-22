@@ -55,7 +55,7 @@ func SignArtifacts(results []models.ArtifactUploadResult, ociRegistry, token, gi
 		signingReq := &models.SigningRequest{
 			Registry:   registry,
 			Repository: repository,
-			Tag:        version,
+			Tag:        result.Tag,
 			Digest:     result.Digest,
 		}
 

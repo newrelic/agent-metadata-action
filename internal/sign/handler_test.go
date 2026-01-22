@@ -32,7 +32,7 @@ func TestSignArtifacts_Success_SingleArtifact(t *testing.T) {
 		json.Unmarshal(body, &request)
 		assert.Equal(t, "docker.io", request.Registry)
 		assert.Equal(t, "newrelic/agents", request.Repository)
-		assert.Equal(t, "v1.2.3", request.Tag)
+		assert.Equal(t, "v1.2.3-linux-amd64", request.Tag)
 		assert.Equal(t, "sha256:abc123", request.Digest)
 
 		// Send success response
@@ -54,6 +54,7 @@ func TestSignArtifacts_Success_SingleArtifact(t *testing.T) {
 			Format:   "tar+gzip",
 			Digest:   "sha256:abc123",
 			Size:     1024,
+			Tag:      "v1.2.3-linux-amd64",
 			Uploaded: true,
 		},
 	}
@@ -97,11 +98,13 @@ func TestSignArtifacts_SkipsFailedUploads(t *testing.T) {
 		{
 			Name:     "linux-tar",
 			Digest:   "sha256:abc123",
+			Tag:      "v1.2.3-linux-amd64",
 			Uploaded: true,
 		},
 		{
 			Name:     "windows-zip",
 			Digest:   "",
+			Tag:      "",
 			Uploaded: false, // This one failed to upload
 			Error:    "upload failed",
 		},

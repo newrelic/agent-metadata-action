@@ -11,14 +11,14 @@ import (
 
 // mockClient is a mock implementation of Client for testing
 type mockClient struct {
-	uploadFunc func(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, error)
+	uploadFunc func(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, string, error)
 }
 
-func (m *mockClient) UploadArtifact(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, error) {
+func (m *mockClient) UploadArtifact(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, string, error) {
 	if m.uploadFunc != nil {
 		return m.uploadFunc(ctx, artifact, artifactPath, agentType, version)
 	}
-	return "", 0, errors.New("mock not configured")
+	return "", 0, "", errors.New("mock not configured")
 }
 
 func TestUploadArtifacts_Success_SingleArtifact(t *testing.T) {
@@ -40,11 +40,11 @@ func TestUploadArtifacts_Success_SingleArtifact(t *testing.T) {
 	}
 
 	mock := &mockClient{
-		uploadFunc: func(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, error) {
+		uploadFunc: func(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, string, error) {
 			assert.Equal(t, "/workspace/dist/agent.tar.gz", artifactPath)
 			assert.Equal(t, "dotnet-agent", agentType)
 			assert.Equal(t, "1.0.0", version)
-			return "sha256:abc123", int64(1024), nil
+			return "sha256:abc123", int64(1024), "1.0.0-linux-amd64", nil
 		},
 	}
 
@@ -59,6 +59,7 @@ func TestUploadArtifacts_Success_SingleArtifact(t *testing.T) {
 	assert.True(t, results[0].Uploaded)
 	assert.Equal(t, "sha256:abc123", results[0].Digest)
 	assert.Equal(t, int64(1024), results[0].Size)
+	assert.Equal(t, "1.0.0-linux-amd64", results[0].Tag)
 	assert.Empty(t, results[0].Error)
 }
 
@@ -82,8 +83,8 @@ func TestUploadArtifacts_UploadError(t *testing.T) {
 
 	expectedError := "failed to push artifact to registry"
 	mock := &mockClient{
-		uploadFunc: func(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, error) {
-			return "", 0, errors.New(expectedError)
+		uploadFunc: func(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, string, error) {
+			return "", 0, "", errors.New(expectedError)
 		},
 	}
 
@@ -94,6 +95,7 @@ func TestUploadArtifacts_UploadError(t *testing.T) {
 	assert.False(t, results[0].Uploaded)
 	assert.Empty(t, results[0].Digest)
 	assert.Equal(t, int64(0), results[0].Size)
+	assert.Empty(t, results[0].Tag)
 	assert.Equal(t, expectedError, results[0].Error)
 }
 
@@ -108,9 +110,9 @@ func TestUploadArtifacts_EmptyArtifactsList(t *testing.T) {
 	}
 
 	mock := &mockClient{
-		uploadFunc: func(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, error) {
+		uploadFunc: func(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, string, error) {
 			t.Fatal("UploadArtifact should not be called with empty artifacts list")
-			return "", 0, nil
+			return "", 0, "", nil
 		},
 	}
 

@@ -35,8 +35,8 @@ func (s *SigningRequest) Validate() error {
 
 // SigningResult tracks signing operation outcome per artifact
 type SigningResult struct {
-	Name   string // Artifact name
-	Digest string // Artifact digest
-	Signed bool   // Whether signing succeeded
-	Error  string // Error message if signing failed
+	Name   string
+	Digest string
+	Signed bool
+	Error  string
 }

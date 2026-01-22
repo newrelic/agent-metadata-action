@@ -134,8 +134,9 @@ type ArtifactUploadResult struct {
 	Format       string
 	Digest       string
 	Size         int64
+	Tag          string
 	Uploaded     bool
 	Error        string
-	Signed       bool   // Whether artifact was signed
-	SigningError string // Signing error if Signed=false
+	Signed       bool
+	SigningError string
 }
