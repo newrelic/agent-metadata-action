@@ -181,12 +181,11 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 
 	printJSON("Agent Metadata", metadata)
 
-	// Send to service
+	// Step 1: Send to metadata service
 	if err := client.SendMetadata(ctx, agentType, agentVersion, &metadata); err != nil {
 		return fmt.Errorf("failed to send metadata for %s: %w", agentType, err)
 	}
 
-	// Handle OCI binary uploads (optional)
 	ociConfig, err := oci.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("error loading OCI config: %w", err)
@@ -199,23 +198,34 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	}
 
 	// Step 3: Sign all uploaded artifacts
-	if ociConfig.IsEnabled() && len(uploadResults) > 0 {
-		githubRepo := config.GetRepo()
-		if githubRepo == "" {
-			return fmt.Errorf("GITHUB_REPOSITORY environment variable is required for artifact signing")
+	if ociConfig.IsEnabled() {
+		successfulUploads := []models.ArtifactUploadResult{}
+		for _, result := range uploadResults {
+			if result.Uploaded {
+				successfulUploads = append(successfulUploads, result)
+			}
 		}
 
-		// Extract repository name from full path (e.g., "agent-metadata-action" from "newrelic/agent-metadata-action")
-		repoParts := strings.Split(githubRepo, "/")
-		repoName := repoParts[len(repoParts)-1]
+		if len(successfulUploads) > 0 {
+			githubRepo := config.GetRepo()
+			if githubRepo == "" {
+				return fmt.Errorf("GITHUB_REPOSITORY environment variable is required for artifact signing")
+			}
 
-		token := config.GetToken()
-		if token == "" {
-			return fmt.Errorf("NEWRELIC_TOKEN is required for artifact signing")
-		}
+			// Extract repository name from full path (e.g., "agent-metadata-action" from "newrelic/agent-metadata-action")
+			repoParts := strings.Split(githubRepo, "/")
+			repoName := repoParts[len(repoParts)-1]
 
-		if err := sign.SignArtifacts(uploadResults, ociConfig.Registry, token, repoName, agentVersion); err != nil {
-			return fmt.Errorf("artifact signing failed: %w", err)
+			token := config.GetToken()
+			if token == "" {
+				return fmt.Errorf("NEWRELIC_TOKEN is required for artifact signing")
+			}
+
+			if err := sign.SignArtifacts(successfulUploads, ociConfig.Registry, token, repoName, agentVersion); err != nil {
+				return fmt.Errorf("artifact signing failed: %w", err)
+			}
+		} else {
+			logging.Warn(ctx, "OCI registry is enabled but no artifacts were successfully uploaded")
 		}
 	}
 
