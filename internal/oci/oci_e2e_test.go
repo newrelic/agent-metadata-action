@@ -16,8 +16,9 @@ import (
 	"testing"
 	"time"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"agent-metadata-action/internal/models"
 )
