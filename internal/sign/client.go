@@ -45,8 +45,8 @@ func (c *Client) SignArtifact(ctx context.Context, clientId string, request *mod
 	// Validate inputs
 	fmt.Println("::debug::Validating inputs...")
 	if clientId == "" {
-		fmt.Println("::error::Client ID is required but was empty")
-		return fmt.Errorf("client ID is required")
+		fmt.Println("::error::Signing client ID is required but was empty")
+		return fmt.Errorf("signing client ID is required")
 	}
 	if request == nil {
 		fmt.Println("::error::Signing request is required but was nil")
@@ -59,7 +59,7 @@ func (c *Client) SignArtifact(ctx context.Context, clientId string, request *mod
 		return fmt.Errorf("invalid signing request: %w", err)
 	}
 
-	fmt.Printf("::debug::Client ID: %s\n", clientId)
+	fmt.Printf("::debug::Signing client ID: %s\n", clientId)
 	fmt.Printf("::debug::Registry: %s\n", request.Registry)
 	fmt.Printf("::debug::Repository: %s\n", request.Repository)
 	fmt.Printf("::debug::Tag: %s\n", request.Tag)

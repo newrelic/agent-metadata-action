@@ -30,6 +30,10 @@ var createMetadataClientFunc = func(baseURL, token string) metadataClient {
 	return client.NewInstrumentationClient(baseURL, token)
 }
 
+// ociHandleUploadsFunc is a variable that holds the function to handle OCI uploads
+// This allows tests to override the implementation
+var ociHandleUploadsFunc = oci.HandleUploads
+
 // initNewRelic initializes the New Relic application
 // Returns nil if APM_CONTROL_NR_LICENSE_KEY is not set (silent no-op mode)
 func initNewRelic() *newrelic.Application {
@@ -192,7 +196,7 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	}
 
 	// Step 2: Upload binaries
-	uploadResults, err := oci.HandleUploads(&ociConfig, workspace, agentType, agentVersion)
+	uploadResults, err := ociHandleUploadsFunc(&ociConfig, workspace, agentType, agentVersion)
 	if err != nil {
 		return fmt.Errorf("binary upload failed: %w", err)
 	}
