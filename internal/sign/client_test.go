@@ -45,7 +45,7 @@ func TestSignArtifact_Success(t *testing.T) {
 		assert.Equal(t, "POST", r.Method)
 
 		// Verify URL path
-		assert.Equal(t, "/v1/signing/newrelic/test-agent/sign", r.URL.Path)
+		assert.Equal(t, "/v1/signing/test-agent/sign", r.URL.Path)
 
 		// Verify headers
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
@@ -81,14 +81,14 @@ func TestSignArtifact_Success(t *testing.T) {
 	getStdout, getStderr := testutil.CaptureOutput(t)
 
 	// method under test
-	err := client.SignArtifact(context.Background(), "newrelic/test-agent", request)
+	err := client.SignArtifact(context.Background(), "test-agent", request)
 
 	outputStr := getStdout()
 	stderrStr := getStderr()
 
 	require.NoError(t, err)
 	assert.Contains(t, outputStr, "Signing artifact")
-	assert.Contains(t, outputStr, "Client ID: newrelic/test-agent")
+	assert.Contains(t, outputStr, "Client ID: test-agent")
 	assert.Contains(t, outputStr, "Registry: docker.io")
 	assert.Contains(t, outputStr, "Repository: newrelic/agents")
 	assert.Contains(t, outputStr, "HTTP status code: 200")
@@ -117,7 +117,7 @@ func TestSignArtifact_Created(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := client.SignArtifact(context.Background(), "newrelic/test-agent", request)
+	err := client.SignArtifact(context.Background(), "test-agent", request)
 
 	outputStr := getStdout()
 
@@ -144,42 +144,42 @@ func TestSignArtifact_ValidationErrors(t *testing.T) {
 		},
 		{
 			name:          "nil request",
-			clientId:      "test/repo",
+			clientId:      "test-repo",
 			request:       nil,
 			expectedInErr: "signing request is required",
 			expectedInLog: "Signing request is required but was nil",
 		},
 		{
 			name:          "empty registry",
-			clientId:      "test/repo",
+			clientId:      "test-repo",
 			request:       &models.SigningRequest{Registry: "", Repository: "test", Tag: "v1.0.0", Digest: "sha256:abc"},
 			expectedInErr: "registry is required",
 			expectedInLog: "Invalid signing request",
 		},
 		{
 			name:          "empty repository",
-			clientId:      "test/repo",
+			clientId:      "test-repo",
 			request:       &models.SigningRequest{Registry: "docker.io", Repository: "", Tag: "v1.0.0", Digest: "sha256:abc"},
 			expectedInErr: "repository is required",
 			expectedInLog: "Invalid signing request",
 		},
 		{
 			name:          "empty tag",
-			clientId:      "test/repo",
+			clientId:      "test-repo",
 			request:       &models.SigningRequest{Registry: "docker.io", Repository: "test", Tag: "", Digest: "sha256:abc"},
 			expectedInErr: "tag is required",
 			expectedInLog: "Invalid signing request",
 		},
 		{
 			name:          "empty digest",
-			clientId:      "test/repo",
+			clientId:      "test-repo",
 			request:       &models.SigningRequest{Registry: "docker.io", Repository: "test", Tag: "v1.0.0", Digest: ""},
 			expectedInErr: "digest is required",
 			expectedInLog: "Invalid signing request",
 		},
 		{
 			name:          "invalid digest format",
-			clientId:      "test/repo",
+			clientId:      "test-repo",
 			request:       &models.SigningRequest{Registry: "docker.io", Repository: "test", Tag: "v1.0.0", Digest: "abc123"},
 			expectedInErr: "digest must be in format sha256",
 			expectedInLog: "Invalid signing request",
@@ -287,7 +287,7 @@ func TestSignArtifact_NetworkError(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := client.SignArtifact(context.Background(), "newrelic/test-agent", request)
+	err := client.SignArtifact(context.Background(), "test-agent", request)
 
 	outputStr := getStdout()
 
@@ -320,7 +320,7 @@ func TestSignArtifact_ContextCancellation(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := client.SignArtifact(ctx, "newrelic/test-agent", request)
+	err := client.SignArtifact(ctx, "test-agent", request)
 
 	_ = getStdout()
 
@@ -354,7 +354,7 @@ func TestSignArtifact_ResponseBodyReadError(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := client.SignArtifact(context.Background(), "newrelic/test-agent", request)
+	err := client.SignArtifact(context.Background(), "test-agent", request)
 
 	outputStr := getStdout()
 

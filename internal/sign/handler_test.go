@@ -23,7 +23,7 @@ func TestSignArtifacts_Success_SingleArtifact(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/v1/signing/newrelic/test-agent/sign", r.URL.Path)
+		assert.Equal(t, "/v1/signing/test-agent/sign", r.URL.Path)
 		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
 
 		// Verify body
@@ -62,7 +62,7 @@ func TestSignArtifacts_Success_SingleArtifact(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := SignArtifacts(results, "docker.io/newrelic/agents", "test-token", "newrelic/test-agent", "v1.2.3")
+	err := SignArtifacts(results, "docker.io/newrelic/agents", "test-token", "test-agent", "v1.2.3")
 
 	outputStr := getStdout()
 
@@ -113,7 +113,7 @@ func TestSignArtifacts_SkipsFailedUploads(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := SignArtifacts(results, "docker.io/newrelic/agents", "test-token", "newrelic/test-agent", "v1.2.3")
+	err := SignArtifacts(results, "docker.io/newrelic/agents", "test-token", "test-agent", "v1.2.3")
 
 	outputStr := getStdout()
 

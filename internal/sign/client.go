@@ -35,7 +35,7 @@ func NewClient(baseURL, token string) *Client {
 
 // SignArtifact signs an uploaded artifact
 // POST /v1/signing/{clientId}/sign
-// clientId: GitHub repository name (e.g., "newrelic/dotnet-agent")
+// clientId: GitHub repository name (e.g., "dotnet-agent")
 // request: signing request with registry, repository, tag, digest
 // Returns error on failure (non-2xx or network error)
 func (c *Client) SignArtifact(ctx context.Context, clientId string, request *models.SigningRequest) error {

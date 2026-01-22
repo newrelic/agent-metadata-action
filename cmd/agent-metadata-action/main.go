@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"agent-metadata-action/internal/client"
@@ -204,12 +205,16 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 			return fmt.Errorf("GITHUB_REPOSITORY environment variable is required for artifact signing")
 		}
 
+		// Extract repository name from full path (e.g., "agent-metadata-action" from "newrelic/agent-metadata-action")
+		repoParts := strings.Split(githubRepo, "/")
+		repoName := repoParts[len(repoParts)-1]
+
 		token := config.GetToken()
 		if token == "" {
 			return fmt.Errorf("NEWRELIC_TOKEN is required for artifact signing")
 		}
 
-		if err := sign.SignArtifacts(uploadResults, ociConfig.Registry, token, githubRepo, agentVersion); err != nil {
+		if err := sign.SignArtifacts(uploadResults, ociConfig.Registry, token, repoName, agentVersion); err != nil {
 			return fmt.Errorf("artifact signing failed: %w", err)
 		}
 	}
