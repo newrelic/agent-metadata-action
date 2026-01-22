@@ -46,7 +46,7 @@ func TestSendMetadata_Success(t *testing.T) {
 		assert.Equal(t, "POST", r.Method)
 
 		// Verify URL path
-		assert.True(t, strings.HasPrefix(r.URL.Path, "/v1/agents/TestAgent/versions/"))
+		assert.True(t, strings.HasPrefix(r.URL.Path, "/v1/agents/NRJavaAgent/versions/"))
 
 		// Verify headers
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
@@ -80,14 +80,14 @@ func TestSendMetadata_Success(t *testing.T) {
 	getStdout, getStderr := testutil.CaptureOutput(t)
 
 	// method under test
-	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
+	err := client.SendMetadata(context.Background(), "NRJavaAgent", "1.2.3", metadata)
 
 	outputStr := getStdout()
 	stderrStr := getStderr()
 
 	require.NoError(t, err)
 	assert.Contains(t, outputStr, "Sending metadata to instrumentation service")
-	assert.Contains(t, outputStr, "Agent type: java")
+	assert.Contains(t, outputStr, "Agent type: NRJavaAgent")
 	assert.Contains(t, outputStr, "Agent version: 1.2.3")
 	assert.Contains(t, outputStr, "HTTP status code: 200")
 	assert.Contains(t, outputStr, "Metadata successfully submitted")
@@ -107,7 +107,7 @@ func TestSendMetadata_ValidationErrors(t *testing.T) {
 		{
 			name:          "nil metadata",
 			metadata:      nil,
-			agentType:     "java-agent",
+			agentType:     "NRJavaAgent",
 			agentVersion:  "1.2.3",
 			expectedInErr: "metadata is required",
 			expectedInLog: "Metadata is required but was nil",
@@ -131,7 +131,7 @@ func TestSendMetadata_ValidationErrors(t *testing.T) {
 					"version": "1.2.3",
 				},
 			},
-			agentType:     "java-agent",
+			agentType:     "NRJavaAgent",
 			agentVersion:  "",
 			expectedInErr: "agent version is required",
 			expectedInLog: "Agent version is required but was empty",
@@ -215,7 +215,7 @@ func TestSendMetadata_HTTPErrors(t *testing.T) {
 			getStdout, _ := testutil.CaptureOutput(t)
 
 			// method under test
-			err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
+			err := client.SendMetadata(context.Background(), "NRJavaAgent", "1.2.3", metadata)
 
 			outputStr := getStdout()
 
@@ -248,7 +248,7 @@ func TestSendMetadata_LargeResponseBodyTruncation(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
+	err := client.SendMetadata(context.Background(), "NRJavaAgent", "1.2.3", metadata)
 
 	outputStr := getStdout()
 
@@ -273,7 +273,7 @@ func TestSendMetadata_NetworkError(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
+	err := client.SendMetadata(context.Background(), "NRJavaAgent", "1.2.3", metadata)
 
 	outputStr := getStdout()
 
@@ -307,7 +307,7 @@ func TestSendMetadata_ContextCancellation(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := client.SendMetadata(ctx, "java-agent", "1.2.3", metadata)
+	err := client.SendMetadata(ctx, "NRJavaAgent", "1.2.3", metadata)
 
 	_ = getStdout()
 
@@ -336,7 +336,7 @@ func TestSendMetadata_SuccessWithResponseBody(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
+	err := client.SendMetadata(context.Background(), "NRJavaAgent", "1.2.3", metadata)
 
 	outputStr := getStdout()
 
@@ -400,7 +400,7 @@ func TestSendMetadata_WithConfigurationDefinitionsAndAgentControl(t *testing.T) 
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
+	err := client.SendMetadata(context.Background(), "NRJavaAgent", "1.2.3", metadata)
 
 	outputStr := getStdout()
 
@@ -425,7 +425,7 @@ func TestSendMetadata_MarshalError(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
+	err := client.SendMetadata(context.Background(), "NRJavaAgent", "1.2.3", metadata)
 
 	outputStr := getStdout()
 
@@ -462,7 +462,7 @@ func TestSendMetadata_ResponseBodyReadError(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := client.SendMetadata(context.Background(), "java-agent", "1.2.3", metadata)
+	err := client.SendMetadata(context.Background(), "NRJavaAgent", "1.2.3", metadata)
 
 	outputStr := getStdout()
 

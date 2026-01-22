@@ -432,7 +432,7 @@ func TestSendDocsMetadata(t *testing.T) {
 		{
 			name: "success",
 			entry: loader.MetadataForDocs{
-				AgentType: "java-agent",
+				AgentType: "NRJavaAgent",
 				AgentMetadataFromDocs: map[string]any{
 					"version":     "1.2.3",
 					"releaseDate": "2024-01-15",
@@ -444,7 +444,7 @@ func TestSendDocsMetadata(t *testing.T) {
 		{
 			name: "send error",
 			entry: loader.MetadataForDocs{
-				AgentType: "java-agent",
+				AgentType: "NRJavaAgent",
 				AgentMetadataFromDocs: map[string]any{
 					"version": "1.2.3",
 				},

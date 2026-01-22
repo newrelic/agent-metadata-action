@@ -24,7 +24,7 @@ func (m *mockClient) UploadArtifact(ctx context.Context, artifact *models.Artifa
 func TestUploadArtifacts_Success_SingleArtifact(t *testing.T) {
 	ctx := context.Background()
 	workspace := "/workspace"
-	agentType := "dotnet-agent"
+	agentType := "NRDotNetAgent"
 	version := "1.0.0"
 
 	config := &models.OCIConfig{
@@ -42,7 +42,7 @@ func TestUploadArtifacts_Success_SingleArtifact(t *testing.T) {
 	mock := &mockClient{
 		uploadFunc: func(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, error) {
 			assert.Equal(t, "/workspace/dist/agent.tar.gz", artifactPath)
-			assert.Equal(t, "dotnet-agent", agentType)
+			assert.Equal(t, "NRDotNetAgent", agentType)
 			assert.Equal(t, "1.0.0", version)
 			return "sha256:abc123", int64(1024), nil
 		},
@@ -65,7 +65,7 @@ func TestUploadArtifacts_Success_SingleArtifact(t *testing.T) {
 func TestUploadArtifacts_UploadError(t *testing.T) {
 	ctx := context.Background()
 	workspace := "/workspace"
-	agentType := "dotnet-agent"
+	agentType := "NRDotNetAgent"
 	version := "1.0.0"
 
 	config := &models.OCIConfig{
@@ -100,7 +100,7 @@ func TestUploadArtifacts_UploadError(t *testing.T) {
 func TestUploadArtifacts_EmptyArtifactsList(t *testing.T) {
 	ctx := context.Background()
 	workspace := "/workspace"
-	agentType := "dotnet-agent"
+	agentType := "NRDotNetAgent"
 	version := "1.0.0"
 
 	config := &models.OCIConfig{
@@ -118,4 +118,3 @@ func TestUploadArtifacts_EmptyArtifactsList(t *testing.T) {
 
 	assert.Empty(t, results)
 }
-
