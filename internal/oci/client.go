@@ -29,8 +29,14 @@ func NewClient(registry, username, password string) (*Client, error) {
 		return nil, fmt.Errorf("failed to create OCI repository: %w", err)
 	}
 
+	// Extract registry host for auth (e.g., "docker.io" from "docker.io/user/repo")
+	registryHost := strings.Split(registry, "/")[0]
+	if registryHost == "" {
+		registryHost = "docker.io"
+	}
+
 	repo.Client = &auth.Client{
-		Credential: auth.StaticCredential(registry, auth.Credential{
+		Credential: auth.StaticCredential(registryHost, auth.Credential{
 			Username: username,
 			Password: password,
 		}),
