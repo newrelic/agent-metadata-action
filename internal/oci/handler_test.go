@@ -72,8 +72,9 @@ func TestHandleUploads_DisabledConfig(t *testing.T) {
 		Registry: "", // Empty registry = disabled
 	}
 
-	err := HandleUploads(context.Background(), config, "/workspace", "dotnet-agent", "1.0.0")
+	results, err := HandleUploads(context.Background(), config, "/workspace", "dotnet-agent", "1.0.0")
 	assert.NoError(t, err, "Should not error when OCI upload is disabled")
+	assert.Nil(t, results, "Should return nil results when OCI upload is disabled")
 }
 
 func TestHandleUploads_ValidationFailure(t *testing.T) {
@@ -94,7 +95,7 @@ func TestHandleUploads_ValidationFailure(t *testing.T) {
 		},
 	}
 
-	err := HandleUploads(context.Background(), config, tmpDir, "dotnet-agent", "1.0.0")
+	_, err := HandleUploads(context.Background(), config, tmpDir, "dotnet-agent", "1.0.0")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "binary validation failed")
 }

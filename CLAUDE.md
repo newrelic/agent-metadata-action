@@ -370,7 +370,7 @@ export GITHUB_WORKSPACE=/path/to/repo
 **Inputs:**
 - `newrelic-client-id` (required): NewRelic client ID for authentication
 - `newrelic-private-key` (required): NewRelic private key content (base64-encoded)
-- `agent-type` (optional): Agent type in lowercase (e.g., "dotnet-agent")
+- `agent-type` (optional): Agent type (e.g., "NRDotNetAgent")
 - `version` (optional): Agent version in semver format (e.g., "1.2.3" or "v1.2.3")
 - `fetch-depth` (optional, default: 1): Number of commits to fetch (>1 may be needed for docs flow)
 - `cache` (optional, default: true): Enable Go build caching

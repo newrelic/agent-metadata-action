@@ -55,7 +55,7 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 	logging.Debugf(ctx, "Agent version: %s", agentVersion)
 
 	// Construct URL
-	url := fmt.Sprintf("%s/v1/agents/%s/versions/%s", c.baseURL, "TestAgent", agentVersion) // @todo update TestAgent after testing
+	url := fmt.Sprintf("%s/v1/agents/%s/versions/%s", c.baseURL, agentType, agentVersion)
 	logging.Debugf(ctx, "Target URL: %s", url)
 	logging.Debugf(ctx, "Base URL: %s", c.baseURL)
 

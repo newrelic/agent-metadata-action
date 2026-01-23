@@ -1,0 +1,244 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>agent-metadata-action: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">agent-metadata-action/cmd/agent-metadata-action/main.go (80.7%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package main
+
+import (
+        "context"
+        "encoding/json"
+        "fmt"
+        "os"
+
+        "agent-metadata-action/internal/client"
+        "agent-metadata-action/internal/config"
+        "agent-metadata-action/internal/loader"
+        "agent-metadata-action/internal/models"
+)
+
+// metadataClient interface for testing
+type metadataClient interface {
+        SendMetadata(ctx context.Context, agentType string, agentVersion string, metadata *models.AgentMetadata) error
+}
+
+// createMetadataClientFunc is a variable that holds the function to create a metadata client
+// This allows tests to override the implementation
+var createMetadataClientFunc = func(baseURL, token string) metadataClient <span class="cov0" title="0">{
+        return client.NewInstrumentationClient(baseURL, token)
+}</span>
+
+func main() <span class="cov0" title="0">{
+        if err := run(); err != nil </span><span class="cov0" title="0">{
+                _, _ = fmt.Fprintf(os.Stderr, "::error::%v\n", err)
+                os.Exit(1)
+        }</span>
+}
+
+func run() error <span class="cov8" title="1">{
+        workspace := config.GetWorkspace()
+
+        //
+        // required validations
+        //
+        if workspace == "" </span><span class="cov8" title="1">{
+                return fmt.Errorf("GITHUB_WORKSPACE is required but not set")
+        }</span>
+
+        <span class="cov8" title="1">if _, err := os.Stat(workspace); err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("error reading configs: workspace directory does not exist: %s", workspace)
+        }</span>
+
+        <span class="cov8" title="1">token := config.GetToken()
+        if token == "" </span><span class="cov8" title="1">{
+                return fmt.Errorf("NEWRELIC_TOKEN is required but not set")
+        }</span>
+        <span class="cov8" title="1">fmt.Println("::notice::OAuth token loaded from environment")
+
+        // Create instrumentation client
+        ctx := context.Background()
+        metadataClient := createMetadataClientFunc(config.GetMetadataURL(), token)
+
+        agentType := config.GetAgentType()
+        agentVersion := config.GetVersion()
+
+        if agentType != "" &amp;&amp; agentVersion != "" </span><span class="cov8" title="1">{ // Scenario 1: Agent repo flow
+                fmt.Println("::debug::Agent scenario")
+
+                fleetControlPath := workspace + "/" + loader.FleetControlDir
+                if _, err := os.Stat(fleetControlPath); err != nil </span><span class="cov0" title="0">{
+                        return fmt.Errorf("error %s folder does not exist: %s", loader.FleetControlDir, fleetControlPath)
+                }</span>
+                <span class="cov8" title="1">fmt.Printf("::debug::Reading config from workspace: %s\n", workspace)
+
+                configs, err := loader.ReadConfigurationDefinitions(workspace)
+                if err != nil </span><span class="cov0" title="0">{
+                        // without configuration defs, we don't have any data to send
+                        return fmt.Errorf("error reading configs: %w", err)
+                }</span>
+
+                <span class="cov8" title="1">fmt.Println("::notice::Successfully read configs file")
+                fmt.Printf("::debug::Found %d configs\n", len(configs))
+
+                agentControl, err := loader.LoadAndEncodeAgentControl(workspace)
+                if err != nil </span><span class="cov0" title="0">{
+                        fmt.Println("::warn::Unable to read and encode agent control file - continuing without it")
+                }</span> else<span class="cov8" title="1"> {
+                        fmt.Println("::notice::Successfully read and encoded agent control file")
+                }</span>
+
+                <span class="cov8" title="1">metadata := loader.LoadMetadataForAgents(agentVersion)
+
+                agentMetadata := models.AgentMetadata{
+                        ConfigurationDefinitions: configs,
+                        Metadata:                 metadata,
+                        AgentControl:             agentControl,
+                }
+
+                printJSON("Agent Metadata", agentMetadata)
+
+                fmt.Println("::debug::Sending metadata to instrumentation service...")
+                if err := metadataClient.SendMetadata(ctx, agentType, agentVersion, &amp;agentMetadata); err != nil </span><span class="cov0" title="0">{
+                        return fmt.Errorf("failed to send agent metadata to instrumentation service for agent type: %s %w", agentType, err)
+                }</span>
+                <span class="cov8" title="1">fmt.Println("::notice::Successfully sent metadata to instrumentation service")</span>
+
+        } else<span class="cov8" title="1"> { // Scenario 2: Docs flow
+                fmt.Println("::debug::Docs scenario")
+
+                metadata, err := loader.LoadMetadataForDocs()
+
+                if err != nil </span><span class="cov0" title="0">{
+                        return fmt.Errorf("error reading metadata: %w", err)
+                }</span>
+
+                <span class="cov8" title="1">fmt.Println("::notice::Successfully read metadata files")
+
+                for _, currMetadata := range metadata </span><span class="cov8" title="1">{
+                        version, _ := currMetadata.AgentMetadataFromDocs["version"].(string)
+
+                        fmt.Printf("::debug::Found metadata for %s %s \n", currMetadata.AgentType, version)
+                        printJSON("Docs Metadata", currMetadata.AgentMetadataFromDocs)
+
+                        currAgentMetadata := models.AgentMetadata{
+                                Metadata: currMetadata.AgentMetadataFromDocs,
+                        }
+
+                        if err := metadataClient.SendMetadata(ctx, currMetadata.AgentType, version, &amp;currAgentMetadata); err != nil </span><span class="cov0" title="0">{
+                                // warning instead of failing so we can send as many changes as possible
+                                fmt.Printf("::warn::Failed to send docs metadata to instrumentation service for agent type: %s \n", currMetadata.AgentType)
+                        }</span> else<span class="cov8" title="1"> {
+                                fmt.Printf("::notice::Successfully sent docs metadata to instrumentation service for agent type:  %s \n", currMetadata.AgentType)
+                        }</span>
+                }
+        }
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+func printJSON(label string, data any) <span class="cov8" title="1">{
+        jsonData, err := json.MarshalIndent(data, "", "  ")
+        if err != nil </span><span class="cov0" title="0">{
+                fmt.Printf("::debug::Failed to marshal %s: %v\n", label, err)
+        }</span> else<span class="cov8" title="1"> {
+                fmt.Printf("::debug::%s: %s\n", label, string(jsonData))
+        }</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

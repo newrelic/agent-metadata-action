@@ -127,13 +127,16 @@ func (o *OCIConfig) ValidateUniqueNames() error {
 }
 
 type ArtifactUploadResult struct {
-	Name     string
-	Path     string
-	OS       string
-	Arch     string
-	Format   string
-	Digest   string
-	Size     int64
-	Uploaded bool
-	Error    string
+	Name         string
+	Path         string
+	OS           string
+	Arch         string
+	Format       string
+	Digest       string
+	Size         int64
+	Tag          string
+	Uploaded     bool
+	Error        string
+	Signed       bool
+	SigningError string
 }

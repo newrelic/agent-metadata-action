@@ -1,16 +1,17 @@
 package oci
 
 import (
-	"agent-metadata-action/internal/logging"
-	"agent-metadata-action/internal/models"
 	"context"
 	"fmt"
+
+	"agent-metadata-action/internal/logging"
+	"agent-metadata-action/internal/models"
 )
 
-func HandleUploads(ctx context.Context, ociConfig *models.OCIConfig, workspace, agentType, version string) error {
+func HandleUploads(ctx context.Context, ociConfig *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
 	if !ociConfig.IsEnabled() {
 		logging.Debug(ctx, "OCI upload is not enabled")
-		return nil
+		return nil, nil
 	}
 
 	logging.Notice(ctx, "OCI upload enabled, starting binary uploads...")
@@ -21,7 +22,7 @@ func HandleUploads(ctx context.Context, ociConfig *models.OCIConfig, workspace, 
 			"oci.registry":    ociConfig.Registry,
 			"artifact.count":  len(ociConfig.Artifacts),
 		})
-		return fmt.Errorf("binary validation failed: %w", err)
+		return nil, fmt.Errorf("binary validation failed: %w", err)
 	}
 
 	client, err := NewClient(ctx, ociConfig.Registry, ociConfig.Username, ociConfig.Password)
@@ -30,7 +31,7 @@ func HandleUploads(ctx context.Context, ociConfig *models.OCIConfig, workspace, 
 			"error.operation": "create_oci_client",
 			"oci.registry":    ociConfig.Registry,
 		})
-		return fmt.Errorf("failed to create OCI client: %w", err)
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
 	uploadResults := UploadArtifacts(ctx, client, ociConfig, workspace, agentType, version)
@@ -54,6 +55,8 @@ func HandleUploads(ctx context.Context, ociConfig *models.OCIConfig, workspace, 
 		}
 	}
 
+	logging.Notice(ctx, "All binaries uploaded successfully")
+
 	// Create manifest index to tag uploaded artifacts with version
 	if len(uploadResults) > 0 {
 		logging.Notice(ctx, "Creating multi-platform manifest index...")
@@ -64,16 +67,16 @@ func HandleUploads(ctx context.Context, ociConfig *models.OCIConfig, workspace, 
 				"oci.registry":    ociConfig.Registry,
 				"manifest.count":  len(uploadResults),
 			})
-			return fmt.Errorf("failed to create manifest index: %w", err)
+			return uploadResults, fmt.Errorf("failed to create manifest index: %w", err)
 		}
 		logging.Noticef(ctx, "Created manifest index with tag '%s' (digest: %s)", version, indexDigest)
 	}
 
 	if HasFailures(uploadResults) {
-		return fmt.Errorf("one or more binary uploads failed")
+		return uploadResults, fmt.Errorf("one or more binary uploads failed")
 	}
 
 	logging.Notice(ctx, "All binaries uploaded successfully")
 
-	return nil
+	return uploadResults, nil
 }
