@@ -8,7 +8,7 @@ inputs:
     description: 'NewRelic private key content (pass from secrets)'
     required: true
   agent-type:
-    description: 'The type of agent in all lowercase eg. dotnet-agent'
+    description: 'The type of agent eg. NRDotNetAgent'
     required: false
     default: ''
   version:
