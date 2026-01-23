@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"agent-metadata-action/internal/client"
@@ -15,6 +16,7 @@ import (
 	"agent-metadata-action/internal/models"
 	"agent-metadata-action/internal/oci"
 	"github.com/newrelic/go-agent/v3/newrelic"
+	"agent-metadata-action/internal/sign"
 )
 
 // metadataClient interface for testing
@@ -27,6 +29,10 @@ type metadataClient interface {
 var createMetadataClientFunc = func(baseURL, token string) metadataClient {
 	return client.NewInstrumentationClient(baseURL, token)
 }
+
+// ociHandleUploadsFunc is a variable that holds the function to handle OCI uploads
+// This allows tests to override the implementation
+var ociHandleUploadsFunc = oci.HandleUploads
 
 // initNewRelic initializes the New Relic application
 // Returns nil if APM_CONTROL_NR_LICENSE_KEY is not set (silent no-op mode)
@@ -179,19 +185,52 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 
 	printJSON("Agent Metadata", metadata)
 
-	// Send to service
+	// Step 1: Send to metadata service
 	if err := client.SendMetadata(ctx, agentType, agentVersion, &metadata); err != nil {
 		return fmt.Errorf("failed to send metadata for %s: %w", agentType, err)
 	}
 
-	// Handle OCI binary uploads (optional)
 	ociConfig, err := oci.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("error loading OCI config: %w", err)
 	}
 
-	if err := oci.HandleUploads(&ociConfig, workspace, agentType, agentVersion); err != nil {
+	// Step 2: Upload binaries
+	uploadResults, err := ociHandleUploadsFunc(&ociConfig, workspace, agentType, agentVersion)
+	if err != nil {
 		return fmt.Errorf("binary upload failed: %w", err)
+	}
+
+	// Step 3: Sign all uploaded artifacts
+	if ociConfig.IsEnabled() {
+		successfulUploads := []models.ArtifactUploadResult{}
+		for _, result := range uploadResults {
+			if result.Uploaded {
+				successfulUploads = append(successfulUploads, result)
+			}
+		}
+
+		if len(successfulUploads) > 0 {
+			githubRepo := config.GetRepo()
+			if githubRepo == "" {
+				return fmt.Errorf("GITHUB_REPOSITORY environment variable is required for artifact signing")
+			}
+
+			// Extract repository name from full path (e.g., "agent-metadata-action" from "newrelic/agent-metadata-action")
+			repoParts := strings.Split(githubRepo, "/")
+			repoName := repoParts[len(repoParts)-1]
+
+			token := config.GetToken()
+			if token == "" {
+				return fmt.Errorf("NEWRELIC_TOKEN is required for artifact signing")
+			}
+
+			if err := sign.SignArtifacts(successfulUploads, ociConfig.Registry, token, repoName, agentVersion); err != nil {
+				return fmt.Errorf("artifact signing failed: %w", err)
+			}
+		} else {
+			logging.Warn(ctx, "OCI registry is enabled but no artifacts were successfully uploaded")
+		}
 	}
 
 	logging.Noticef(ctx, "Successfully sent metadata for %s version %s", agentType, agentVersion)
