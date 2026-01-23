@@ -88,7 +88,7 @@ func TestSignArtifact_Success(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Contains(t, outputStr, "Signing artifact")
-	assert.Contains(t, outputStr, "Client ID: test-agent")
+	assert.Contains(t, outputStr, "Signing client ID: test-agent")
 	assert.Contains(t, outputStr, "Registry: docker.io")
 	assert.Contains(t, outputStr, "Repository: newrelic/agents")
 	assert.Contains(t, outputStr, "HTTP status code: 200")
@@ -140,7 +140,7 @@ func TestSignArtifact_ValidationErrors(t *testing.T) {
 			clientId:      "",
 			request:       &models.SigningRequest{Registry: "docker.io", Repository: "test", Tag: "v1.0.0", Digest: "sha256:abc"},
 			expectedInErr: "client ID is required",
-			expectedInLog: "Client ID is required but was empty",
+			expectedInLog: "Signing client ID is required but was empty",
 		},
 		{
 			name:          "nil request",
