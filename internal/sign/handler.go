@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"agent-metadata-action/internal/config"
+	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
 )
 
@@ -19,25 +20,24 @@ const (
 // SignArtifacts signs all uploaded artifacts in batch
 // Retries failed signing operations up to MaxRetries times
 // Returns error if any artifact fails to sign after all retries
-func SignArtifacts(results []models.ArtifactUploadResult, ociRegistry, token, githubRepo, version string) error {
+func SignArtifacts(ctx context.Context, results []models.ArtifactUploadResult, ociRegistry, token, githubRepo, version string) error {
 	if len(results) == 0 {
-		fmt.Println("::debug::No artifacts to sign")
+		logging.Debug(ctx, "No artifacts to sign")
 		return nil
 	}
 
-	fmt.Printf("::notice::Starting artifact signing for %d artifacts...\n", len(results))
+	logging.Noticef(ctx, "Starting artifact signing for %d artifacts...", len(results))
 
 	// Parse registry URL once
 	registry, repository, err := ParseRegistryURL(ociRegistry)
 	if err != nil {
 		return fmt.Errorf("failed to parse registry URL: %w", err)
 	}
-	fmt.Printf("::debug::Parsed registry URL - Registry: %s, Repository: %s\n", registry, repository)
+	logging.Debugf(ctx, "Parsed registry URL - Registry: %s, Repository: %s", registry, repository)
 
 	// Create signing client
 	client := NewClient(config.GetSigningURL(), token)
 
-	ctx := context.Background()
 	successCount := 0
 	failCount := 0
 
@@ -45,11 +45,11 @@ func SignArtifacts(results []models.ArtifactUploadResult, ociRegistry, token, gi
 	for i, result := range results {
 		// Skip artifacts that failed to upload
 		if !result.Uploaded {
-			fmt.Printf("::warn::Skipping signing for %s - upload failed\n", result.Name)
+			logging.Warnf(ctx, "Skipping signing for %s - upload failed", result.Name)
 			continue
 		}
 
-		fmt.Printf("::group::Signing artifact %d/%d: %s\n", i+1, len(results), result.Name)
+		logging.Log(ctx, "group", fmt.Sprintf("Signing artifact %d/%d: %s", i+1, len(results), result.Name))
 
 		// Create signing request
 		signingReq := &models.SigningRequest{
@@ -64,14 +64,14 @@ func SignArtifacts(results []models.ArtifactUploadResult, ociRegistry, token, gi
 		for attempt := 1; attempt <= MaxRetries; attempt++ {
 			if attempt > 1 {
 				delay := time.Duration(attempt-1) * RetryDelay
-				fmt.Printf("::debug::Retry attempt %d/%d after %s delay...\n", attempt, MaxRetries, delay)
+				logging.Debugf(ctx, "Retry attempt %d/%d after %s delay...", attempt, MaxRetries, delay)
 				time.Sleep(delay)
 			}
 
 			signErr = client.SignArtifact(ctx, githubRepo, signingReq)
 			if signErr == nil {
 				// Success!
-				fmt.Printf("::notice::Successfully signed artifact %s (digest: %s)\n", result.Name, result.Digest)
+				logging.Noticef(ctx, "Successfully signed artifact %s (digest: %s)", result.Name, result.Digest)
 				results[i].Signed = true
 				successCount++
 				break
@@ -79,26 +79,26 @@ func SignArtifacts(results []models.ArtifactUploadResult, ociRegistry, token, gi
 
 			// Log retry info
 			if attempt < MaxRetries {
-				fmt.Printf("::warn::Signing attempt %d failed: %v - will retry\n", attempt, signErr)
+				logging.Warnf(ctx, "Signing attempt %d failed: %v - will retry", attempt, signErr)
 			}
 		}
 
 		// Check if all retries failed
 		if signErr != nil {
-			fmt.Printf("::error::Failed to sign artifact %s after %d attempts: %v\n", result.Name, MaxRetries, signErr)
+			logging.Errorf(ctx, "Failed to sign artifact %s after %d attempts: %v", result.Name, MaxRetries, signErr)
 			results[i].Signed = false
 			results[i].SigningError = signErr.Error()
 			failCount++
 
-			fmt.Println("::endgroup::")
+			logging.Log(ctx, "endgroup", "")
 			return fmt.Errorf("failed to sign artifact %s after %d attempts: %w", result.Name, MaxRetries, signErr)
 		}
 
-		fmt.Println("::endgroup::")
+		logging.Log(ctx, "endgroup", "")
 	}
 
 	// Summary
-	fmt.Printf("::notice::Artifact signing complete: %d/%d signed successfully\n", successCount, successCount+failCount)
+	logging.Noticef(ctx, "Artifact signing complete: %d/%d signed successfully", successCount, successCount+failCount)
 
 	return nil
 }

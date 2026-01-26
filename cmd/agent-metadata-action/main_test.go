@@ -158,7 +158,7 @@ Release notes content here.
 
 	// Mock GetChangedMDXFiles to return test MDX files
 	originalFunc := github.GetChangedMDXFilesFunc
-	github.GetChangedMDXFilesFunc = func() ([]string, error) {
+	github.GetChangedMDXFilesFunc = func(ctx context.Context) ([]string, error) {
 		return []string{testMDXFile}, nil
 	}
 	defer func() {
@@ -175,11 +175,11 @@ Release notes content here.
 	main()
 
 	outputStr := getStdout()
-	stderrStr := getStderr()
+	_ = getStderr()
 
 	// Verify docs scenario was triggered
 	assert.Contains(t, outputStr, "Running documentation flow")
-	assert.Contains(t, stderrStr, "::notice::Loaded metadata for 1 out of 1 changed MDX files")
+	assert.Contains(t, outputStr, "::notice::Loaded metadata for 1 out of 1 changed MDX files")
 
 	// Verify output contains agent metadata
 	assert.Contains(t, outputStr, "NRJavaAgent")
@@ -331,7 +331,7 @@ func TestRunAgentFlow_SendMetadataFails(t *testing.T) {
 
 func TestRunDocsFlow_LoadMetadataError(t *testing.T) {
 	originalFunc := github.GetChangedMDXFilesFunc
-	github.GetChangedMDXFilesFunc = func() ([]string, error) {
+	github.GetChangedMDXFilesFunc = func(ctx context.Context) ([]string, error) {
 		return nil, assert.AnError
 	}
 	defer func() {
@@ -350,7 +350,7 @@ func TestRunDocsFlow_LoadMetadataError(t *testing.T) {
 
 func TestRunDocsFlow_NoMetadataChanges(t *testing.T) {
 	originalFunc := github.GetChangedMDXFilesFunc
-	github.GetChangedMDXFilesFunc = func() ([]string, error) {
+	github.GetChangedMDXFilesFunc = func(ctx context.Context) ([]string, error) {
 		return []string{}, nil
 	}
 	defer func() {
@@ -399,7 +399,7 @@ version: 1.3.1
 	require.NoError(t, os.WriteFile(testMDXFile2, []byte(mdxContent2), 0644))
 
 	originalFunc := github.GetChangedMDXFilesFunc
-	github.GetChangedMDXFilesFunc = func() ([]string, error) {
+	github.GetChangedMDXFilesFunc = func(ctx context.Context) ([]string, error) {
 		return []string{testMDXFile1, testMDXFile2}, nil
 	}
 	defer func() {
@@ -422,7 +422,7 @@ version: 1.3.1
 	outputStr := getStdout()
 
 	assert.Contains(t, outputStr, "Successfully sent 1 of 2 metadata entries")
-	assert.Contains(t, outputStr, "::warn::Failed to send metadata")
+	assert.Contains(t, outputStr, "::error::Failed to send metadata")
 }
 
 func TestRunAgentFlow_AgentControlDefinitionsError(t *testing.T) {
@@ -587,7 +587,7 @@ func TestRunAgentFlow_SigningSuccess_SingleArtifact(t *testing.T) {
 
 	// Mock OCI handler to return 1 successful upload
 	originalOCIHandler := ociHandleUploadsFunc
-	ociHandleUploadsFunc = func(cfg *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
+	ociHandleUploadsFunc = func(ctx context.Context, cfg *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
 		return []models.ArtifactUploadResult{
 			createSuccessfulUploadResult("linux-tar", "sha256:abc123", "v1.2.3-linux-amd64"),
 		}, nil
@@ -666,7 +666,7 @@ func TestRunAgentFlow_SigningDisabled_OCINotEnabled(t *testing.T) {
 
 	// Mock OCI handler should not be called since OCI is disabled
 	originalOCIHandler := ociHandleUploadsFunc
-	ociHandleUploadsFunc = func(cfg *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
+	ociHandleUploadsFunc = func(ctx context.Context, cfg *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
 		return []models.ArtifactUploadResult{}, nil
 	}
 	defer func() { ociHandleUploadsFunc = originalOCIHandler }()
@@ -720,7 +720,7 @@ func TestRunAgentFlow_SigningSkipped_AllUploadsFailed(t *testing.T) {
 
 	// Mock OCI handler to return only failed uploads
 	originalOCIHandler := ociHandleUploadsFunc
-	ociHandleUploadsFunc = func(cfg *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
+	ociHandleUploadsFunc = func(ctx context.Context, cfg *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
 		return []models.ArtifactUploadResult{
 			createFailedUploadResult("linux-tar"),
 			createFailedUploadResult("windows-zip"),
@@ -779,7 +779,7 @@ func TestRunAgentFlow_SigningError_ServiceFailure(t *testing.T) {
 
 	// Mock OCI handler to return 1 successful upload
 	originalOCIHandler := ociHandleUploadsFunc
-	ociHandleUploadsFunc = func(cfg *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
+	ociHandleUploadsFunc = func(ctx context.Context, cfg *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
 		return []models.ArtifactUploadResult{
 			createSuccessfulUploadResult("linux-tar", "sha256:abc123", "v1.2.3-linux-amd64"),
 		}, nil

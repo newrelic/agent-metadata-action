@@ -2,10 +2,11 @@ package loader
 
 import (
 	"agent-metadata-action/internal/github"
+	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
 	"agent-metadata-action/internal/parser"
+	"context"
 	"fmt"
-	"os"
 )
 
 // LoadMetadataForAgents loads metadata with only version populated
@@ -22,7 +23,7 @@ type MetadataForDocs struct {
 
 // LoadMetadataForDocs loads metadata from changed MDX files in a PR
 // Loads as many files as it can and warns on issues with certain files
-func LoadMetadataForDocs() ([]MetadataForDocs, error) {
+func LoadMetadataForDocs(ctx context.Context) ([]MetadataForDocs, error) {
 	filesProcessed := 0
 
 	// Get changed MDX files (for PR context)
@@ -34,17 +35,17 @@ func LoadMetadataForDocs() ([]MetadataForDocs, error) {
 		for _, filepath := range changedFilepaths {
 			frontMatter, err := parser.ParseMDXFile(filepath)
 			if err != nil {
-				fmt.Printf("::warn::Failed to parse MDX file %s %s - skipping\n", filepath, err)
+				logging.Warnf(ctx, "Failed to parse MDX file %s %s - skipping", filepath, err)
 				continue
 			}
 
 			if frontMatter["version"] == "" {
-				fmt.Printf("::warn::Version is required in metadata for file %s - skipping\n", filepath)
+				logging.Warnf(ctx, "Version is required in metadata for file %s - skipping", filepath)
 				continue
 			}
 
 			if frontMatter["subject"] == nil || frontMatter["subject"] == "" {
-				fmt.Printf("::warn::Subject (to derive agent type) is required in metadata for file %s - skipping\n", filepath)
+				logging.Warnf(ctx, "Subject (to derive agent type) is required in metadata for file %s - skipping", filepath)
 				continue
 			}
 			agentType := parser.SubjectToAgentTypeMapping[parser.Subject(frontMatter["subject"].(string))]
@@ -64,11 +65,11 @@ func LoadMetadataForDocs() ([]MetadataForDocs, error) {
 			return nil, fmt.Errorf("unable to load metadata for any of the %d changed MDX files", len(changedFilepaths))
 		}
 
-		_, _ = fmt.Fprintf(os.Stderr, "::notice::Loaded metadata for %d out of %d changed MDX files\n", filesProcessed, len(changedFilepaths))
+		logging.Noticef(ctx, "Loaded metadata for %d out of %d changed MDX files", filesProcessed, len(changedFilepaths))
 
 		return metadataForDocs, nil
 	}
 
-	fmt.Print("::debug::no changed files detected in the PR context\n")
+	logging.Debug(ctx, "no changed files detected in the PR context")
 	return nil, nil
 }

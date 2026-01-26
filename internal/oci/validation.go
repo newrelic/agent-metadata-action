@@ -1,7 +1,9 @@
 package oci
 
 import (
+	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,13 +57,13 @@ func ValidateBinaryPath(workspacePath, binaryPath string) error {
 	return nil
 }
 
-func ValidateAllArtifacts(workspacePath string, config *models.OCIConfig) error {
+func ValidateAllArtifacts(ctx context.Context, workspacePath string, config *models.OCIConfig) error {
 	for _, artifact := range config.Artifacts {
 		if err := ValidateBinaryPath(workspacePath, artifact.Path); err != nil {
 			return fmt.Errorf("validation failed for artifact '%s': %w", artifact.Name, err)
 		}
 	}
-	fmt.Println("::debug::All artifact validations passed")
+	logging.Debug(ctx, "All artifact validations passed")
 	return nil
 }
 

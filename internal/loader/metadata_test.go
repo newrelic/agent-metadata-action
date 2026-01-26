@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -86,7 +87,7 @@ bugs:
 
 	// Mock GetChangedMDXFiles to return our test files
 	originalFunc := github.GetChangedMDXFilesFunc
-	github.GetChangedMDXFilesFunc = func() ([]string, error) {
+	github.GetChangedMDXFilesFunc = func(ctx context.Context) ([]string, error) {
 		return []string{mdxFile1, mdxFile2}, nil
 	}
 	defer func() {
@@ -98,7 +99,7 @@ bugs:
 	t.Setenv("GITHUB_WORKSPACE", tmpWorkspace)
 
 	// Load metadata
-	metadata, err := LoadMetadataForDocs()
+	metadata, err := LoadMetadataForDocs(context.Background())
 	require.NoError(t, err)
 	assert.NotNil(t, metadata)
 	assert.Len(t, metadata, 2, "Should load 2 MDX files")
@@ -133,7 +134,7 @@ func TestLoadMetadataForDocs_ErrorCases(t *testing.T) {
 			setupFunc: func(t *testing.T) (string, []string) {
 				// Mock to return error
 				originalFunc := github.GetChangedMDXFilesFunc
-				github.GetChangedMDXFilesFunc = func() ([]string, error) {
+				github.GetChangedMDXFilesFunc = func(ctx context.Context) ([]string, error) {
 					return nil, fmt.Errorf("git error")
 				}
 				t.Cleanup(func() {
@@ -253,7 +254,7 @@ version: 1.2.3
 			// Mock GetChangedMDXFiles if files provided
 			if mdxFiles != nil {
 				originalFunc := github.GetChangedMDXFilesFunc
-				github.GetChangedMDXFilesFunc = func() ([]string, error) {
+				github.GetChangedMDXFilesFunc = func(ctx context.Context) ([]string, error) {
 					return mdxFiles, nil
 				}
 				defer func() {
@@ -266,7 +267,7 @@ version: 1.2.3
 			}
 
 			// method under test
-			metadata, err := LoadMetadataForDocs()
+			metadata, err := LoadMetadataForDocs(context.Background())
 
 			stdout := getStdout()
 
@@ -289,7 +290,7 @@ version: 1.2.3
 func TestLoadMetadataForDocs_NoChangedFiles(t *testing.T) {
 	// Mock GetChangedMDXFiles to return empty list (not error)
 	originalFunc := github.GetChangedMDXFilesFunc
-	github.GetChangedMDXFilesFunc = func() ([]string, error) {
+	github.GetChangedMDXFilesFunc = func(ctx context.Context) ([]string, error) {
 		return []string{}, nil
 	}
 	defer func() {
@@ -299,7 +300,7 @@ func TestLoadMetadataForDocs_NoChangedFiles(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	metadata, err := LoadMetadataForDocs()
+	metadata, err := LoadMetadataForDocs(context.Background())
 
 	stdout := getStdout()
 

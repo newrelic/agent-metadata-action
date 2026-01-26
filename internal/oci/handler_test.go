@@ -2,6 +2,7 @@ package oci
 
 import (
 	"agent-metadata-action/internal/models"
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,7 +72,7 @@ func TestHandleUploads_DisabledConfig(t *testing.T) {
 		Registry: "", // Empty registry = disabled
 	}
 
-	results, err := HandleUploads(config, "/workspace", "dotnet-agent", "1.0.0")
+	results, err := HandleUploads(context.Background(), config, "/workspace", "dotnet-agent", "1.0.0")
 	assert.NoError(t, err, "Should not error when OCI upload is disabled")
 	assert.Nil(t, results, "Should return nil results when OCI upload is disabled")
 }
@@ -94,7 +95,7 @@ func TestHandleUploads_ValidationFailure(t *testing.T) {
 		},
 	}
 
-	_, err := HandleUploads(config, tmpDir, "dotnet-agent", "1.0.0")
+	_, err := HandleUploads(context.Background(), config, tmpDir, "dotnet-agent", "1.0.0")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "binary validation failed")
 }

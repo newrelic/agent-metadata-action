@@ -2,7 +2,9 @@ package loader
 
 import (
 	"agent-metadata-action/internal/config"
+	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -13,7 +15,7 @@ import (
 )
 
 // ReadConfigurationDefinitions reads and parses the configurationDefinitions file
-func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationDefinition, error) {
+func ReadConfigurationDefinitions(ctx context.Context, workspacePath string) ([]models.ConfigurationDefinition, error) {
 	fullPath := filepath.Join(workspacePath, config.GetConfigurationDefinitionsFilepath())
 
 	definitions, err := readDefinitionsFile(fullPath)
@@ -24,19 +26,19 @@ func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationD
 	for i := range definitions {
 		// Skip if no schema path is provided
 		if definitions[i]["schema"] == nil || definitions[i]["schema"] == "" {
-			fmt.Printf("::debug::no schema provided - skipping\n")
+			logging.Debug(ctx, "no schema provided - skipping")
 			continue
 		}
 		schemaPath, ok := definitions[i]["schema"].(string)
 		if !ok {
-			fmt.Printf("::warn::schema field is not a string - skipping\n")
+			logging.Warn(ctx, "schema field is not a string - skipping")
 			continue
 		}
 
 		// @todo at some point, we may want to do this concurrently if there are any agents with a large number of files
 		encoded, err := loadAndEncodeFile(workspacePath, schemaPath, "schema")
 		if err != nil {
-			fmt.Printf("::warn::failed to load schema at schema path %s: %v -- continuing without it\n", schemaPath, err)
+			logging.Warnf(ctx, "failed to load schema at schema path %s: %v -- continuing without it", schemaPath, err)
 			continue
 		}
 		definitions[i]["schema"] = encoded
@@ -52,7 +54,7 @@ func ReadConfigurationDefinitions(workspacePath string) ([]models.ConfigurationD
 }
 
 // ReadAgentControlDefinitions reads and parses the agentControlDefinitions file
-func ReadAgentControlDefinitions(workspacePath string) ([]models.AgentControlDefinition, error) {
+func ReadAgentControlDefinitions(ctx context.Context, workspacePath string) ([]models.AgentControlDefinition, error) {
 	fullPath := filepath.Join(workspacePath, config.GetAgentControlDefinitionsFilepath())
 
 	definitions, err := readDefinitionsFile(fullPath)
@@ -64,19 +66,19 @@ func ReadAgentControlDefinitions(workspacePath string) ([]models.AgentControlDef
 	for i := range definitions {
 		// Skip if no content path is provided
 		if definitions[i]["content"] == nil || definitions[i]["content"] == "" {
-			fmt.Printf("::debug::no content provided - skipping\n")
+			logging.Debug(ctx, "no content provided - skipping")
 			continue
 		}
 		contentPath, ok := definitions[i]["content"].(string)
 		if !ok {
-			fmt.Printf("::warn::content field is not a string - skipping\n")
+			logging.Warn(ctx, "content field is not a string - skipping")
 			continue
 		}
 
 		// @todo at some point, we may want to do this concurrently if there are any agents with a large number of files
 		encoded, err := loadAndEncodeFile(workspacePath, contentPath, "content")
 		if err != nil {
-			fmt.Printf("::warn::failed to load content at path %s: %v -- continuing without it\n", contentPath, err)
+			logging.Warnf(ctx, "failed to load content at path %s: %v -- continuing without it", contentPath, err)
 			continue
 		}
 		definitions[i]["content"] = encoded

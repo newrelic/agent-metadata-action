@@ -1,6 +1,7 @@
 package oci
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,11 +10,11 @@ import (
 
 func TestNewClient_Success(t *testing.T) {
 	tests := []struct {
-		name         string
-		registry     string
-		username     string
-		password     string
-		expectPlain  bool
+		name        string
+		registry    string
+		username    string
+		password    string
+		expectPlain bool
 	}{
 		{
 			name:        "standard registry with authentication",
@@ -47,7 +48,7 @@ func TestNewClient_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := NewClient(tt.registry, tt.username, tt.password)
+			client, err := NewClient(context.Background(), tt.registry, tt.username, tt.password)
 
 			require.NoError(t, err)
 			assert.NotNil(t, client)
@@ -75,7 +76,7 @@ func TestNewClient_InvalidRegistry(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := NewClient(tt.registry, "user", "pass")
+			client, err := NewClient(context.Background(), tt.registry, "user", "pass")
 
 			assert.Error(t, err)
 			assert.Nil(t, client)

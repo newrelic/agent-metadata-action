@@ -1,57 +1,82 @@
 package oci
 
 import (
-	"agent-metadata-action/internal/models"
 	"context"
 	"fmt"
-	"os"
+
+	"agent-metadata-action/internal/logging"
+	"agent-metadata-action/internal/models"
 )
 
-func HandleUploads(ociConfig *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
+func HandleUploads(ctx context.Context, ociConfig *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
 	if !ociConfig.IsEnabled() {
-		fmt.Println("::debug::OCI upload is not enabled")
+		logging.Debug(ctx, "OCI upload is not enabled")
 		return nil, nil
 	}
 
-	fmt.Println("::notice::OCI upload enabled, starting binary uploads...")
+	logging.Notice(ctx, "OCI upload enabled, starting binary uploads...")
 
-	if err := ValidateAllArtifacts(workspace, ociConfig); err != nil {
+	if err := ValidateAllArtifacts(ctx, workspace, ociConfig); err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "oci.validation", map[string]interface{}{
+			"error.operation": "validate_artifacts",
+			"oci.registry":    ociConfig.Registry,
+			"artifact.count":  len(ociConfig.Artifacts),
+		})
 		return nil, fmt.Errorf("binary validation failed: %w", err)
 	}
 
-	client, err := NewClient(ociConfig.Registry, ociConfig.Username, ociConfig.Password)
+	client, err := NewClient(ctx, ociConfig.Registry, ociConfig.Username, ociConfig.Password)
 	if err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "oci.client", map[string]interface{}{
+			"error.operation": "create_oci_client",
+			"oci.registry":    ociConfig.Registry,
+		})
 		return nil, fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
-	ctx := context.Background()
 	uploadResults := UploadArtifacts(ctx, client, ociConfig, workspace, agentType, version)
 
 	for _, result := range uploadResults {
 		if result.Uploaded {
-			fmt.Printf("::notice::Uploaded %s: %s (os: %s, arch: %s, digest: %s, manifest size: %d bytes)\n",
+			logging.Noticef(ctx, "Uploaded %s: %s (os: %s, arch: %s, digest: %s, manifest size: %d bytes)",
 				result.Name, result.Path, result.OS, result.Arch, result.Digest, result.Size)
 		} else {
-			fmt.Fprintf(os.Stderr, "::error::Failed to upload %s (%s): %s\n",
+			artifactErr := fmt.Errorf("upload failed: %s", result.Error)
+			logging.NoticeErrorWithCategory(ctx, artifactErr, "oci.artifact.upload", map[string]interface{}{
+				"error.operation": "upload_artifact",
+				"artifact.name":   result.Name,
+				"artifact.path":   result.Path,
+				"artifact.os":     result.OS,
+				"artifact.arch":   result.Arch,
+				"oci.registry":    ociConfig.Registry,
+			})
+			logging.Errorf(ctx, "Failed to upload %s (%s): %s",
 				result.Name, result.Path, result.Error)
 		}
 	}
 
-	fmt.Println("::notice::All binaries uploaded successfully")
+	logging.Notice(ctx, "All binaries uploaded successfully")
 
 	// Create manifest index to tag uploaded artifacts with version
 	if len(uploadResults) > 0 {
-		fmt.Println("::notice::Creating multi-platform manifest index...")
+		logging.Notice(ctx, "Creating multi-platform manifest index...")
 		indexDigest, err := client.CreateManifestIndex(ctx, uploadResults, version)
 		if err != nil {
+			logging.NoticeErrorWithCategory(ctx, err, "oci.manifest", map[string]interface{}{
+				"error.operation": "create_manifest_index",
+				"oci.registry":    ociConfig.Registry,
+				"manifest.count":  len(uploadResults),
+			})
 			return uploadResults, fmt.Errorf("failed to create manifest index: %w", err)
 		}
-		fmt.Printf("::notice::Created manifest index with tag '%s' (digest: %s)\n", version, indexDigest)
+		logging.Noticef(ctx, "Created manifest index with tag '%s' (digest: %s)", version, indexDigest)
 	}
 
 	if HasFailures(uploadResults) {
 		return uploadResults, fmt.Errorf("one or more binary uploads failed")
 	}
+
+	logging.Notice(ctx, "All binaries uploaded successfully")
 
 	return uploadResults, nil
 }

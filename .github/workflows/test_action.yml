@@ -7,6 +7,8 @@ on:
   push:
     branches:
       - '**'
+  schedule:
+    - cron: '0 1 * * *' # This runs the workflow daily at 1am UTC
 
 jobs:
   setup-test-tag:

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
 )
 
@@ -33,98 +34,125 @@ func NewInstrumentationClient(baseURL, token string) *InstrumentationClient {
 // SendMetadata sends agent metadata to the instrumentation service
 // POST /v1/agents/{agentType}/versions/{agentVersion}
 func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType string, agentVersion string, metadata *models.AgentMetadata) error {
-	fmt.Println("::group::Sending metadata to instrumentation service")
-	defer fmt.Println("::endgroup::")
+	logging.Log(ctx, "group", "Sending metadata to instrumentation service")
+	defer logging.Log(ctx, "endgroup", "")
 
 	// Validate inputs
-	fmt.Println("::debug::Validating inputs...")
+	logging.Debug(ctx, "Validating inputs...")
 	if metadata == nil {
-		fmt.Println("::error::Metadata is required but was nil")
+		logging.Error(ctx, "Metadata is required but was nil")
 		return fmt.Errorf("metadata is required")
 	}
 	if agentType == "" {
-		fmt.Println("::error::Agent type is required but was empty")
+		logging.Error(ctx, "Agent type is required but was empty")
 		return fmt.Errorf("agent type is required")
 	}
 	if agentVersion == "" {
-		fmt.Println("::error::Agent version is required but was empty")
+		logging.Error(ctx, "Agent version is required but was empty")
 		return fmt.Errorf("agent version is required")
 	}
-	fmt.Printf("::debug::Agent type: %s\n", agentType)
-	fmt.Printf("::debug::Agent version: %s\n", agentVersion)
+	logging.Debugf(ctx, "Agent type: %s", agentType)
+	logging.Debugf(ctx, "Agent version: %s", agentVersion)
 
 	// Construct URL
 	url := fmt.Sprintf("%s/v1/agents/%s/versions/%s", c.baseURL, agentType, agentVersion)
-	fmt.Printf("::debug::Target URL: %s\n", url)
-	fmt.Printf("::debug::Base URL: %s\n", c.baseURL)
+	logging.Debugf(ctx, "Target URL: %s", url)
+	logging.Debugf(ctx, "Base URL: %s", c.baseURL)
 
 	// Marshal metadata to JSON
-	fmt.Println("::debug::Marshaling metadata to JSON...")
+	logging.Debug(ctx, "Marshaling metadata to JSON...")
 	jsonBody, err := json.Marshal(metadata)
 	if err != nil {
-		fmt.Printf("::error::Failed to marshal metadata: %v\n", err)
+		logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
+			"error.operation": "marshal_metadata",
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+		})
+		logging.Errorf(ctx, "Failed to marshal metadata: %v", err)
 		return fmt.Errorf("failed to marshal metadata: %w", err)
 	}
-	fmt.Printf("::debug::JSON payload size: %d bytes\n", len(jsonBody))
-	fmt.Printf("::debug::Configuration definitions count: %d\n", len(metadata.ConfigurationDefinitions))
-	fmt.Printf("::debug::Agent control entries: %d\n", len(metadata.AgentControlDefinitions))
+	logging.Debugf(ctx, "JSON payload size: %d bytes", len(jsonBody))
+	logging.Debugf(ctx, "Configuration definitions count: %d", len(metadata.ConfigurationDefinitions))
+	logging.Debugf(ctx, "Agent control entries: %d", len(metadata.AgentControlDefinitions))
 
 	// Create HTTP request
-	fmt.Println("::debug::Creating HTTP POST request...")
+	logging.Debug(ctx, "Creating HTTP POST request...")
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
-		fmt.Printf("::error::Failed to create request: %v\n", err)
+		logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
+			"error.operation": "create_http_request",
+			"http.url":        url,
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+		})
+		logging.Errorf(ctx, "Failed to create request: %v", err)
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
-	fmt.Println("::debug::Setting request headers...")
+	logging.Debug(ctx, "Setting request headers...")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
 	// SECURITY: Token is in header but not logged
 
 	// Execute request
-	fmt.Println("::debug::Sending HTTP request...")
+	logging.Debug(ctx, "Sending HTTP request...")
 	startTime := time.Now()
 	resp, err := c.httpClient.Do(req)
 	duration := time.Since(startTime)
 
 	if err != nil {
-		fmt.Printf("::error::HTTP request failed after %s: %v\n", duration, err)
+		logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
+			"error.operation": "execute_http_request",
+			"http.url":        url,
+			"http.duration":   duration.String(),
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+		})
+		logging.Errorf(ctx, "HTTP request failed after %s: %v", duration, err)
 		return fmt.Errorf("failed to send metadata: %w", err)
 	}
 	defer resp.Body.Close()
 
-	fmt.Printf("::debug::Response received in %s\n", duration)
-	fmt.Printf("::debug::HTTP status code: %d %s\n", resp.StatusCode, resp.Status)
+	logging.Debugf(ctx, "Response received in %s", duration)
+	logging.Debugf(ctx, "HTTP status code: %d %s", resp.StatusCode, resp.Status)
 
 	// Read response body for error details (with size limit)
-	fmt.Println("::debug::Reading response body...")
+	logging.Debug(ctx, "Reading response body...")
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("::error::Failed to read response body: %v\n", err)
+		logging.Errorf(ctx, "Failed to read response body: %v", err)
 		return fmt.Errorf("failed to read response: %w", err)
 	}
-	fmt.Printf("::debug::Response body size: %d bytes\n", len(body))
+	logging.Debugf(ctx, "Response body size: %d bytes", len(body))
 
 	// Check for non-2xx status codes
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		fmt.Printf("::error::Metadata submission failed with status %d\n", resp.StatusCode)
-
 		// Log response body for debugging, but truncate if too large
 		responsePreview := string(body)
 		if len(responsePreview) > 500 {
 			responsePreview = responsePreview[:500] + "... (truncated)"
 		}
-		fmt.Printf("::debug::Error response body: %s\n", responsePreview)
 
-		return fmt.Errorf("metadata submission failed with status %d: %s", resp.StatusCode, string(body))
+		err := fmt.Errorf("metadata submission failed with status %d: %s", resp.StatusCode, string(body))
+		logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
+			"error.operation":    "http_non_2xx_response",
+			"http.status_code":   resp.StatusCode,
+			"http.url":           url,
+			"http.response_body": responsePreview,
+			"agent.type":         agentType,
+			"agent.version":      agentVersion,
+		})
+		logging.Errorf(ctx, "Metadata submission failed with status %d", resp.StatusCode)
+		logging.Debugf(ctx, "Error response body: %s", responsePreview)
+
+		return err
 	}
 
 	// Success logging
-	fmt.Println("::notice::Metadata successfully submitted to instrumentation service")
+	logging.Notice(ctx, "Metadata successfully submitted to instrumentation service")
 	if len(body) > 0 {
-		fmt.Printf("::debug::Success response: %s\n", string(body))
+		logging.Debugf(ctx, "Success response: %s", string(body))
 	}
 
 	return nil

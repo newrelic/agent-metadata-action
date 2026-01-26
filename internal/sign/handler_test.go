@@ -1,6 +1,7 @@
 package sign
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -62,7 +63,7 @@ func TestSignArtifacts_Success_SingleArtifact(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := SignArtifacts(results, "docker.io/newrelic/agents", "test-token", "test-agent", "v1.2.3")
+	err := SignArtifacts(context.Background(), results, "docker.io/newrelic/agents", "test-token", "test-agent", "v1.2.3")
 
 	outputStr := getStdout()
 
@@ -113,7 +114,7 @@ func TestSignArtifacts_SkipsFailedUploads(t *testing.T) {
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := SignArtifacts(results, "docker.io/newrelic/agents", "test-token", "test-agent", "v1.2.3")
+	err := SignArtifacts(context.Background(), results, "docker.io/newrelic/agents", "test-token", "test-agent", "v1.2.3")
 
 	outputStr := getStdout()
 
@@ -183,7 +184,7 @@ func TestSignArtifacts_RegistryURLParsing(t *testing.T) {
 					{Name: "test", Digest: "sha256:abc123", Uploaded: true},
 				}
 
-				err := SignArtifacts(results, tt.registryURL, "test-token", "newrelic/test-agent", "v1.2.3")
+				err := SignArtifacts(context.Background(), results, tt.registryURL, "test-token", "newrelic/test-agent", "v1.2.3")
 
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
