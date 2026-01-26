@@ -15,8 +15,9 @@ import (
 	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
 	"agent-metadata-action/internal/oci"
-	"github.com/newrelic/go-agent/v3/newrelic"
 	"agent-metadata-action/internal/sign"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 // metadataClient interface for testing
@@ -224,12 +225,6 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 
 	// Step 1: Send to metadata service
 	if err := client.SendMetadata(ctx, agentType, agentVersion, &metadata); err != nil {
-		logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
-			"error.operation": "send_metadata",
-			"agent.type":      agentType,
-			"agent.version":   agentVersion,
-			"workflow.type":   "agent",
-		})
 		return fmt.Errorf("failed to send metadata for %s: %w", agentType, err)
 	}
 
@@ -246,12 +241,6 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	// Step 2: Upload binaries
 	uploadResults, err := ociHandleUploadsFunc(ctx, &ociConfig, workspace, agentType, agentVersion)
 	if err != nil {
-		logging.NoticeErrorWithCategory(ctx, err, "oci.upload", map[string]interface{}{
-			"error.operation": "upload_binaries",
-			"oci.registry":    ociConfig.Registry,
-			"agent.type":      agentType,
-			"agent.version":   agentVersion,
-		})
 		return fmt.Errorf("binary upload failed: %w", err)
 	}
 
@@ -298,10 +287,6 @@ func runDocsFlow(ctx context.Context, client metadataClient) error {
 	// Load metadata from changed MDX files
 	metadataList, err := loader.LoadMetadataForDocs(ctx)
 	if err != nil {
-		logging.NoticeErrorWithCategory(ctx, err, "docs.load", map[string]interface{}{
-			"error.operation": "load_metadata_from_docs",
-			"workflow.type":   "docs",
-		})
 		return fmt.Errorf("failed to load metadata from docs: %w", err)
 	}
 
@@ -316,12 +301,6 @@ func runDocsFlow(ctx context.Context, client metadataClient) error {
 	successCount := 0
 	for _, entry := range metadataList {
 		if err := sendDocsMetadata(ctx, client, entry); err != nil {
-			logging.NoticeErrorWithCategory(ctx, err, "docs.send", map[string]interface{}{
-				"error.operation": "send_docs_metadata",
-				"agent.type":      entry.AgentType,
-				"workflow.type":   "docs",
-				"error.severity":  "warning", // Graceful error
-			})
 			logging.Errorf(ctx, "Failed to send metadata for %s: %v", entry.AgentType, err)
 			continue
 		}
