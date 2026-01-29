@@ -67,7 +67,7 @@ func (a *ArtifactDefinition) GetMediaType() string {
 }
 
 func (a *ArtifactDefinition) GetArtifactType() string {
-	return fmt.Sprintf("application/vnd.newrelic.agent.v1+%s", a.Format)
+	return "application/vnd.newrelic.agent.v1"
 }
 
 func (a *ArtifactDefinition) GetPlatformString() string {

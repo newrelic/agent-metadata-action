@@ -205,7 +205,7 @@ func TestArtifactDefinition_GetMediaType(t *testing.T) {
 
 func TestArtifactDefinition_GetArtifactType(t *testing.T) {
 	artifact := ArtifactDefinition{Format: "tar+gzip"}
-	assert.Equal(t, "application/vnd.newrelic.agent.v1+tar+gzip", artifact.GetArtifactType())
+	assert.Equal(t, "application/vnd.newrelic.agent.v1", artifact.GetArtifactType())
 }
 
 func TestArtifactDefinition_GetPlatformString(t *testing.T) {
