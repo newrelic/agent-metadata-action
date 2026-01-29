@@ -6,7 +6,7 @@ import (
 )
 
 type ArtifactUploader interface {
-	UploadArtifact(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (digest string, size int64, tag string, err error)
+	UploadArtifact(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, version string) (digest string, size int64, err error)
 }
 
 func UploadArtifacts(ctx context.Context, client ArtifactUploader, config *models.OCIConfig, workspacePath, agentType, version string) []models.ArtifactUploadResult {
@@ -29,13 +29,12 @@ func UploadArtifacts(ctx context.Context, client ArtifactUploader, config *model
 			continue
 		}
 
-		digest, size, tag, err := client.UploadArtifact(ctx, &artifact, fullPath, agentType, version)
+		digest, size, err := client.UploadArtifact(ctx, &artifact, fullPath, version)
 		if err != nil {
 			result.Error = err.Error()
 		} else {
 			result.Digest = digest
 			result.Size = size
-			result.Tag = tag
 			result.Uploaded = true
 		}
 

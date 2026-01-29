@@ -7,21 +7,16 @@ import (
 	"os"
 )
 
-func HandleUploads(ociConfig *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
-	if !ociConfig.IsEnabled() {
-		fmt.Println("::debug::OCI upload is not enabled")
-		return nil, nil
-	}
-
+func HandleUploads(ociConfig *models.OCIConfig, workspace, agentType, version string) (string, error) {
 	fmt.Println("::notice::OCI upload enabled, starting binary uploads...")
 
 	if err := ValidateAllArtifacts(workspace, ociConfig); err != nil {
-		return nil, fmt.Errorf("binary validation failed: %w", err)
+		return "", fmt.Errorf("binary validation failed: %w", err)
 	}
 
 	client, err := NewClient(ociConfig.Registry, ociConfig.Username, ociConfig.Password)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+		return "", fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
 	ctx := context.Background()
@@ -37,21 +32,22 @@ func HandleUploads(ociConfig *models.OCIConfig, workspace, agentType, version st
 		}
 	}
 
+	if HasFailures(uploadResults) {
+		return "", fmt.Errorf("one or more binary uploads failed")
+	}
+
 	fmt.Println("::notice::All binaries uploaded successfully")
 
 	// Create manifest index to tag uploaded artifacts with version
+	var indexDigest string
 	if len(uploadResults) > 0 {
 		fmt.Println("::notice::Creating multi-platform manifest index...")
-		indexDigest, err := client.CreateManifestIndex(ctx, uploadResults, version)
+		indexDigest, err = client.CreateManifestIndex(ctx, uploadResults, version)
 		if err != nil {
-			return uploadResults, fmt.Errorf("failed to create manifest index: %w", err)
+			return "", fmt.Errorf("failed to create manifest index: %w", err)
 		}
 		fmt.Printf("::notice::Created manifest index with tag '%s' (digest: %s)\n", version, indexDigest)
 	}
 
-	if HasFailures(uploadResults) {
-		return uploadResults, fmt.Errorf("one or more binary uploads failed")
-	}
-
-	return uploadResults, nil
+	return indexDigest, nil
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -585,12 +586,10 @@ func TestRunAgentFlow_SigningSuccess_SingleArtifact(t *testing.T) {
 	}
 	defer func() { createMetadataClientFunc = originalCreateClient }()
 
-	// Mock OCI handler to return 1 successful upload
+	// Mock OCI handler to return index digest
 	originalOCIHandler := ociHandleUploadsFunc
-	ociHandleUploadsFunc = func(cfg *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
-		return []models.ArtifactUploadResult{
-			createSuccessfulUploadResult("linux-tar", "sha256:abc123", "v1.2.3-linux-amd64"),
-		}, nil
+	ociHandleUploadsFunc = func(cfg *models.OCIConfig, workspace, agentType, version string) (string, error) {
+		return "sha256:index123", nil
 	}
 	defer func() { ociHandleUploadsFunc = originalOCIHandler }()
 
@@ -604,14 +603,14 @@ func TestRunAgentFlow_SigningSuccess_SingleArtifact(t *testing.T) {
 		assert.Equal(t, "/v1/signing/agent-metadata-action/sign", r.URL.Path)
 		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
 
-		// Validate request body
+		// Validate request body - should sign index, not individual artifacts
 		body, _ := io.ReadAll(r.Body)
 		var signingReq models.SigningRequest
 		json.Unmarshal(body, &signingReq)
 		assert.Equal(t, "docker.io", signingReq.Registry)
 		assert.Equal(t, "newrelic/agents", signingReq.Repository)
-		assert.Equal(t, "v1.2.3-linux-amd64", signingReq.Tag)
-		assert.Equal(t, "sha256:abc123", signingReq.Digest)
+		assert.Equal(t, "1.2.3", signingReq.Tag)          // Index tag (version only)
+		assert.Equal(t, "sha256:index123", signingReq.Digest) // Index digest
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"success": true}`))
@@ -647,12 +646,11 @@ func TestRunAgentFlow_SigningSuccess_SingleArtifact(t *testing.T) {
 	stderrStr := getStderr()
 
 	// Verify signing requests
-	assert.Equal(t, 1, requestCount, "Should have made 1 signing request")
+	assert.Equal(t, 1, requestCount, "Should have made 1 signing request for index")
 
 	// Verify logging
-	assert.Contains(t, outputStr, "Starting artifact signing for 1 artifacts")
-	assert.Contains(t, outputStr, "Successfully signed artifact linux-tar")
-	assert.Contains(t, outputStr, "Artifact signing complete: 1/1 signed successfully")
+	assert.Contains(t, outputStr, "Signing manifest index with tag '1.2.3'")
+	assert.Contains(t, outputStr, "Successfully signed manifest index")
 	assert.NotContains(t, stderrStr, "::error::")
 }
 
@@ -666,8 +664,9 @@ func TestRunAgentFlow_SigningDisabled_OCINotEnabled(t *testing.T) {
 
 	// Mock OCI handler should not be called since OCI is disabled
 	originalOCIHandler := ociHandleUploadsFunc
-	ociHandleUploadsFunc = func(cfg *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
-		return []models.ArtifactUploadResult{}, nil
+	ociHandleUploadsFunc = func(cfg *models.OCIConfig, workspace, agentType, version string) (string, error) {
+		t.Fatal("ociHandleUploadsFunc should not be called when OCI is disabled")
+		return "", nil
 	}
 	defer func() { ociHandleUploadsFunc = originalOCIHandler }()
 
@@ -710,7 +709,7 @@ func TestRunAgentFlow_SigningDisabled_OCINotEnabled(t *testing.T) {
 	assert.NotContains(t, stderrStr, "::error::")
 }
 
-func TestRunAgentFlow_SigningSkipped_AllUploadsFailed(t *testing.T) {
+func TestRunAgentFlow_UploadsFailed(t *testing.T) {
 	// Override metadata client with mock
 	originalCreateClient := createMetadataClientFunc
 	createMetadataClientFunc = func(baseURL, token string) metadataClient {
@@ -718,13 +717,10 @@ func TestRunAgentFlow_SigningSkipped_AllUploadsFailed(t *testing.T) {
 	}
 	defer func() { createMetadataClientFunc = originalCreateClient }()
 
-	// Mock OCI handler to return only failed uploads
+	// Mock OCI handler to return error (uploads failed)
 	originalOCIHandler := ociHandleUploadsFunc
-	ociHandleUploadsFunc = func(cfg *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
-		return []models.ArtifactUploadResult{
-			createFailedUploadResult("linux-tar"),
-			createFailedUploadResult("windows-zip"),
-		}, nil
+	ociHandleUploadsFunc = func(cfg *models.OCIConfig, workspace, agentType, version string) (string, error) {
+		return "", fmt.Errorf("one or more binary uploads failed")
 	}
 	defer func() { ociHandleUploadsFunc = originalOCIHandler }()
 
@@ -756,17 +752,14 @@ func TestRunAgentFlow_SigningSkipped_AllUploadsFailed(t *testing.T) {
 	mockClient := &mockMetadataClient{}
 	err = runAgentFlow(ctx, mockClient, workspace, "java", "1.2.3")
 
-	// Verify success (signing is skipped but flow continues)
-	require.NoError(t, err)
+	// Verify error when uploads fail
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "binary upload failed")
 
-	outputStr := getStdout()
+	_ = getStdout()
 
-	// Verify NO signing requests were made
+	// Verify NO signing requests were made (never got that far)
 	assert.Equal(t, 0, requestCount, "Should have made 0 signing requests")
-
-	// Verify warning was logged
-	assert.Contains(t, outputStr, "OCI registry is enabled but no artifacts were successfully uploaded")
-	assert.NotContains(t, outputStr, "Starting artifact signing")
 }
 
 func TestRunAgentFlow_SigningError_ServiceFailure(t *testing.T) {
@@ -777,12 +770,10 @@ func TestRunAgentFlow_SigningError_ServiceFailure(t *testing.T) {
 	}
 	defer func() { createMetadataClientFunc = originalCreateClient }()
 
-	// Mock OCI handler to return 1 successful upload
+	// Mock OCI handler to return index digest
 	originalOCIHandler := ociHandleUploadsFunc
-	ociHandleUploadsFunc = func(cfg *models.OCIConfig, workspace, agentType, version string) ([]models.ArtifactUploadResult, error) {
-		return []models.ArtifactUploadResult{
-			createSuccessfulUploadResult("linux-tar", "sha256:abc123", "v1.2.3-linux-amd64"),
-		}, nil
+	ociHandleUploadsFunc = func(cfg *models.OCIConfig, workspace, agentType, version string) (string, error) {
+		return "sha256:index123", nil
 	}
 	defer func() { ociHandleUploadsFunc = originalOCIHandler }()
 
@@ -817,7 +808,7 @@ func TestRunAgentFlow_SigningError_ServiceFailure(t *testing.T) {
 
 	// Verify error
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "artifact signing failed")
+	assert.Contains(t, err.Error(), "index signing failed")
 
 	outputStr := getStdout()
 
@@ -825,5 +816,5 @@ func TestRunAgentFlow_SigningError_ServiceFailure(t *testing.T) {
 	assert.Equal(t, 3, requestCount, "Should have made 3 signing requests (retries)")
 	assert.Contains(t, outputStr, "Signing attempt 1 failed")
 	assert.Contains(t, outputStr, "Signing attempt 2 failed")
-	assert.Contains(t, outputStr, "Failed to sign artifact linux-tar after 3 attempts")
+	assert.Contains(t, outputStr, "Failed to sign manifest index after 3 attempts")
 }

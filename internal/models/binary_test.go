@@ -190,9 +190,9 @@ func TestArtifactDefinition_GetMediaType(t *testing.T) {
 		format   string
 		expected string
 	}{
-		{"tar", "application/vnd.newrelic.agent.v1+tar"},
-		{"tar+gzip", "application/vnd.newrelic.agent.v1+tar+gzip"},
-		{"zip", "application/vnd.newrelic.agent.v1+zip"},
+		{"tar", "application/vnd.newrelic.agent.content.v1.tar"},
+		{"tar+gzip", "application/vnd.newrelic.agent.content.v1.tar+gzip"},
+		{"zip", "application/vnd.newrelic.agent.content.v1.zip"},
 	}
 
 	for _, tt := range tests {

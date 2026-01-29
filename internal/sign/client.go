@@ -78,6 +78,7 @@ func (c *Client) SignArtifact(ctx context.Context, clientId string, request *mod
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 	fmt.Printf("::debug::JSON payload size: %d bytes\n", len(jsonBody))
+	fmt.Printf("::debug::Request body: %s\n", string(jsonBody))
 
 	// Create HTTP request
 	fmt.Println("::debug::Creating HTTP POST request...")

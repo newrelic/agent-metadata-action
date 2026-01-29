@@ -16,89 +16,54 @@ const (
 	RetryDelay = 2 * time.Second
 )
 
-// SignArtifacts signs all uploaded artifacts in batch
-// Retries failed signing operations up to MaxRetries times
-// Returns error if any artifact fails to sign after all retries
-func SignArtifacts(results []models.ArtifactUploadResult, ociRegistry, token, githubRepo, version string) error {
-	if len(results) == 0 {
-		fmt.Println("::debug::No artifacts to sign")
-		return nil
+// SignIndex signs the manifest index with the given digest and tag
+// Makes a single signing request to oci-signer for the index
+func SignIndex(registry, indexDigest, version, token, githubRepo string) error {
+	if indexDigest == "" {
+		return fmt.Errorf("index digest is required for signing")
 	}
 
-	fmt.Printf("::notice::Starting artifact signing for %d artifacts...\n", len(results))
+	fmt.Printf("::notice::Signing manifest index with tag '%s'...\n", version)
 
-	// Parse registry URL once
-	registry, repository, err := ParseRegistryURL(ociRegistry)
+	// Parse registry URL
+	registryHost, repository, err := ParseRegistryURL(registry)
 	if err != nil {
 		return fmt.Errorf("failed to parse registry URL: %w", err)
 	}
-	fmt.Printf("::debug::Parsed registry URL - Registry: %s, Repository: %s\n", registry, repository)
+	fmt.Printf("::debug::Parsed registry URL - Registry: %s, Repository: %s\n", registryHost, repository)
 
-	// Create signing client
+
 	client := NewClient(config.GetSigningURL(), token)
 
-	ctx := context.Background()
-	successCount := 0
-	failCount := 0
-
-	// Sign each artifact
-	for i, result := range results {
-		// Skip artifacts that failed to upload
-		if !result.Uploaded {
-			fmt.Printf("::warn::Skipping signing for %s - upload failed\n", result.Name)
-			continue
-		}
-
-		fmt.Printf("::group::Signing artifact %d/%d: %s\n", i+1, len(results), result.Name)
-
-		// Create signing request
-		signingReq := &models.SigningRequest{
-			Registry:   registry,
-			Repository: repository,
-			Tag:        result.Tag,
-			Digest:     result.Digest,
-		}
-
-		// Attempt signing with retries
-		var signErr error
-		for attempt := 1; attempt <= MaxRetries; attempt++ {
-			if attempt > 1 {
-				delay := time.Duration(attempt-1) * RetryDelay
-				fmt.Printf("::debug::Retry attempt %d/%d after %s delay...\n", attempt, MaxRetries, delay)
-				time.Sleep(delay)
-			}
-
-			signErr = client.SignArtifact(ctx, githubRepo, signingReq)
-			if signErr == nil {
-				// Success!
-				fmt.Printf("::notice::Successfully signed artifact %s (digest: %s)\n", result.Name, result.Digest)
-				results[i].Signed = true
-				successCount++
-				break
-			}
-
-			// Log retry info
-			if attempt < MaxRetries {
-				fmt.Printf("::warn::Signing attempt %d failed: %v - will retry\n", attempt, signErr)
-			}
-		}
-
-		// Check if all retries failed
-		if signErr != nil {
-			fmt.Printf("::error::Failed to sign artifact %s after %d attempts: %v\n", result.Name, MaxRetries, signErr)
-			results[i].Signed = false
-			results[i].SigningError = signErr.Error()
-			failCount++
-
-			fmt.Println("::endgroup::")
-			return fmt.Errorf("failed to sign artifact %s after %d attempts: %w", result.Name, MaxRetries, signErr)
-		}
-
-		fmt.Println("::endgroup::")
+	// Create signing request for index
+	signingReq := &models.SigningRequest{
+		Registry:   registryHost,
+		Repository: repository,
+		Tag:        version,     // Index tag (e.g., "v1.2.3")
+		Digest:     indexDigest, // Index digest
 	}
 
-	// Summary
-	fmt.Printf("::notice::Artifact signing complete: %d/%d signed successfully\n", successCount, successCount+failCount)
+	// Attempt signing with retries
+	ctx := context.Background()
+	var signErr error
+	for attempt := 1; attempt <= MaxRetries; attempt++ {
+		if attempt > 1 {
+			delay := time.Duration(attempt-1) * RetryDelay
+			fmt.Printf("::debug::Retry attempt %d/%d after %s delay...\n", attempt, MaxRetries, delay)
+			time.Sleep(delay)
+		}
 
-	return nil
+		signErr = client.SignArtifact(ctx, githubRepo, signingReq)
+		if signErr == nil {
+			fmt.Printf("::notice::Successfully signed manifest index (tag: %s, digest: %s)\n", version, indexDigest)
+			return nil
+		}
+
+		if attempt < MaxRetries {
+			fmt.Printf("::warn::Signing attempt %d failed: %v - will retry\n", attempt, signErr)
+		}
+	}
+
+	fmt.Printf("::error::Failed to sign manifest index after %d attempts: %v\n", MaxRetries, signErr)
+	return fmt.Errorf("failed to sign manifest index after %d attempts: %w", MaxRetries, signErr)
 }

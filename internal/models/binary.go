@@ -63,7 +63,7 @@ func (a *ArtifactDefinition) Validate() error {
 }
 
 func (a *ArtifactDefinition) GetMediaType() string {
-	return fmt.Sprintf("application/vnd.newrelic.agent.v1+%s", a.Format)
+	return fmt.Sprintf("application/vnd.newrelic.agent.content.v1.%s", a.Format)
 }
 
 func (a *ArtifactDefinition) GetArtifactType() string {
