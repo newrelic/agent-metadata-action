@@ -18,6 +18,7 @@ func TestValidateBinaryPath(t *testing.T) {
 	tests := []struct {
 		name        string
 		workspace   string
+		setupFunc   func(t *testing.T) string
 		binaryPath  string
 		expectError bool
 		errorMsg    string
@@ -42,6 +43,13 @@ func TestValidateBinaryPath(t *testing.T) {
 			errorMsg:    "directory traversal",
 		},
 		{
+			name:        "path with multiple directory traversal segments",
+			workspace:   tmpDir,
+			binaryPath:  "../../etc/passwd",
+			expectError: true,
+			errorMsg:    "directory traversal",
+		},
+		{
 			name:        "file not found",
 			workspace:   tmpDir,
 			binaryPath:  "nonexistent.tar.gz",
@@ -49,17 +57,28 @@ func TestValidateBinaryPath(t *testing.T) {
 			errorMsg:    "not found",
 		},
 		{
-			name:        "path outside workspace",
-			workspace:   tmpDir,
-			binaryPath:  "/tmp/outside.tar.gz",
-			expectError: true,
-			errorMsg:    "within workspace",
+			name:      "valid absolute path outside workspace",
+			workspace: tmpDir,
+			setupFunc: func(t *testing.T) string {
+				// Create test file in system temp (outside workspace)
+				outsideFile := filepath.Join(os.TempDir(), "outside-workspace.tar.gz")
+				err := os.WriteFile(outsideFile, []byte("test data"), 0644)
+				assert.NoError(t, err)
+				t.Cleanup(func() { os.Remove(outsideFile) })
+				return outsideFile
+			},
+			expectError: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateBinaryPath(tt.workspace, tt.binaryPath)
+			binaryPath := tt.binaryPath
+			if tt.setupFunc != nil {
+				binaryPath = tt.setupFunc(t)
+			}
+
+			err := ValidateBinaryPath(tt.workspace, binaryPath)
 			if tt.expectError {
 				assert.Error(t, err)
 				if tt.errorMsg != "" {
