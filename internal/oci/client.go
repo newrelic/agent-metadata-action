@@ -112,7 +112,6 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 	}
 
 	// Tag manifest in file store with a temporary tag so it can be referenced during copy
-	// This tag is only used locally and won't be pushed to the remote registry
 	tempTag := "temp-manifest"
 	if err = fs.Tag(ctx, manifestDesc, tempTag); err != nil {
 		return "", 0, fmt.Errorf("failed to tag manifest in file store: %w", err)
@@ -123,7 +122,7 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 
 	logging.Debugf(ctx, "Pushing artifact %s to registry by digest (digest: %s)", artifact.Name, manifestDesc.Digest.String())
 
-	// Copy manifest and blobs to remote registry by digest (no remote tag)
+	// Copy manifest and blobs to remote registry by digest
 	copyOpts := oras.CopyOptions{}
 	digestRef := manifestDesc.Digest.String()
 	if _, err = oras.Copy(pushCtx, fs, tempTag, c.repo, digestRef, copyOpts); err != nil {
