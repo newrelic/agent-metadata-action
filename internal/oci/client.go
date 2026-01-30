@@ -55,16 +55,16 @@ func NewClient(ctx context.Context, registry, username, password string) (*Clien
 	}, nil
 }
 
-func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, agentType, version string) (string, int64, string, error) {
+func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, version string) (string, int64, error) {
 	tempDir, err := os.MkdirTemp("", "oras-upload-*")
 	if err != nil {
-		return "", 0, "", fmt.Errorf("failed to create temp directory: %w", err)
+		return "", 0, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
 
 	fs, err := file.New(tempDir)
 	if err != nil {
-		return "", 0, "", fmt.Errorf("failed to create file store: %w", err)
+		return "", 0, fmt.Errorf("failed to create file store: %w", err)
 	}
 	defer fs.Close()
 
@@ -72,7 +72,7 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 
 	layerDesc, err := fs.Add(ctx, artifact.Name, artifact.GetMediaType(), artifactPath)
 	if err != nil {
-		return "", 0, "", fmt.Errorf("failed to add file to store: %w", err)
+		return "", 0, fmt.Errorf("failed to add file to store: %w", err)
 	}
 
 	layerDesc.Annotations = layerAnnotations
@@ -87,7 +87,7 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 	}
 
 	if err = fs.Push(ctx, emptyConfigDesc, bytes.NewReader(emptyConfig)); err != nil {
-		return "", 0, "", fmt.Errorf("failed to push empty config: %w", err)
+		return "", 0, fmt.Errorf("failed to push empty config: %w", err)
 	}
 
 	artifactType := artifact.GetArtifactType()
@@ -99,27 +99,23 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 
 	manifestDesc, err := oras.PackManifest(ctx, fs, oras.PackManifestVersion1_1, artifactType, packOpts)
 	if err != nil {
-		return "", 0, "", fmt.Errorf("failed to pack manifest: %w", err)
+		return "", 0, fmt.Errorf("failed to pack manifest: %w", err)
 	}
 
-	artifactTag := fmt.Sprintf("%s-%s-%s", version, artifact.OS, artifact.Arch)
-
-	// Tag in file store so we can reference it during copy
-	if err = fs.Tag(ctx, manifestDesc, artifactTag); err != nil {
-		return "", 0, "", fmt.Errorf("failed to tag manifest: %w", err)
-	}
-
-	copyCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	pushCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
+	logging.Debugf(ctx, "Pushing artifact %s to registry by digest (digest: %s)", artifact.Name, manifestDesc.Digest.String())
+
+	// Push manifest and blob directly to registry by digest (no tag)
 	copyOpts := oras.CopyOptions{}
-	logging.Debugf(ctx, "Copying artifact %s to registry with tag %s (digest: %s)", artifact.Name, artifactTag, manifestDesc.Digest.String())
-	if _, err = oras.Copy(copyCtx, fs, artifactTag, c.repo, artifactTag, copyOpts); err != nil {
-		return "", 0, "", fmt.Errorf("failed to copy artifact to registry: %w", err)
+	digestRef := manifestDesc.Digest.String()
+	if _, err = oras.Copy(pushCtx, fs, digestRef, c.repo, digestRef, copyOpts); err != nil {
+		return "", 0, fmt.Errorf("failed to push artifact to registry: %w", err)
 	}
 
-	logging.Debugf(ctx, "Successfully uploaded artifact with tag %s", artifactTag)
-	return manifestDesc.Digest.String(), manifestDesc.Size, artifactTag, nil
+	logging.Debugf(ctx, "Successfully uploaded artifact by digest: %s", manifestDesc.Digest.String())
+	return manifestDesc.Digest.String(), manifestDesc.Size, nil
 }
 
 func (c *Client) CreateManifestIndex(ctx context.Context, uploadResults []models.ArtifactUploadResult, version string) (string, error) {
@@ -141,14 +137,12 @@ func (c *Client) CreateManifestIndex(ctx context.Context, uploadResults []models
 			Architecture: result.Arch,
 		}
 
-		artifactType := fmt.Sprintf("application/vnd.newrelic.agent.v1+%s", result.Format)
-
 		manifest := ocispec.Descriptor{
 			MediaType:    ocispec.MediaTypeImageManifest,
 			Digest:       digest,
 			Size:         result.Size,
 			Platform:     platform,
-			ArtifactType: artifactType,
+			ArtifactType: "application/vnd.newrelic.agent.v1",
 		}
 
 		manifests = append(manifests, manifest)
