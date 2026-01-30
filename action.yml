@@ -62,6 +62,7 @@ runs:
       with:
         ref: ${{ steps.version.outputs.ref }} # When ref is empty (as in docs scenario), this will default to checking out the commit that triggered the action
         fetch-depth: ${{ inputs.fetch-depth }}
+        clean: false
     - name: Setup Go
       uses: actions/setup-go@v4
       with:
