@@ -79,20 +79,29 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 
 	manifestAnnotations := CreateManifestAnnotations()
 
-	emptyConfig := []byte("{}")
-	emptyConfigDesc := ocispec.Descriptor{
-		MediaType: "application/vnd.oci.empty.v1+json",
-		Digest:    digest.FromBytes(emptyConfig),
-		Size:      int64(len(emptyConfig)),
+	// Create config with platform information for multi-arch support
+	config := map[string]string{
+		"architecture": artifact.Arch,
+		"os":           artifact.OS,
+	}
+	configBytes, err := json.Marshal(config)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err = fs.Push(ctx, emptyConfigDesc, bytes.NewReader(emptyConfig)); err != nil {
-		return "", 0, fmt.Errorf("failed to push empty config: %w", err)
+	configDesc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageConfig,
+		Digest:    digest.FromBytes(configBytes),
+		Size:      int64(len(configBytes)),
+	}
+
+	if err = fs.Push(ctx, configDesc, bytes.NewReader(configBytes)); err != nil {
+		return "", 0, fmt.Errorf("failed to push config: %w", err)
 	}
 
 	artifactType := artifact.GetArtifactType()
 	packOpts := oras.PackManifestOptions{
-		ConfigDescriptor:    &emptyConfigDesc,
+		ConfigDescriptor:    &configDesc,
 		Layers:              []ocispec.Descriptor{layerDesc},
 		ManifestAnnotations: manifestAnnotations,
 	}
