@@ -29,17 +29,6 @@ func ValidateBinaryPath(workspacePath, binaryPath string) error {
 		return fmt.Errorf("failed to resolve binary path: %w", err)
 	}
 
-	// Ensure path is within workspace
-	resolvedWorkspace, err := filepath.Abs(workspacePath)
-	if err != nil {
-		return fmt.Errorf("failed to resolve workspace path: %w", err)
-	}
-
-	relPath, err := filepath.Rel(resolvedWorkspace, resolvedPath)
-	if err != nil || strings.HasPrefix(relPath, "..") {
-		return fmt.Errorf("binary path must be within workspace directory")
-	}
-
 	// Check file exists and is readable
 	info, err := os.Stat(resolvedPath)
 	if err != nil {
