@@ -90,7 +90,7 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 	}
 
 	configDesc := ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageConfig,
+		MediaType: "application/vnd.newrelic.agent.config.v1+json",
 		Digest:    digest.FromBytes(configBytes),
 		Size:      int64(len(configBytes)),
 	}
@@ -111,15 +111,22 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 		return "", 0, fmt.Errorf("failed to pack manifest: %w", err)
 	}
 
+	// Tag manifest in file store with a temporary tag so it can be referenced during copy
+	// This tag is only used locally and won't be pushed to the remote registry
+	tempTag := "temp-manifest"
+	if err = fs.Tag(ctx, manifestDesc, tempTag); err != nil {
+		return "", 0, fmt.Errorf("failed to tag manifest in file store: %w", err)
+	}
+
 	pushCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	logging.Debugf(ctx, "Pushing artifact %s to registry by digest (digest: %s)", artifact.Name, manifestDesc.Digest.String())
 
-	// Push manifest and blob directly to registry by digest (no tag)
+	// Copy manifest and blobs to remote registry by digest (no remote tag)
 	copyOpts := oras.CopyOptions{}
 	digestRef := manifestDesc.Digest.String()
-	if _, err = oras.Copy(pushCtx, fs, digestRef, c.repo, digestRef, copyOpts); err != nil {
+	if _, err = oras.Copy(pushCtx, fs, tempTag, c.repo, digestRef, copyOpts); err != nil {
 		return "", 0, fmt.Errorf("failed to push artifact to registry: %w", err)
 	}
 
