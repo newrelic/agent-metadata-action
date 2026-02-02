@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSignArtifacts_Success_SingleArtifact(t *testing.T) {
+func TestSignIndex_Success(t *testing.T) {
 	// Set up test environment
 	setupTestEnv(t)
 
@@ -33,7 +33,7 @@ func TestSignArtifacts_Success_SingleArtifact(t *testing.T) {
 		json.Unmarshal(body, &request)
 		assert.Equal(t, "docker.io", request.Registry)
 		assert.Equal(t, "newrelic/agents", request.Repository)
-		assert.Equal(t, "v1.2.3-linux-amd64", request.Tag)
+		assert.Equal(t, "1.2.3", request.Tag)
 		assert.Equal(t, "sha256:abc123", request.Digest)
 
 		// Send success response
@@ -46,48 +46,34 @@ func TestSignArtifacts_Success_SingleArtifact(t *testing.T) {
 	os.Setenv("SIGNING_SERVICE_URL", server.URL)
 	defer os.Unsetenv("SIGNING_SERVICE_URL")
 
-	results := []models.ArtifactUploadResult{
-		{
-			Name:     "linux-tar",
-			Path:     "./dist/agent.tar.gz",
-			OS:       "linux",
-			Arch:     "amd64",
-			Format:   "tar+gzip",
-			Digest:   "sha256:abc123",
-			Size:     1024,
-			Tag:      "v1.2.3-linux-amd64",
-			Uploaded: true,
-		},
-	}
-
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := SignArtifacts(context.Background(), results, "docker.io/newrelic/agents", "test-token", "test-agent", "v1.2.3")
+	err := SignIndex(context.Background(), "docker.io/newrelic/agents", "sha256:abc123", "1.2.3", "test-token", "test-agent")
 
 	outputStr := getStdout()
 
 	require.NoError(t, err)
-	assert.Contains(t, outputStr, "Starting artifact signing for 1 artifacts")
-	assert.Contains(t, outputStr, "Successfully signed artifact linux-tar")
-	assert.Contains(t, outputStr, "Artifact signing complete: 1/1 signed successfully")
-
-	// Verify result was updated
-	assert.True(t, results[0].Signed)
-	assert.Empty(t, results[0].SigningError)
+	assert.Contains(t, outputStr, "Starting manifest index signing")
+	assert.Contains(t, outputStr, "Successfully signed manifest index")
 }
 
-func TestSignArtifacts_SkipsFailedUploads(t *testing.T) {
+func TestSignIndex_RetryOnFailure(t *testing.T) {
 	// Set up test environment
 	setupTestEnv(t)
 
-	requestCount := 0
+	attemptCount := 0
 
-	// Create mock signing service
+	// Create mock signing service that fails first 2 attempts, succeeds on 3rd
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"success": true}`))
+		attemptCount++
+		if attemptCount < 3 {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"error": "temporary failure"}`))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"success": true}`))
+		}
 	}))
 	defer server.Close()
 
@@ -95,41 +81,52 @@ func TestSignArtifacts_SkipsFailedUploads(t *testing.T) {
 	os.Setenv("SIGNING_SERVICE_URL", server.URL)
 	defer os.Unsetenv("SIGNING_SERVICE_URL")
 
-	results := []models.ArtifactUploadResult{
-		{
-			Name:     "linux-tar",
-			Digest:   "sha256:abc123",
-			Tag:      "v1.2.3-linux-amd64",
-			Uploaded: true,
-		},
-		{
-			Name:     "windows-zip",
-			Digest:   "",
-			Tag:      "",
-			Uploaded: false, // This one failed to upload
-			Error:    "upload failed",
-		},
-	}
-
 	getStdout, _ := testutil.CaptureOutput(t)
 
 	// method under test
-	err := SignArtifacts(context.Background(), results, "docker.io/newrelic/agents", "test-token", "test-agent", "v1.2.3")
+	err := SignIndex(context.Background(), "docker.io/newrelic/agents", "sha256:abc123", "1.2.3", "test-token", "test-agent")
 
 	outputStr := getStdout()
 
 	require.NoError(t, err)
-	assert.Equal(t, 1, requestCount, "Should have made 1 signing request (skipped failed upload)")
-	assert.Contains(t, outputStr, "Skipping signing for windows-zip - upload failed")
-	assert.Contains(t, outputStr, "Successfully signed artifact linux-tar")
-
-	// Verify signing status
-	assert.True(t, results[0].Signed)
-	assert.False(t, results[1].Signed) // Skipped, not signed
+	assert.Equal(t, 3, attemptCount, "Should have made 3 attempts (2 failures + 1 success)")
+	assert.Contains(t, outputStr, "Signing attempt 1 failed")
+	assert.Contains(t, outputStr, "Signing attempt 2 failed")
+	assert.Contains(t, outputStr, "Successfully signed manifest index")
 }
 
+func TestSignIndex_FailsAfterMaxRetries(t *testing.T) {
+	// Set up test environment
+	setupTestEnv(t)
 
-func TestSignArtifacts_RegistryURLParsing(t *testing.T) {
+	attemptCount := 0
+
+	// Create mock signing service that always fails
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptCount++
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error": "persistent failure"}`))
+	}))
+	defer server.Close()
+
+	// Override signing URL for testing
+	os.Setenv("SIGNING_SERVICE_URL", server.URL)
+	defer os.Unsetenv("SIGNING_SERVICE_URL")
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// method under test
+	err := SignIndex(context.Background(), "docker.io/newrelic/agents", "sha256:abc123", "1.2.3", "test-token", "test-agent")
+
+	outputStr := getStdout()
+
+	require.Error(t, err)
+	assert.Equal(t, MaxRetries, attemptCount, "Should have made MaxRetries attempts")
+	assert.Contains(t, err.Error(), "failed to sign manifest index after 3 attempts")
+	assert.Contains(t, outputStr, "Failed to sign manifest index after 3 attempts")
+}
+
+func TestSignIndex_RegistryURLParsing(t *testing.T) {
 	// Set up test environment
 	setupTestEnv(t)
 
@@ -180,11 +177,7 @@ func TestSignArtifacts_RegistryURLParsing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.expectError {
 				// Only test error cases for URL parsing
-				results := []models.ArtifactUploadResult{
-					{Name: "test", Digest: "sha256:abc123", Uploaded: true},
-				}
-
-				err := SignArtifacts(context.Background(), results, tt.registryURL, "test-token", "newrelic/test-agent", "v1.2.3")
+				err := SignIndex(context.Background(), tt.registryURL, "sha256:abc123", "1.2.3", "test-token", "test-agent")
 
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
