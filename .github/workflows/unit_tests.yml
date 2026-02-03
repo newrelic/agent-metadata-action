@@ -1,4 +1,4 @@
-name: Go Unit Tests
+name: Go Tests
 
 permissions:
   contents: read
@@ -9,7 +9,7 @@ on:
       - '**'
 
 jobs:
-  test:
+  tests:
     name: Run Go Unit Tests
     runs-on: ubuntu-latest
 
@@ -33,7 +33,7 @@ jobs:
       run: go mod download
 
     - name: Run tests
-      run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+      run: go test -v -race -tags=e2e -timeout=10m -coverprofile=coverage.out -covermode=atomic ./...
 
     - name: Display coverage
       run: go tool cover -func=coverage.out
