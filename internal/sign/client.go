@@ -13,6 +13,7 @@ import (
 
 	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
+	"agent-metadata-action/internal/retry"
 )
 
 type Client struct {
@@ -47,17 +48,17 @@ func (c *Client) SignArtifact(ctx context.Context, clientId string, request *mod
 	logging.Debug(ctx, "Validating inputs...")
 	if clientId == "" {
 		logging.Error(ctx, "Signing client ID is required but was empty")
-		return fmt.Errorf("signing client ID is required")
+		return retry.NewNonRetryableError(fmt.Errorf("signing client ID is required"))
 	}
 	if request == nil {
 		logging.Error(ctx, "Signing request is required but was nil")
-		return fmt.Errorf("signing request is required")
+		return retry.NewNonRetryableError(fmt.Errorf("signing request is required"))
 	}
 
 	// Validate request fields
 	if err := request.Validate(); err != nil {
 		logging.Errorf(ctx, "Invalid signing request: %v", err)
-		return fmt.Errorf("invalid signing request: %w", err)
+		return retry.NewNonRetryableError(fmt.Errorf("invalid signing request: %w", err))
 	}
 
 	logging.Debugf(ctx, "Signing client ID: %s", clientId)
@@ -76,7 +77,7 @@ func (c *Client) SignArtifact(ctx context.Context, clientId string, request *mod
 	jsonBody, err := json.Marshal(request)
 	if err != nil {
 		logging.Errorf(ctx, "Failed to marshal request: %v", err)
-		return fmt.Errorf("failed to marshal request: %w", err)
+		return retry.NewNonRetryableError(fmt.Errorf("failed to marshal request: %w", err))
 	}
 	logging.Debugf(ctx, "JSON payload size: %d bytes", len(jsonBody))
 
@@ -85,7 +86,7 @@ func (c *Client) SignArtifact(ctx context.Context, clientId string, request *mod
 	req, err := http.NewRequestWithContext(ctx, "POST", requestURL, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		logging.Errorf(ctx, "Failed to create request: %v", err)
-		return fmt.Errorf("failed to create request: %w", err)
+		return retry.NewNonRetryableError(fmt.Errorf("failed to create request: %w", err))
 	}
 
 	// Set headers
@@ -129,7 +130,16 @@ func (c *Client) SignArtifact(ctx context.Context, clientId string, request *mod
 		}
 		logging.Debugf(ctx, "Error response body: %s", responsePreview)
 
-		return fmt.Errorf("artifact signing failed with status %d: %s", resp.StatusCode, string(body))
+		err := fmt.Errorf("artifact signing failed with status %d: %s", resp.StatusCode, string(body))
+
+		// Determine if error is retryable
+		// Retry on: 5xx (server errors), 408 (timeout), 429 (rate limit)
+		// Don't retry: 4xx (client errors, except 408 and 429)
+		isRetryable := resp.StatusCode >= 500 || resp.StatusCode == 408 || resp.StatusCode == 429
+		if !isRetryable {
+			return retry.NewNonRetryableError(err)
+		}
+		return err
 	}
 
 	// Success logging

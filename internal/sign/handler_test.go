@@ -121,9 +121,9 @@ func TestSignIndex_FailsAfterMaxRetries(t *testing.T) {
 	outputStr := getStdout()
 
 	require.Error(t, err)
-	assert.Equal(t, MaxRetries, attemptCount, "Should have made MaxRetries attempts")
-	assert.Contains(t, err.Error(), "failed to sign manifest index after 3 attempts")
-	assert.Contains(t, outputStr, "Failed to sign manifest index after 3 attempts")
+	assert.Equal(t, 3, attemptCount, "Should have made 3 attempts")
+	assert.Contains(t, err.Error(), "failed Signing after 3 attempts")
+	assert.Contains(t, outputStr, "Failed to sign manifest index")
 }
 
 func TestSignIndex_RegistryURLParsing(t *testing.T) {

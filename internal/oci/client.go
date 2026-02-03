@@ -3,6 +3,7 @@ package oci
 import (
 	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
+	"agent-metadata-action/internal/retry"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -58,13 +59,13 @@ func NewClient(ctx context.Context, registry, username, password string) (*Clien
 func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDefinition, artifactPath, version string) (string, int64, error) {
 	tempDir, err := os.MkdirTemp("", "oras-upload-*")
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to create temp directory: %w", err)
+		return "", 0, retry.NewNonRetryableError(fmt.Errorf("failed to create temp directory: %w", err))
 	}
 	defer os.RemoveAll(tempDir)
 
 	fs, err := file.New(tempDir)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to create file store: %w", err)
+		return "", 0, retry.NewNonRetryableError(fmt.Errorf("failed to create file store: %w", err))
 	}
 	defer fs.Close()
 
@@ -72,7 +73,7 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 
 	layerDesc, err := fs.Add(ctx, artifact.Name, artifact.GetMediaType(), artifactPath)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to add file to store: %w", err)
+		return "", 0, retry.NewNonRetryableError(fmt.Errorf("failed to add file to store: %w", err))
 	}
 
 	layerDesc.Annotations = layerAnnotations
@@ -86,7 +87,7 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 	}
 	configBytes, err := json.Marshal(config)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to marshal config: %w", err)
+		return "", 0, retry.NewNonRetryableError(fmt.Errorf("failed to marshal config: %w", err))
 	}
 
 	configDesc := ocispec.Descriptor{
@@ -96,7 +97,7 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 	}
 
 	if err = fs.Push(ctx, configDesc, bytes.NewReader(configBytes)); err != nil {
-		return "", 0, fmt.Errorf("failed to push config: %w", err)
+		return "", 0, retry.NewNonRetryableError(fmt.Errorf("failed to push config: %w", err))
 	}
 
 	artifactType := artifact.GetArtifactType()
@@ -108,25 +109,40 @@ func (c *Client) UploadArtifact(ctx context.Context, artifact *models.ArtifactDe
 
 	manifestDesc, err := oras.PackManifest(ctx, fs, oras.PackManifestVersion1_1, artifactType, packOpts)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to pack manifest: %w", err)
+		return "", 0, retry.NewNonRetryableError(fmt.Errorf("failed to pack manifest: %w", err))
 	}
 
 	// Tag manifest in file store with a temporary tag so it can be referenced during copy
 	tempTag := "temp-manifest"
 	if err = fs.Tag(ctx, manifestDesc, tempTag); err != nil {
-		return "", 0, fmt.Errorf("failed to tag manifest in file store: %w", err)
+		return "", 0, retry.NewNonRetryableError(fmt.Errorf("failed to tag manifest in file store: %w", err))
 	}
 
-	pushCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-
 	logging.Debugf(ctx, "Pushing artifact %s to registry by digest (digest: %s)", artifact.Name, manifestDesc.Digest.String())
+
+	// Copy manifest and blobs to remote registry by digest with retry logic
+	retryConfig := retry.Config{
+		MaxAttempts: 3,
+		BaseDelay:   2 * time.Second,
+		Operation:   "OCI artifact upload",
+	}
 
 	// Copy manifest and blobs to remote registry by digest
 	copyOpts := oras.CopyOptions{}
 	digestRef := manifestDesc.Digest.String()
-	if _, err = oras.Copy(pushCtx, fs, tempTag, c.repo, digestRef, copyOpts); err != nil {
-		return "", 0, fmt.Errorf("failed to push artifact to registry: %w", err)
+
+	err = retry.Do(ctx, retryConfig, func() error {
+		pushCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+
+		if _, err := oras.Copy(pushCtx, fs, tempTag, c.repo, digestRef, copyOpts); err != nil {
+			return fmt.Errorf("failed to push artifact to registry: %w", err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return "", 0, err
 	}
 
 	logging.Debugf(ctx, "Successfully uploaded artifact by digest: %s", manifestDesc.Digest.String())

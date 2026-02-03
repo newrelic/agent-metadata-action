@@ -11,6 +11,7 @@ import (
 
 	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
+	"agent-metadata-action/internal/retry"
 )
 
 // InstrumentationClient handles instrumentation metadata operations
@@ -69,91 +70,112 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 			"agent.version":   agentVersion,
 		})
 		logging.Errorf(ctx, "Failed to marshal metadata: %v", err)
-		return fmt.Errorf("failed to marshal metadata: %w", err)
+		return retry.NewNonRetryableError(fmt.Errorf("failed to marshal metadata: %w", err))
 	}
 	logging.Debugf(ctx, "JSON payload size: %d bytes", len(jsonBody))
 	logging.Debugf(ctx, "Configuration definitions count: %d", len(metadata.ConfigurationDefinitions))
 	logging.Debugf(ctx, "Agent control entries: %d", len(metadata.AgentControlDefinitions))
 
-	// Create HTTP request
-	logging.Debug(ctx, "Creating HTTP POST request...")
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
-	if err != nil {
-		logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
-			"error.operation": "create_http_request",
-			"http.url":        url,
-			"agent.type":      agentType,
-			"agent.version":   agentVersion,
-		})
-		logging.Errorf(ctx, "Failed to create request: %v", err)
-		return fmt.Errorf("failed to create request: %w", err)
+	// Execute request with retry logic
+	retryConfig := retry.Config{
+		MaxAttempts: 3,
+		BaseDelay:   2 * time.Second,
+		Operation:   "Metadata submission",
 	}
 
-	// Set headers
-	logging.Debug(ctx, "Setting request headers...")
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
-	// SECURITY: Token is in header but not logged
-
-	// Execute request
-	logging.Debug(ctx, "Sending HTTP request...")
-	startTime := time.Now()
-	resp, err := c.httpClient.Do(req)
-	duration := time.Since(startTime)
-
-	if err != nil {
-		logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
-			"error.operation": "execute_http_request",
-			"http.url":        url,
-			"http.duration":   duration.String(),
-			"agent.type":      agentType,
-			"agent.version":   agentVersion,
-		})
-		logging.Errorf(ctx, "HTTP request failed after %s: %v", duration, err)
-		return fmt.Errorf("failed to send metadata: %w", err)
-	}
-	defer resp.Body.Close()
-
-	logging.Debugf(ctx, "Response received in %s", duration)
-	logging.Debugf(ctx, "HTTP status code: %d %s", resp.StatusCode, resp.Status)
-
-	// Read response body for error details (with size limit)
-	logging.Debug(ctx, "Reading response body...")
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		logging.Errorf(ctx, "Failed to read response body: %v", err)
-		return fmt.Errorf("failed to read response: %w", err)
-	}
-	logging.Debugf(ctx, "Response body size: %d bytes", len(body))
-
-	// Check for non-2xx status codes
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// Log response body for debugging, but truncate if too large
-		responsePreview := string(body)
-		if len(responsePreview) > 500 {
-			responsePreview = responsePreview[:500] + "... (truncated)"
+	err = retry.Do(ctx, retryConfig, func() error {
+		// Create HTTP request (must be recreated for each retry)
+		logging.Debug(ctx, "Creating HTTP POST request...")
+		req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+		if err != nil {
+			logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
+				"error.operation": "create_http_request",
+				"http.url":        url,
+				"agent.type":      agentType,
+				"agent.version":   agentVersion,
+			})
+			logging.Errorf(ctx, "Failed to create request: %v", err)
+			return retry.NewNonRetryableError(fmt.Errorf("failed to create request: %w", err))
 		}
 
-		err := fmt.Errorf("metadata submission failed with status %d: %s", resp.StatusCode, string(body))
-		logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
-			"error.operation":    "http_non_2xx_response",
-			"http.status_code":   resp.StatusCode,
-			"http.url":           url,
-			"http.response_body": responsePreview,
-			"agent.type":         agentType,
-			"agent.version":      agentVersion,
-		})
-		logging.Errorf(ctx, "Metadata submission failed with status %d", resp.StatusCode)
-		logging.Debugf(ctx, "Error response body: %s", responsePreview)
+		// Set headers
+		logging.Debug(ctx, "Setting request headers...")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
 
+		// Execute request
+		logging.Debug(ctx, "Sending HTTP request...")
+		startTime := time.Now()
+		resp, err := c.httpClient.Do(req)
+		duration := time.Since(startTime)
+
+		if err != nil {
+			logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
+				"error.operation": "execute_http_request",
+				"http.url":        url,
+				"http.duration":   duration.String(),
+				"agent.type":      agentType,
+				"agent.version":   agentVersion,
+			})
+			logging.Errorf(ctx, "HTTP request failed after %s: %v", duration, err)
+			return fmt.Errorf("failed to send metadata: %w", err)
+		}
+		defer resp.Body.Close()
+
+		logging.Debugf(ctx, "Response received in %s", duration)
+		logging.Debugf(ctx, "HTTP status code: %d %s", resp.StatusCode, resp.Status)
+
+		// Read response body for error details (with size limit)
+		logging.Debug(ctx, "Reading response body...")
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			logging.Errorf(ctx, "Failed to read response body: %v", err)
+			return fmt.Errorf("failed to read response: %w", err)
+		}
+		logging.Debugf(ctx, "Response body size: %d bytes", len(body))
+
+		// Check for non-2xx status codes
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			// Log response body for debugging, but truncate if too large
+			responsePreview := string(body)
+			if len(responsePreview) > 500 {
+				responsePreview = responsePreview[:500] + "... (truncated)"
+			}
+
+			err := fmt.Errorf("metadata submission failed with status %d: %s", resp.StatusCode, string(body))
+			logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
+				"error.operation":    "http_non_2xx_response",
+				"http.status_code":   resp.StatusCode,
+				"http.url":           url,
+				"http.response_body": responsePreview,
+				"agent.type":         agentType,
+				"agent.version":      agentVersion,
+			})
+			logging.Errorf(ctx, "Metadata submission failed with status %d", resp.StatusCode)
+			logging.Debugf(ctx, "Error response body: %s", responsePreview)
+
+			// Determine if error is retryable
+			// Retry on: 5xx (server errors), 408 (timeout), 429 (rate limit)
+			// Don't retry: 4xx (client errors, except 408 and 429)
+			isRetryable := resp.StatusCode >= 500 || resp.StatusCode == 408 || resp.StatusCode == 429
+			if !isRetryable {
+				return retry.NewNonRetryableError(err)
+			}
+			return err
+		}
+
+		// Success logging
+		if len(body) > 0 {
+			logging.Debugf(ctx, "Success response: %s", string(body))
+		}
+
+		return nil
+	})
+
+	if err != nil {
 		return err
 	}
 
-	// Success logging
 	logging.Notice(ctx, "Metadata successfully submitted to instrumentation service")
-	if len(body) > 0 {
-		logging.Debugf(ctx, "Success response: %s", string(body))
-	}
-
 	return nil
 }

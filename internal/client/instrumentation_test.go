@@ -312,7 +312,7 @@ func TestSendMetadata_ContextCancellation(t *testing.T) {
 	_ = getStdout()
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to send metadata")
+	assert.Contains(t, err.Error(), "retry cancelled")
 }
 
 func TestSendMetadata_SuccessWithResponseBody(t *testing.T) {
