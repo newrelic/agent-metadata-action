@@ -26,6 +26,7 @@ const (
 	//EBPF   Subject = "" @todo update once eBPF is publishing release notes
 )
 
+// SubjectToAgentTypeMapping list based on these: https://source.datanerd.us/fleet-management/fleet-deployment-api/blob/master/src/main/java/com/newrelic/fleetdeploymentapi/constant/AgentConstants.java
 var SubjectToAgentTypeMapping = map[Subject]string{
 	DotNet:   "NRDotNetAgent",
 	Infra:    "NRInfra", // maps to the same agent type for k8s & host

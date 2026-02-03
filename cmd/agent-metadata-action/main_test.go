@@ -813,9 +813,9 @@ func TestRunAgentFlow_SigningError_ServiceFailure(t *testing.T) {
 
 	outputStr := getStdout()
 
-	// Verify retries occurred (MaxRetries = 3 from sign package)
+	// Verify retries occurred (3 attempts from retry package)
 	assert.Equal(t, 3, requestCount, "Should have made 3 signing requests (retries)")
 	assert.Contains(t, outputStr, "Signing attempt 1 failed")
 	assert.Contains(t, outputStr, "Signing attempt 2 failed")
-	assert.Contains(t, outputStr, "Failed to sign manifest index after 3 attempts")
+	assert.Contains(t, outputStr, "Failed to sign manifest index")
 }

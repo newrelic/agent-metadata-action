@@ -223,6 +223,7 @@ jobs:
           fi
 
   test-docs-flow:
+    needs: setup-test-tag
     name: Test Documentation Flow (MDX Parsing)
     runs-on: ubuntu-latest
     steps:
