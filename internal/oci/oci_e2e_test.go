@@ -6,6 +6,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -234,9 +235,9 @@ func verifyArtifactManifest(t *testing.T, registryURL string, manifestDesc ocisp
 		t.Errorf("Expected architecture '%s', got '%s'", expectedArtifact.Arch, manifestDesc.Platform.Architecture)
 	}
 
-	expectedMediaType := expectedArtifact.GetMediaType()
-	if manifestDesc.ArtifactType != expectedMediaType {
-		t.Errorf("Expected artifact type '%s', got '%s'", expectedMediaType, manifestDesc.ArtifactType)
+	expectedArtifactType := "application/vnd.newrelic.agent.v1"
+	if manifestDesc.ArtifactType != expectedArtifactType {
+		t.Errorf("Expected artifact type '%s', got '%s'", expectedArtifactType, manifestDesc.ArtifactType)
 	}
 
 	if !strings.HasPrefix(string(manifestDesc.Digest), "sha256:") {
@@ -331,6 +332,7 @@ func verifyArtifactManifest(t *testing.T, registryURL string, manifestDesc ocisp
 	}
 
 	// Verify layer media type
+	expectedMediaType := fmt.Sprintf("application/vnd.newrelic.agent.content.v1.%s", expectedArtifact.Format)
 	if layer.MediaType != expectedMediaType {
 		t.Errorf("Expected layer media type '%s', got '%s'", expectedMediaType, layer.MediaType)
 	}
@@ -432,7 +434,7 @@ func TestOCIArtifactUpload(t *testing.T) {
 			}
 
 			// Call the main function under test
-			err := HandleUploads(config, workspace, "test-agent", tt.version)
+			_, err := HandleUploads(context.Background(), config, workspace, tt.version)
 
 			if tt.expectError {
 				if err == nil {
