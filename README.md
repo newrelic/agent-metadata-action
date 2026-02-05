@@ -3,7 +3,7 @@
 # Agent Metadata Action
 
 A GitHub Action that reads agent configuration metadata from the calling repository. There are 2 scearios to use this action:
-1. An agent release - This action parses the `.fleetControl/configurationDefinitions.yml` file and makes the configuration data and metadata available in New Relic.
+1. An agent release - This action parses the `.fleetControl/configurationDefinitions.yml` file and makes the configuration data, metadata, and binaries available in New Relic.
 2. A docs update for an agent release - This action parses the frontmatter of the docs mdx files and makes the metadata available in New Relic.
 
 ## Installation
@@ -27,7 +27,7 @@ This action requires OAuth credentials to authenticate with New Relic services. 
 These must be passed as action inputs using the `with:` parameter in your workflow.
 
 ### Example Workflow For Releasing a New Agent Version
-This action automatically checks out your repository at the specified version tag, then reads the `.fleetControl/configurationDefinitions.yml` file and other associated files in `/fleetControl` and saves the agent information in New Relic. 
+This action automatically checks out your repository at the specified version tag, then reads the `.fleetControl/configurationDefinitions.yml` file and other associated files in `.fleetControl` and saves the agent information in New Relic. 
 
 ```yaml
 name: Process Agent Metadata
@@ -89,7 +89,7 @@ with the following structures:
 
 ```yaml
 configurationDefinitions:
-  - platform: KUBERNETESCLUSTER  # or "HOST" or "ALL" if there is no distinction
+  - platform: KUBERNETESCLUSTER  # or "HOST" 
     description: Description of the configuration
     type: agent-config
     version: 1.0.0 -- config schema version
@@ -99,7 +99,7 @@ configurationDefinitions:
 
 ```yaml
 agentControlDefinitions:
-  - platform: KUBERNETES  # "ALL" is not an option
+  - platform: KUBERNETES
     supportFromAgent: 1.0.0
     supportFromAgentControl: 1.0.0
     content: ./agentControl/agent-schema-for-agent-control.yml
