@@ -26,7 +26,7 @@ func NewInstrumentationClient(baseURL, token string) *InstrumentationClient {
 	return &InstrumentationClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 1 * time.Minute,
 		},
 		token: token,
 	}
