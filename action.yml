@@ -12,7 +12,7 @@ inputs:
     required: false
     default: ''
   version:
-    description: 'Agent version in semver format (ex. 1.2.3 or v1.2.3). The action will prepend "v" if not present for tag checkout.'
+    description: 'Agent version tag name (ex. v1.2.3). Must match the exact git tag name for checkout.'
     required: false
     default: ''
   fetch-depth:
@@ -46,16 +46,11 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Normalize version tag for checkout
+    - name: Set version ref for checkout
       id: version
       shell: bash
       run: |
-        VERSION="${{ inputs.version }}"
-        if [[ -n "$VERSION" && ! "$VERSION" =~ ^v ]]; then
-          echo "ref=v${VERSION}" >> $GITHUB_OUTPUT
-        else
-          echo "ref=${VERSION}" >> $GITHUB_OUTPUT
-        fi
+        echo "ref=${{ inputs.version }}" >> $GITHUB_OUTPUT
 
     - name: Checkout repository
       uses: actions/checkout@v4

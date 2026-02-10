@@ -46,7 +46,7 @@ jobs:
           newrelic-client-id: ${{ secrets.OAUTH_CLIENT_ID }}
           newrelic-private-key: ${{ secrets.OAUTH_CLIENT_SECRET }}
           agent-type: NRDotNetAgent # Required for agent release workflow: The type of agent (e.g., NRJavaAgent, NRNodeAgent)
-          version: 1.0.0 # Required for agent release workflow: will be used to check out appropriate release tag
+          version: v1.0.0 # Required for agent release workflow: must match exact git tag name for checkout
           cache: true  # Optional: Enable Go build cache (default: true)
           oci-registry: docker.io/newrelic/agents  # Optional: OCI registry URL for binary uploads
           oci-username: ${{ github.actor }}  # Optional: OCI registry username

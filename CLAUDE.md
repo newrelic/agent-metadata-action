@@ -92,9 +92,6 @@ go test -v -run TestLoadEnv_Success ./internal/config
 # Local development (requires GITHUB_WORKSPACE to be set)
 export GITHUB_WORKSPACE=/path/to/repo
 ./agent-metadata-action
-
-# Or use run_local.sh for testing
-./run_local.sh
 ```
 
 ## Architecture
@@ -371,7 +368,7 @@ export GITHUB_WORKSPACE=/path/to/repo
 - `newrelic-client-id` (required): NewRelic client ID for authentication
 - `newrelic-private-key` (required): NewRelic private key content (base64-encoded)
 - `agent-type` (optional): Agent type (e.g., "NRDotNetAgent")
-- `version` (optional): Agent version in semver format (e.g., "1.2.3" or "v1.2.3")
+- `version` (optional): Agent version tag name (e.g., "v1.2.3"). Must match the exact git tag name for checkout.
 - `fetch-depth` (optional, default: 1): Number of commits to fetch (>1 may be needed for docs flow)
 - `cache` (optional, default: true): Enable Go build caching
 - `oci-registry` (optional): OCI registry URL for binary uploads (e.g., "ghcr.io/newrelic/agents"). Leave empty to skip binary upload.
@@ -381,11 +378,11 @@ export GITHUB_WORKSPACE=/path/to/repo
 
 **Steps:**
 
-1. **Normalize version tag**: Prepends "v" to version if not present for tag checkout
-   - Output: `ref` variable with normalized version tag
+1. **Set version ref**: Sets the version tag for checkout
+   - Output: `ref` variable with the exact version tag provided
 
 2. **Checkout repository**: Uses `actions/checkout@v4`
-   - For agent flow: Checks out the normalized version tag (e.g., "v1.2.3")
+   - For agent flow: Checks out the exact version tag as provided (e.g., "v1.2.3")
    - For docs flow: Checks out the PR commit (when `ref` is empty)
    - Uses `fetch-depth` input for controlling commit history depth
    - Sets `GITHUB_WORKSPACE` environment variable automatically
@@ -426,7 +423,7 @@ export GITHUB_WORKSPACE=/path/to/repo
 
 **Key behaviors:**
 - The action automatically handles repository checkout, so users don't need a separate `actions/checkout` step
-- Version normalization ensures consistent tag format (with "v" prefix)
+- Version tag must match the exact git tag name (no automatic normalization)
 - Authentication is handled automatically and securely (credentials masked in logs)
 - Both agent and docs flows are supported based on whether inputs are provided
 - OCI binary uploads are optional and only occur in agent flow when `oci-registry` is configured
