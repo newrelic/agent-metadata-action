@@ -1,4 +1,4 @@
-validateConfigDirectorypackage main
+package main
 
 import (
 	"context"
