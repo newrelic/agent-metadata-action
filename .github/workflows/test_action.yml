@@ -42,6 +42,12 @@ jobs:
     name: Test Agent Repository Flow (Basic)
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          disable-sudo: true
+          egress-policy: audit
+
       - name: Checkout action repository
         uses: actions/checkout@v4
         with:
@@ -67,9 +73,11 @@ jobs:
 
       - name: Setup mock newrelic-auth-cli
         run: |
-          # Make our mock CLI executable and install to standard location
+          # Make our mock CLI executable and install to user-writable location
           chmod +x .github/mock-newrelic-auth-cli
-          sudo cp .github/mock-newrelic-auth-cli /usr/local/bin/newrelic-auth-cli
+          mkdir -p "$HOME/.local/bin"
+          cp .github/mock-newrelic-auth-cli "$HOME/.local/bin/newrelic-auth-cli"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
           # Verify it's accessible
           which newrelic-auth-cli
@@ -111,6 +119,12 @@ jobs:
         ports:
           - 5000:5000
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          disable-sudo: true
+          egress-policy: audit
+
       - name: Checkout action repository
         uses: actions/checkout@v4
         with:
@@ -136,9 +150,11 @@ jobs:
 
       - name: Setup mock newrelic-auth-cli
         run: |
-          # Make our mock CLI executable and install to standard location
+          # Make our mock CLI executable and install to user-writable location
           chmod +x .github/mock-newrelic-auth-cli
-          sudo cp .github/mock-newrelic-auth-cli /usr/local/bin/newrelic-auth-cli
+          mkdir -p "$HOME/.local/bin"
+          cp .github/mock-newrelic-auth-cli "$HOME/.local/bin/newrelic-auth-cli"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
           # Verify it's accessible
           which newrelic-auth-cli
@@ -227,6 +243,12 @@ jobs:
     name: Test Documentation Flow (MDX Parsing)
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          disable-sudo: true
+          egress-policy: audit
+
       - name: Checkout action repository
         uses: actions/checkout@v4
         with:
@@ -252,9 +274,11 @@ jobs:
 
       - name: Setup mock newrelic-auth-cli
         run: |
-          # Make our mock CLI executable and install to standard location
+          # Make our mock CLI executable and install to user-writable location
           chmod +x .github/mock-newrelic-auth-cli
-          sudo cp .github/mock-newrelic-auth-cli /usr/local/bin/newrelic-auth-cli
+          mkdir -p "$HOME/.local/bin"
+          cp .github/mock-newrelic-auth-cli "$HOME/.local/bin/newrelic-auth-cli"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
           # Verify it's accessible
           which newrelic-auth-cli
