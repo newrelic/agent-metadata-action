@@ -1,10 +1,18 @@
 package config
 
-import "path/filepath"
+import (
+	"path/filepath"
+	"strings"
+)
 
-// GetRootFolderForAgentRepo loads the root folder where configuration info is st
+// GetRootFolderForAgentRepo loads the root folder where configuration info is stored
+// Returns the configured directory or defaults to ".fleetControl"
 func GetRootFolderForAgentRepo() string {
-	return ".fleetControl"
+	configDir := GetConfigDirectory()
+	if configDir == "" {
+		return ".fleetControl"
+	}
+	return strings.TrimSpace(configDir)
 }
 
 // GetConfigurationDefinitionsFilepath loads the root folder where configuration info is st

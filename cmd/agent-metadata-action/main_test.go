@@ -1,4 +1,4 @@
-package main
+validateConfigDirectorypackage main
 
 import (
 	"context"
@@ -294,7 +294,7 @@ func TestRunAgentFlow_MissingFleetControl(t *testing.T) {
 	err := runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), ".fleetControl directory does not exist")
+	assert.Contains(t, err.Error(), "config directory does not exist")
 }
 
 func TestRunAgentFlow_InvalidConfigDefinitions(t *testing.T) {
