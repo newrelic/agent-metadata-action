@@ -190,6 +190,7 @@ func validateConfigDirectory(ctx context.Context, workspace string) error {
 		return fmt.Errorf("config directory does not exist: %s", configDir)
 	}
 
+	logging.Debugf(ctx, "Using config directory: %s", configDir)
 	return nil
 }
 
@@ -200,8 +201,6 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	if err := validateConfigDirectory(ctx, workspace); err != nil {
 		return fmt.Errorf("config directory validation failed: %w", err)
 	}
-	configDir := config.GetRootFolderForAgentRepo()
-	logging.Debugf(ctx, "Using config directory: %s", configDir)
 
 	// Load configuration definitions (required)
 	configs, err := loader.ReadConfigurationDefinitions(ctx, workspace)
