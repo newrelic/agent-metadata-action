@@ -84,7 +84,7 @@ runs:
         echo "Downloading newrelic-auth-cli at commit ${CLI_COMMIT}"
         curl -L "https://github.com/newrelic/newrelic-auth-rs/archive/${CLI_COMMIT}.tar.gz" -o newrelic-auth-cli.tar.gz
         tar -xzf newrelic-auth-cli.tar.gz --strip-components=1
-        chmod +x newrelic-auth-cli_amd64.tar.gz
+        chmod +x newrelic-auth-cli
         mkdir -p "$HOME/.local/bin"
         mv newrelic-auth-cli "$HOME/.local/bin/"
         echo "$HOME/.local/bin" >> $GITHUB_PATH
