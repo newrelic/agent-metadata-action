@@ -81,7 +81,7 @@ runs:
 
         echo "::group::Installing newrelic-auth-cli"
         echo "Downloading newrelic-auth-cli"
-        curl -L "https://github.com/newrelic/newrelic-auth-rs/archive/0.1.3.tar.gz" -o newrelic-auth-cli.tar.gz
+        curl -L "https://github.com/newrelic/newrelic-auth-rs/releases/download/0.1.3/newrelic-auth-cli_amd64.tar.gz" -o newrelic-auth-cli.tar.gz
         tar -xzf newrelic-auth-cli.tar.gz
         chmod +x newrelic-auth-cli
         mkdir -p "$HOME/.local/bin"
