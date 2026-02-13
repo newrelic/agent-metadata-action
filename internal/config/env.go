@@ -59,6 +59,12 @@ func GetNRAgentLicenseKey() string {
 	return os.Getenv("APM_CONTROL_NR_LICENSE_KEY")
 }
 
+// GetConfigDirectory loads the config directory from environment variables
+// Returns the directory where configuration files are located (relative to workspace)
+func GetConfigDirectory() string {
+	return os.Getenv("INPUT_CONFIG_DIRECTORY")
+}
+
 // SetNRAgentHost sets the host to use for the go agent that will be used to monitor this app
 func SetNRAgentHost() error {
 	err := os.Setenv("NEW_RELIC_HOST", "staging-collector.newrelic.com")

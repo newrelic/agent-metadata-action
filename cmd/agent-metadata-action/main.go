@@ -177,14 +177,29 @@ func validateEnvironment(ctx context.Context) (workspace string, token string, e
 	return workspace, token, nil
 }
 
+func validateConfigDirectory(ctx context.Context, workspace string) error {
+	configDir := config.GetRootFolderForAgentRepo()
+
+	fullPath := filepath.Join(workspace, configDir)
+	resolvedPath, err := filepath.Abs(fullPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve config directory path: %w", err)
+	}
+
+	if _, err := os.Stat(resolvedPath); err != nil {
+		return fmt.Errorf("config directory does not exist: %s", configDir)
+	}
+
+	logging.Debugf(ctx, "Using config directory: %s", configDir)
+	return nil
+}
+
 // runAgentFlow handles the agent repository workflow
 func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentType, agentVersion string) error {
 	logging.Debugf(ctx, "Running agent repository flow for %s version %s", agentType, agentVersion)
 
-	// Check for .fleetControl directory
-	fleetControlPath := filepath.Join(workspace, config.GetRootFolderForAgentRepo())
-	if _, err := os.Stat(fleetControlPath); err != nil {
-		return fmt.Errorf("%s directory does not exist: %s", config.GetRootFolderForAgentRepo(), fleetControlPath)
+	if err := validateConfigDirectory(ctx, workspace); err != nil {
+		return fmt.Errorf("config directory validation failed: %w", err)
 	}
 
 	// Load configuration definitions (required)

@@ -15,6 +15,14 @@ inputs:
     description: 'Agent version tag name (ex. v1.2.3). Must match the exact git tag name for checkout.'
     required: false
     default: ''
+  git-ref:
+    description: 'Git reference to checkout (tag, branch, commit SHA). Use this when the git tag differs from the semantic version. For example, if your git tag is "nr-ebpf-agent-1.2.3" but the version for APIs is "1.2.3", pass git-ref="nr-ebpf-agent-1.2.3" and version="1.2.3". Leave empty to use version parameter for checkout (backwards compatibility).'
+    required: false
+    default: ''
+  config-directory:
+    description: 'Directory containing agent configuration files (relative to repository root, default: .fleetControl)'
+    required: false
+    default: '.fleetControl'
   fetch-depth:
     description: 'Number of commits to fetch (> 1 may be required for docs flow)'
     required: false
@@ -46,16 +54,31 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Set version ref for checkout
-      id: version
+    - name: Determine checkout ref
+      id: checkout-ref
       shell: bash
       run: |
-        echo "ref=${{ inputs.version }}" >> $GITHUB_OUTPUT
+        GIT_REF="${{ inputs.git-ref }}"
+        VERSION="${{ inputs.version }}"
+
+        # If git-ref is explicitly provided, use it
+        if [ -n "$GIT_REF" ]; then
+          echo "ref=$GIT_REF" >> $GITHUB_OUTPUT
+          echo "Using git-ref: $GIT_REF"
+        # If git-ref not provided, fall back to version for backwards compatibility
+        elif [ -n "$VERSION" ]; then
+          echo "ref=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version for checkout (backwards compatibility): $VERSION"
+        # If both empty, use default (checkout triggering commit for docs flow)
+        else
+          echo "ref=" >> $GITHUB_OUTPUT
+          echo "No ref specified, using triggering commit"
+        fi
 
     - name: Checkout repository
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
-        ref: ${{ steps.version.outputs.ref }} # When ref is empty (as in docs scenario), this will default to checking out the commit that triggered the action
+        ref: ${{ steps.checkout-ref.outputs.ref }}
         fetch-depth: ${{ inputs.fetch-depth }}
     - name: Setup Go
       uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
@@ -172,6 +195,7 @@ runs:
       env:
         INPUT_AGENT_TYPE: ${{ inputs.agent-type }}
         INPUT_VERSION: ${{ inputs.version }}
+        INPUT_CONFIG_DIRECTORY: ${{ inputs.config-directory }}
         NEWRELIC_TOKEN: ${{ steps.newrelic-auth.outputs.token }}
         INPUT_OCI_REGISTRY: ${{ inputs.oci-registry }}
         INPUT_OCI_USERNAME: ${{ inputs.oci-username }}
