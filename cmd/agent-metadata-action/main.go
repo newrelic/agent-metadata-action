@@ -240,11 +240,6 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 
 	printJSON(ctx, "Agent Metadata", metadata)
 
-	// Step 1: Send to metadata service
-	if err := client.SendMetadata(ctx, agentType, agentVersion, &metadata); err != nil {
-		return fmt.Errorf("failed to send metadata for %s: %w", agentType, err)
-	}
-
 	ociConfig, err := oci.LoadConfig()
 	if err != nil {
 		logging.NoticeErrorWithCategory(ctx, err, "oci.configuration", map[string]interface{}{
@@ -256,13 +251,13 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	}
 
 	if ociConfig.IsEnabled() {
-		// Step 2: Upload binaries
+		// Step 1: Upload binaries
 		indexDigest, err := ociHandleUploadsFunc(ctx, &ociConfig, workspace, agentVersion)
 		if err != nil {
 			return fmt.Errorf("binary upload failed: %w", err)
 		}
 
-		// Step 3: Sign the manifest index
+		// Step 2: Sign the manifest index
 		githubRepo := config.GetRepo()
 		if githubRepo == "" {
 			return fmt.Errorf("GITHUB_REPOSITORY environment variable is required for artifact signing")
@@ -280,6 +275,11 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 		if err := sign.SignIndex(ctx, ociConfig.Registry, indexDigest, agentVersion, token, repoName); err != nil {
 			return fmt.Errorf("artifact signing failed: %w", err)
 		}
+	}
+
+	// Step 3: Send to metadata service
+	if err := client.SendMetadata(ctx, agentType, agentVersion, &metadata); err != nil {
+		return fmt.Errorf("failed to send metadata for %s: %w", agentType, err)
 	}
 
 	logging.Noticef(ctx, "Successfully sent metadata for %s version %s", agentType, agentVersion)
