@@ -218,13 +218,6 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	// Load agent control definitions (optional)
 	agentControl, err := loader.ReadAgentControlDefinitions(ctx, workspace)
 	if err != nil {
-		logging.NoticeErrorWithCategory(ctx, err, "configuration.load", map[string]interface{}{
-			"error.operation": "load_agent_control_definitions",
-			"agent.type":      agentType,
-			"agent.version":   agentVersion,
-			"workflow.type":   "agent",
-			"error.severity":  "warning", // Graceful error
-		})
 		logging.Warnf(ctx, "Unable to load agent control definitions: %v - continuing without them", err)
 		agentControl = nil
 	} else {
