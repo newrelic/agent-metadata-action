@@ -102,7 +102,7 @@ func main() {
 
 	// Exit with appropriate code
 	if err != nil {
-		logging.Errorf(ctx, "%v", err)
+		logging.Noticef(ctx, "%v", err)
 		os.Exit(1)
 	}
 }
