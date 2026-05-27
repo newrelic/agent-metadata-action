@@ -16,6 +16,9 @@ func LoadMetadataForAgents(version string) models.Metadata {
 	if monitoringType := config.GetMonitoringType(); monitoringType != "" {
 		m["monitoringType"] = monitoringType
 	}
+	if displayName := config.GetDisplayName(); displayName != "" {
+		m["displayName"] = displayName
+	}
 	return m
 }
 

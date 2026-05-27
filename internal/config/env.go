@@ -70,6 +70,11 @@ func GetMonitoringType() string {
 	return os.Getenv("INPUT_MONITORING_TYPE")
 }
 
+// GetDisplayName loads the display name from environment variables
+func GetDisplayName() string {
+	return os.Getenv("INPUT_DISPLAY_NAME")
+}
+
 // SetNRAgentHost sets the host to use for the go agent that will be used to monitor this app
 func SetNRAgentHost() error {
 	err := os.Setenv("NEW_RELIC_HOST", "staging-collector.newrelic.com")

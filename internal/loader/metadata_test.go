@@ -58,6 +58,39 @@ func TestLoadMetadataForAgents(t *testing.T) {
 	}
 }
 
+func TestLoadMetadataForAgents_DisplayName(t *testing.T) {
+	tests := []struct {
+		name            string
+		displayName     string
+		expectKey       bool
+		expectedVal     string
+	}{
+		{
+			name:        "no displayName - key absent",
+			displayName: "",
+			expectKey:   false,
+		},
+		{
+			name:        "displayName set",
+			displayName: "Java Agent",
+			expectKey:   true,
+			expectedVal: "Java Agent",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("INPUT_DISPLAY_NAME", tt.displayName)
+			metadata := LoadMetadataForAgents("1.2.3")
+			if tt.expectKey {
+				assert.Equal(t, tt.expectedVal, metadata["displayName"])
+			} else {
+				assert.NotContains(t, metadata, "displayName")
+			}
+		})
+	}
+}
+
 func TestLoadMetadata_WithMDXFiles_Success(t *testing.T) {
 	// Create a temporary workspace
 	tmpWorkspace := t.TempDir()
