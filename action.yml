@@ -43,6 +43,14 @@ inputs:
     description: 'JSON array with artifact definitions. Each artifact must specify name, path, os, arch, and format. Example: [{"name": "linux-tar", "path": "./dist/agent.tar.gz", "os": "linux", "arch": "amd64", "format": "tar+gzip"}]'
     required: false
     default: ''
+  monitoring-type:
+    description: 'Monitoring type indicating which fleet this agent belongs to (APM or INFRA). Leave empty to use the service default mapping.'
+    required: false
+    default: ''
+  display-name:
+    description: 'Human-readable display name for this agent.'
+    required: false
+    default: ''
   cache:
     description: 'Enable Go build cache'
     required: false
@@ -196,6 +204,8 @@ runs:
         INPUT_AGENT_TYPE: ${{ inputs.agent-type }}
         INPUT_VERSION: ${{ inputs.version }}
         INPUT_CONFIG_DIRECTORY: ${{ inputs.config-directory }}
+        INPUT_MONITORING_TYPE: ${{ inputs.monitoring-type }}
+        INPUT_DISPLAY_NAME: ${{ inputs.display-name }}
         NEWRELIC_TOKEN: ${{ steps.newrelic-auth.outputs.token }}
         INPUT_OCI_REGISTRY: ${{ inputs.oci-registry }}
         INPUT_OCI_USERNAME: ${{ inputs.oci-username }}
