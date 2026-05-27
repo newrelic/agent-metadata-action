@@ -15,17 +15,47 @@ import (
 )
 
 func TestLoadMetadataForAgents(t *testing.T) {
-	t.Setenv("INPUT_AGENT_TYPE", "myagenttype")
-	t.Setenv("INPUT_VERSION", "1.2.3")
+	tests := []struct {
+		name                  string
+		version               string
+		monitoringType        string
+		expectMonitoringType  bool
+		expectedMonitoringVal string
+	}{
+		{
+			name:                 "no monitoringType - only version key present",
+			version:              "1.2.3",
+			monitoringType:       "",
+			expectMonitoringType: false,
+		},
+		{
+			name:                  "APM monitoringType",
+			version:               "1.2.3",
+			monitoringType:        "APM",
+			expectMonitoringType:  true,
+			expectedMonitoringVal: "APM",
+		},
+		{
+			name:                  "INFRA monitoringType",
+			version:               "1.2.3",
+			monitoringType:        "INFRA",
+			expectMonitoringType:  true,
+			expectedMonitoringVal: "INFRA",
+		},
+	}
 
-	metadata := LoadMetadataForAgents("1.2.3")
-	assert.Equal(t, "1.2.3", metadata["version"])
-	assert.Empty(t, metadata["features"])
-	assert.Empty(t, metadata["bugs"])
-	assert.Empty(t, metadata["security"])
-	assert.Empty(t, metadata["deprecations"])
-	assert.Empty(t, metadata["supportedOperatingSystems"])
-	assert.Empty(t, metadata["eol"])
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("INPUT_MONITORING_TYPE", tt.monitoringType)
+			metadata := LoadMetadataForAgents(tt.version)
+			assert.Equal(t, tt.version, metadata["version"])
+			if tt.expectMonitoringType {
+				assert.Equal(t, tt.expectedMonitoringVal, metadata["monitoringType"])
+			} else {
+				assert.NotContains(t, metadata, "monitoringType")
+			}
+		})
+	}
 }
 
 func TestLoadMetadata_WithMDXFiles_Success(t *testing.T) {

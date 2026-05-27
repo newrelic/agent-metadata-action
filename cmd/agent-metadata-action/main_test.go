@@ -213,6 +213,63 @@ func TestRun_InvalidEnvironment(t *testing.T) {
 	assert.Contains(t, err.Error(), "workspace directory does not exist")
 }
 
+func TestRun_InvalidMonitoringType(t *testing.T) {
+	originalCreateClient := createMetadataClientFunc
+	createMetadataClientFunc = func(baseURL, token string) metadataClient {
+		return &mockMetadataClient{}
+	}
+	defer func() { createMetadataClientFunc = originalCreateClient }()
+
+	workspace := t.TempDir()
+	t.Setenv("GITHUB_WORKSPACE", workspace)
+	t.Setenv("NEWRELIC_TOKEN", "mock-token")
+	t.Setenv("INPUT_AGENT_TYPE", "java")
+	t.Setenv("INPUT_VERSION", "1.0.0")
+	t.Setenv("INPUT_MONITORING_TYPE", "METRICS")
+
+	err := run(nil)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid monitoring-type")
+	assert.Contains(t, err.Error(), "must be APM or INFRA")
+}
+
+func TestRun_ValidMonitoringTypes(t *testing.T) {
+	tests := []struct {
+		name           string
+		monitoringType string
+	}{
+		{name: "empty - relies on service default", monitoringType: ""},
+		{name: "APM", monitoringType: "APM"},
+		{name: "INFRA", monitoringType: "INFRA"},
+	}
+
+	projectRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	workspace := filepath.Join(projectRoot, "integration-test", "agent-flow")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			originalCreateClient := createMetadataClientFunc
+			createMetadataClientFunc = func(baseURL, token string) metadataClient {
+				return &mockMetadataClient{}
+			}
+			defer func() { createMetadataClientFunc = originalCreateClient }()
+
+			t.Setenv("GITHUB_WORKSPACE", workspace)
+			t.Setenv("NEWRELIC_TOKEN", "mock-token")
+			t.Setenv("INPUT_AGENT_TYPE", "java")
+			t.Setenv("INPUT_VERSION", "1.0.0")
+			t.Setenv("INPUT_OCI_REGISTRY", "")
+			t.Setenv("INPUT_MONITORING_TYPE", tt.monitoringType)
+
+			err := run(nil)
+
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func TestValidateEnvironment(t *testing.T) {
 	tests := []struct {
 		name          string

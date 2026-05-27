@@ -134,6 +134,10 @@ func run(nrApp *newrelic.Application) error {
 	// Determine which flow to execute
 	agentType := config.GetAgentType()
 	agentVersion := config.GetVersion()
+	monitoringType := config.GetMonitoringType()
+	if monitoringType != "" && monitoringType != "APM" && monitoringType != "INFRA" {
+		return fmt.Errorf("invalid monitoring-type %q: must be APM or INFRA", monitoringType)
+	}
 
 	if agentType != "" && agentVersion != "" {
 		return runAgentFlow(ctx, metadataClient, workspace, agentType, agentVersion)

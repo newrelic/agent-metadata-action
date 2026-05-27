@@ -65,6 +65,11 @@ func GetConfigDirectory() string {
 	return os.Getenv("INPUT_CONFIG_DIRECTORY")
 }
 
+// GetMonitoringType loads the monitoring type from environment variables
+func GetMonitoringType() string {
+	return os.Getenv("INPUT_MONITORING_TYPE")
+}
+
 // SetNRAgentHost sets the host to use for the go agent that will be used to monitor this app
 func SetNRAgentHost() error {
 	err := os.Setenv("NEW_RELIC_HOST", "staging-collector.newrelic.com")

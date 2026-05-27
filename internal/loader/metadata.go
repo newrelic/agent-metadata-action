@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"agent-metadata-action/internal/config"
 	"agent-metadata-action/internal/github"
 	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
@@ -9,11 +10,13 @@ import (
 	"fmt"
 )
 
-// LoadMetadataForAgents loads metadata with only version populated
+// LoadMetadataForAgents loads metadata with version and optional monitoringType
 func LoadMetadataForAgents(version string) models.Metadata {
-	return models.Metadata{
-		"version": version,
+	m := models.Metadata{"version": version}
+	if monitoringType := config.GetMonitoringType(); monitoringType != "" {
+		m["monitoringType"] = monitoringType
 	}
+	return m
 }
 
 type MetadataForDocs struct {
