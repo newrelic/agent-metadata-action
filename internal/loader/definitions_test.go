@@ -386,10 +386,6 @@ func TestReadConfigurationDefinitions_DirectoryTraversal(t *testing.T) {
 			schemaPath: "../../../etc/passwd",
 		},
 		{
-			name:       "relative parent traversal",
-			schemaPath: "schemas/../../secrets.json",
-		},
-		{
 			name:       "multiple parent traversals",
 			schemaPath: "./../.././../../../sensitive.json",
 		},
@@ -428,7 +424,7 @@ func TestReadConfigurationDefinitions_DirectoryTraversal(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.NotNil(t, configs)
-			assert.Contains(t, outputStr, "directory traversal")
+			assert.Contains(t, outputStr, "must be within workspace")
 		})
 	}
 }
@@ -530,11 +526,11 @@ func TestReadAgentControlDefinitions_ContentLoadingWarnings(t *testing.T) {
 			expectedWarning: "failed to load content",
 		},
 		{
-			name: "directory traversal in content path",
+			name: "content path escapes workspace",
 			setupFunc: func(t *testing.T, tmpDir string) string {
 				return "../../../etc/passwd"
 			},
-			expectedWarning: "directory traversal",
+			expectedWarning: "must be within workspace",
 		},
 	}
 
@@ -820,43 +816,15 @@ func TestLoadAndEncodeFile_PathValidation(t *testing.T) {
 		expectedErrMsg string
 	}{
 		{
-			name: "path with directory traversal using ../",
+			name: "path escapes workspace via parent traversal",
 			setupFunc: func(t *testing.T) (string, string) {
 				tmpDir := t.TempDir()
 				workspace := filepath.Join(tmpDir, "workspace", config.GetRootFolderForAgentRepo())
 				require.NoError(t, os.MkdirAll(workspace, 0755))
 
-				// Path that would escape using ../
 				return filepath.Join(tmpDir, "workspace"), "../../../etc/passwd"
 			},
-			expectedErrMsg: "directory traversal",
-		},
-		{
-			name: "path with multiple directory traversals",
-			setupFunc: func(t *testing.T) (string, string) {
-				tmpDir := t.TempDir()
-				workspace := filepath.Join(tmpDir, "workspace", config.GetRootFolderForAgentRepo())
-				require.NoError(t, os.MkdirAll(workspace, 0755))
-
-				return filepath.Join(tmpDir, "workspace"), "schemas/../../sensitive.json"
-			},
-			expectedErrMsg: "directory traversal",
-		},
-		{
-			name: "path attempting to read outside .fleetControl via symlink-like path",
-			setupFunc: func(t *testing.T) (string, string) {
-				tmpDir := t.TempDir()
-				workspace := filepath.Join(tmpDir, "workspace", config.GetRootFolderForAgentRepo())
-				require.NoError(t, os.MkdirAll(workspace, 0755))
-
-				// Create a file at workspace level (outside .fleetControl)
-				outsideFile := filepath.Join(tmpDir, "workspace", "outside.json")
-				require.NoError(t, os.WriteFile(outsideFile, []byte(`{"test": "data"}`), 0644))
-
-				// Try to access it from .fleetControl
-				return filepath.Join(tmpDir, "workspace"), "../outside.json"
-			},
-			expectedErrMsg: "directory traversal",
+			expectedErrMsg: "must be within workspace",
 		},
 	}
 
@@ -889,4 +857,40 @@ func TestLoadAndEncodeFile_PathValidation(t *testing.T) {
 			assert.Contains(t, outputStr, tt.expectedErrMsg)
 		})
 	}
+}
+
+// TestLoadAndEncodeFile_OutsideFleetControl verifies that schema files referenced
+// from outside .fleetControl (but still within the workspace) load successfully.
+// This is the dotnet agent shape: schema lives at ../src/.../Configuration.xsd.
+func TestLoadAndEncodeFile_OutsideFleetControl(t *testing.T) {
+	tmpDir := t.TempDir()
+	workspace := filepath.Join(tmpDir, "workspace")
+	configDir := filepath.Join(workspace, config.GetRootFolderForAgentRepo())
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	// Schema lives outside .fleetControl, in a sibling directory inside the workspace.
+	srcDir := filepath.Join(workspace, "src")
+	require.NoError(t, os.MkdirAll(srcDir, 0755))
+	schemaContent := `<?xml version="1.0"?><xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>`
+	schemaFile := filepath.Join(srcDir, "Configuration.xsd")
+	require.NoError(t, os.WriteFile(schemaFile, []byte(schemaContent), 0644))
+
+	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
+	testYAML := `configurationDefinitions:
+  - platform: linux
+    description: Test config
+    type: test-config
+    version: 1.0.0
+    format: xml
+    schema: ../src/Configuration.xsd`
+	require.NoError(t, os.WriteFile(configFile, []byte(testYAML), 0644))
+
+	configs, err := ReadConfigurationDefinitions(context.Background(), workspace)
+	require.NoError(t, err)
+	require.Len(t, configs, 1)
+
+	encoded, ok := configs[0]["schema"].(string)
+	require.True(t, ok, "schema should be base64-encoded string, got %T", configs[0]["schema"])
+	expected := base64.StdEncoding.EncodeToString([]byte(schemaContent))
+	assert.Equal(t, expected, encoded)
 }

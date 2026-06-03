@@ -139,28 +139,22 @@ func loadAndEncodeFile(workspacePath string, contentPath string, filePathField s
 		return "", nil
 	}
 
-	// Validate content path to prevent directory traversal attacks
-	if strings.Contains(contentPath, "..") {
-		return "", fmt.Errorf("invalid %s path: contains directory traversal", filePathField)
-	}
-
-	// Content paths are relative to the expected root directory
+	// Content paths are relative to the .fleetControl directory; the resolved path
+	// must stay within the workspace so we can't read arbitrary files on the runner.
 	fullPath := filepath.Join(workspacePath, config.GetRootFolderForAgentRepo(), contentPath)
 
-	// Additional security check: ensure the resolved path is within the expected root directory
-	expectedRootDir := filepath.Join(workspacePath, config.GetRootFolderForAgentRepo())
 	resolvedPath, err := filepath.Abs(fullPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve %s path: %w", filePathField, err)
 	}
 
-	resolvedRootDirectory, err := filepath.Abs(expectedRootDir)
+	resolvedWorkspace, err := filepath.Abs(workspacePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve expected root directory:%s %w", expectedRootDir, err)
+		return "", fmt.Errorf("failed to resolve workspace path %s: %w", workspacePath, err)
 	}
 
-	if !strings.HasPrefix(resolvedPath, resolvedRootDirectory+string(filepath.Separator)) && resolvedPath != resolvedRootDirectory {
-		return "", fmt.Errorf("invalid %s path: must be within expected root directory: %s\n", filePathField, expectedRootDir)
+	if !strings.HasPrefix(resolvedPath, resolvedWorkspace+string(filepath.Separator)) && resolvedPath != resolvedWorkspace {
+		return "", fmt.Errorf("invalid %s path: must be within workspace: %s", filePathField, resolvedWorkspace)
 	}
 
 	data, err := os.ReadFile(fullPath)
