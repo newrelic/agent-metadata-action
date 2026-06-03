@@ -31,14 +31,19 @@ func ReadConfigurationDefinitions(ctx context.Context, workspacePath string) ([]
 		}
 		schemaPath, ok := definitions[i]["schema"].(string)
 		if !ok {
-			logging.Warn(ctx, "schema field is not a string - skipping")
+			// Drop the field so the server doesn't reject the whole request over a malformed type.
+			logging.Warn(ctx, "schema field is not a string - dropping it")
+			delete(definitions[i], "schema")
 			continue
 		}
 
 		// @todo at some point, we may want to do this concurrently if there are any agents with a large number of files
 		encoded, err := loadAndEncodeFile(workspacePath, schemaPath, "schema")
 		if err != nil {
-			logging.Warnf(ctx, "failed to load schema at schema path %s: %v -- continuing without it", schemaPath, err)
+			// Drop the field rather than leaving the path string in place — the server would
+			// otherwise try to base64-decode the path and reject the whole bundled request.
+			logging.Warnf(ctx, "failed to load schema at schema path %s: %v -- dropping schema field", schemaPath, err)
+			delete(definitions[i], "schema")
 			continue
 		}
 		definitions[i]["schema"] = encoded
@@ -71,14 +76,19 @@ func ReadAgentControlDefinitions(ctx context.Context, workspacePath string) ([]m
 		}
 		contentPath, ok := definitions[i]["content"].(string)
 		if !ok {
-			logging.Warn(ctx, "content field is not a string - skipping")
+			// Drop the field so the server doesn't reject the whole request over a malformed type.
+			logging.Warn(ctx, "content field is not a string - dropping it")
+			delete(definitions[i], "content")
 			continue
 		}
 
 		// @todo at some point, we may want to do this concurrently if there are any agents with a large number of files
 		encoded, err := loadAndEncodeFile(workspacePath, contentPath, "content")
 		if err != nil {
-			logging.Warnf(ctx, "failed to load content at path %s: %v -- continuing without it", contentPath, err)
+			// Drop the field rather than leaving the path string in place — the server would
+			// otherwise try to base64-decode the path and reject the whole bundled request.
+			logging.Warnf(ctx, "failed to load content at path %s: %v -- dropping content field", contentPath, err)
+			delete(definitions[i], "content")
 			continue
 		}
 		definitions[i]["content"] = encoded

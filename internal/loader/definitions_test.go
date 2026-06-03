@@ -894,3 +894,111 @@ func TestLoadAndEncodeFile_OutsideFleetControl(t *testing.T) {
 	expected := base64.StdEncoding.EncodeToString([]byte(schemaContent))
 	assert.Equal(t, expected, encoded)
 }
+
+// TestReadConfigurationDefinitions_DropsBrokenSchemaField verifies that when a
+// schema can't be loaded or has the wrong type, the schema field is removed from
+// the entry rather than left in place. This prevents the server from rejecting the
+// entire bundled request when one entry has a broken schema reference.
+func TestReadConfigurationDefinitions_DropsBrokenSchemaField(t *testing.T) {
+	tests := []struct {
+		name        string
+		yamlContent string
+	}{
+		{
+			name: "schema path points to missing file",
+			yamlContent: `configurationDefinitions:
+  - platform: linux
+    description: good entry
+    type: test-config
+    version: 1.0.0
+    format: yaml
+    schema: ./schemas/does-not-exist.json`,
+		},
+		{
+			name: "schema field is not a string",
+			yamlContent: `configurationDefinitions:
+  - platform: linux
+    description: good entry
+    type: test-config
+    version: 1.0.0
+    format: yaml
+    schema: 12345`,
+		},
+		{
+			name: "schema path escapes workspace",
+			yamlContent: `configurationDefinitions:
+  - platform: linux
+    description: good entry
+    type: test-config
+    version: 1.0.0
+    format: yaml
+    schema: ../../../etc/passwd`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+			require.NoError(t, os.MkdirAll(configDir, 0755))
+
+			configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
+			require.NoError(t, os.WriteFile(configFile, []byte(tt.yamlContent), 0644))
+
+			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
+			require.NoError(t, err)
+			require.Len(t, configs, 1)
+
+			_, hasSchema := configs[0]["schema"]
+			assert.False(t, hasSchema, "schema field should be removed when load fails, but got: %v", configs[0]["schema"])
+			// Sibling fields stay so the rest of the entry can still ship.
+			assert.Equal(t, "good entry", configs[0]["description"])
+		})
+	}
+}
+
+// TestReadAgentControlDefinitions_DropsBrokenContentField is the agent-control
+// counterpart to TestReadConfigurationDefinitions_DropsBrokenSchemaField.
+func TestReadAgentControlDefinitions_DropsBrokenContentField(t *testing.T) {
+	tests := []struct {
+		name        string
+		yamlContent string
+	}{
+		{
+			name: "content path points to missing file",
+			yamlContent: `agentControlDefinitions:
+  - platform: KUBERNETES
+    supportFromAgent: 1.0.0
+    supportFromAgentControl: 1.0.0
+    content: ./agentControl/does-not-exist.yml`,
+		},
+		{
+			name: "content field is not a string",
+			yamlContent: `agentControlDefinitions:
+  - platform: KUBERNETES
+    supportFromAgent: 1.0.0
+    supportFromAgentControl: 1.0.0
+    content: 42`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+			require.NoError(t, os.MkdirAll(configDir, 0755))
+
+			agentControlFile := filepath.Join(configDir, config.GetAgentControlDefinitionsFilename())
+			require.NoError(t, os.WriteFile(agentControlFile, []byte(tt.yamlContent), 0644))
+
+			defs, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
+			require.NoError(t, err)
+			require.Len(t, defs, 1)
+
+			_, hasContent := defs[0]["content"]
+			assert.False(t, hasContent, "content field should be removed when load fails, but got: %v", defs[0]["content"])
+			// Sibling fields stay so the rest of the entry can still ship.
+			assert.Equal(t, "KUBERNETES", defs[0]["platform"])
+		})
+	}
+}
