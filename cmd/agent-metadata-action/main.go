@@ -57,7 +57,6 @@ func initNewRelic(ctx context.Context) *newrelic.Application {
 	app, err := newrelic.NewApplication(
 		newrelic.ConfigAppName("agent-metadata-action"),
 		newrelic.ConfigLicense(licenseKey),
-		newrelic.ConfigDebugLogger(os.Stdout),
 		newrelic.ConfigDistributedTracerEnabled(true),
 		newrelic.ConfigAppLogForwardingEnabled(true),
 		newrelic.ConfigFromEnvironment(), // This reads NEW_RELIC_HOST

@@ -31,14 +31,19 @@ func ReadConfigurationDefinitions(ctx context.Context, workspacePath string) ([]
 		}
 		schemaPath, ok := definitions[i]["schema"].(string)
 		if !ok {
-			logging.Warn(ctx, "schema field is not a string - skipping")
+			// Drop the field so the server doesn't reject the whole request over a malformed type.
+			logging.Warn(ctx, "schema field is not a string - dropping it")
+			delete(definitions[i], "schema")
 			continue
 		}
 
 		// @todo at some point, we may want to do this concurrently if there are any agents with a large number of files
 		encoded, err := loadAndEncodeFile(workspacePath, schemaPath, "schema")
 		if err != nil {
-			logging.Warnf(ctx, "failed to load schema at schema path %s: %v -- continuing without it", schemaPath, err)
+			// Drop the field rather than leaving the path string in place — the server would
+			// otherwise try to base64-decode the path and reject the whole bundled request.
+			logging.Warnf(ctx, "failed to load schema at schema path %s: %v -- dropping schema field", schemaPath, err)
+			delete(definitions[i], "schema")
 			continue
 		}
 		definitions[i]["schema"] = encoded
@@ -71,14 +76,19 @@ func ReadAgentControlDefinitions(ctx context.Context, workspacePath string) ([]m
 		}
 		contentPath, ok := definitions[i]["content"].(string)
 		if !ok {
-			logging.Warn(ctx, "content field is not a string - skipping")
+			// Drop the field so the server doesn't reject the whole request over a malformed type.
+			logging.Warn(ctx, "content field is not a string - dropping it")
+			delete(definitions[i], "content")
 			continue
 		}
 
 		// @todo at some point, we may want to do this concurrently if there are any agents with a large number of files
 		encoded, err := loadAndEncodeFile(workspacePath, contentPath, "content")
 		if err != nil {
-			logging.Warnf(ctx, "failed to load content at path %s: %v -- continuing without it", contentPath, err)
+			// Drop the field rather than leaving the path string in place — the server would
+			// otherwise try to base64-decode the path and reject the whole bundled request.
+			logging.Warnf(ctx, "failed to load content at path %s: %v -- dropping content field", contentPath, err)
+			delete(definitions[i], "content")
 			continue
 		}
 		definitions[i]["content"] = encoded
@@ -139,28 +149,22 @@ func loadAndEncodeFile(workspacePath string, contentPath string, filePathField s
 		return "", nil
 	}
 
-	// Validate content path to prevent directory traversal attacks
-	if strings.Contains(contentPath, "..") {
-		return "", fmt.Errorf("invalid %s path: contains directory traversal", filePathField)
-	}
-
-	// Content paths are relative to the expected root directory
+	// Content paths are relative to the .fleetControl directory; the resolved path
+	// must stay within the workspace so we can't read arbitrary files on the runner.
 	fullPath := filepath.Join(workspacePath, config.GetRootFolderForAgentRepo(), contentPath)
 
-	// Additional security check: ensure the resolved path is within the expected root directory
-	expectedRootDir := filepath.Join(workspacePath, config.GetRootFolderForAgentRepo())
 	resolvedPath, err := filepath.Abs(fullPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve %s path: %w", filePathField, err)
 	}
 
-	resolvedRootDirectory, err := filepath.Abs(expectedRootDir)
+	resolvedWorkspace, err := filepath.Abs(workspacePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve expected root directory:%s %w", expectedRootDir, err)
+		return "", fmt.Errorf("failed to resolve workspace path %s: %w", workspacePath, err)
 	}
 
-	if !strings.HasPrefix(resolvedPath, resolvedRootDirectory+string(filepath.Separator)) && resolvedPath != resolvedRootDirectory {
-		return "", fmt.Errorf("invalid %s path: must be within expected root directory: %s\n", filePathField, expectedRootDir)
+	if !strings.HasPrefix(resolvedPath, resolvedWorkspace+string(filepath.Separator)) && resolvedPath != resolvedWorkspace {
+		return "", fmt.Errorf("invalid %s path: must be within workspace: %s", filePathField, resolvedWorkspace)
 	}
 
 	data, err := os.ReadFile(fullPath)
