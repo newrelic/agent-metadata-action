@@ -1002,3 +1002,73 @@ func TestReadAgentControlDefinitions_DropsBrokenContentField(t *testing.T) {
 		})
 	}
 }
+
+func TestReadAgentDefinition_FileNotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	result, err := ReadAgentDefinition(context.Background(), tmpDir)
+	require.NoError(t, err)
+	assert.Nil(t, result)
+}
+
+func TestReadAgentDefinition_ValidFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	yamlContent := `bindings:
+  - type: REQUIRES
+    targetType: AGENT
+    target: NrInfra
+    versions:
+      - ">=1.0.0"
+breakingChange: "2.0.0"`
+	defFile := filepath.Join(configDir, "agentDefinition.yml")
+	require.NoError(t, os.WriteFile(defFile, []byte(yamlContent), 0644))
+
+	result, err := ReadAgentDefinition(context.Background(), tmpDir)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, "2.0.0", (*result)["breakingChange"])
+
+	bindings, ok := (*result)["bindings"].([]interface{})
+	require.True(t, ok, "bindings should be a slice")
+	require.Len(t, bindings, 1)
+
+	binding := bindings[0].(map[string]interface{})
+	assert.Equal(t, "REQUIRES", binding["type"])
+	assert.Equal(t, "AGENT", binding["targetType"])
+	assert.Equal(t, "NrInfra", binding["target"])
+}
+
+func TestReadAgentDefinition_BreakingChangeOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	yamlContent := `breakingChange: "1.5.0"`
+	defFile := filepath.Join(configDir, "agentDefinition.yml")
+	require.NoError(t, os.WriteFile(defFile, []byte(yamlContent), 0644))
+
+	result, err := ReadAgentDefinition(context.Background(), tmpDir)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "1.5.0", (*result)["breakingChange"])
+}
+
+func TestReadAgentDefinition_InvalidYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	defFile := filepath.Join(configDir, "agentDefinition.yml")
+	require.NoError(t, os.WriteFile(defFile, []byte(":\tinvalid: yaml: ["), 0644))
+
+	result, err := ReadAgentDefinition(context.Background(), tmpDir)
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "failed to parse agentDefinition.yml")
+}

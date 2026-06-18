@@ -33,6 +33,11 @@ func GetAgentControlDefinitionsFilename() string {
 	return "agentControlDefinitions.yml"
 }
 
+// GetAgentDefinitionFilepath returns the path to the optional agentDefinition.yml file
+func GetAgentDefinitionFilepath() string {
+	return filepath.Join(GetRootFolderForAgentRepo(), "agentDefinition.yml")
+}
+
 func GetReleaseNotesDirectory() string {
 	return "src/content/docs/release-notes"
 }

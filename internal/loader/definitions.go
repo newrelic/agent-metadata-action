@@ -103,6 +103,29 @@ func ReadAgentControlDefinitions(ctx context.Context, workspacePath string) ([]m
 	return result, nil
 }
 
+// ReadAgentDefinition reads the optional agentDefinition.yml file.
+// Returns nil, nil if the file does not exist (the file is optional).
+func ReadAgentDefinition(ctx context.Context, workspacePath string) (*models.AgentDefinition, error) {
+	fullPath := filepath.Join(workspacePath, config.GetAgentDefinitionFilepath())
+
+	data, err := os.ReadFile(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			logging.Debug(ctx, "agentDefinition.yml not found - skipping")
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read agentDefinition.yml: %w", err)
+	}
+
+	var content map[string]interface{}
+	if err := yaml.Unmarshal(data, &content); err != nil {
+		return nil, fmt.Errorf("failed to parse agentDefinition.yml: %w", err)
+	}
+
+	def := models.AgentDefinition(content)
+	return &def, nil
+}
+
 // readDefinitionsFile reads a YAML file and extracts the first array it finds at the top level.
 // This is a generic function that works for both configurationDefinitions and agentControlDefinitions files.
 // It returns the array of definitions as []map[string]interface{}.
