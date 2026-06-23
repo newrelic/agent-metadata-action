@@ -248,14 +248,14 @@ runs:
         FAILURE_JOB: ${{ github.job }}
         FAILURE_SHA: ${{ github.sha }}
       run: |
-        echo "::error::Agent Metadata Action failed. agent-type='${FAILURE_AGENT_TYPE}' version='${FAILURE_VERSION}' git-ref='${FAILURE_GIT_REF}' repo='${FAILURE_REPO}' run='${FAILURE_RUN_URL}'"
-
+        echo "Agent Metadata Action failed. agent-type='${FAILURE_AGENT_TYPE}' version='${FAILURE_VERSION}' git-ref='${FAILURE_GIT_REF}' repo='${FAILURE_REPO}' run='${FAILURE_RUN_URL}'"
+        echo "LIJFHEOIEFHOIFHOIEFHIOEFHOIEFH"
         if [ -z "$NR_ACCOUNT_ID" ] || [ -z "$NR_LICENSE_KEY" ]; then
-          echo "::debug::newrelic-account-id or newrelic-insert-key not set; skipping NewRelic failure notification"
+          echo "newrelic-account-id or newrelic-insert-key not set; skipping NewRelic failure notification"
           exit 0
         fi
 
-        echo "::add-mask::$NR_LICENSE_KEY"
+        # echo "::add-mask::$NR_LICENSE_KEY"
         echo "BEFORE PAYLOAD"
         PAYLOAD=$(jq -nc \
           --arg agentType "$FAILURE_AGENT_TYPE" \
@@ -285,9 +285,9 @@ runs:
           --data "$PAYLOAD" || echo "000")
 
         if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
-          echo "::notice::Failure event sent to NewRelic (HTTP $HTTP_STATUS)"
+          echo "Failure event sent to NewRelic (HTTP $HTTP_STATUS)"
         else
           RESPONSE_BODY=$(head -c 500 /tmp/nr_response.txt 2>/dev/null || true)
-          echo "::warning::Failed to send NewRelic failure event (HTTP $HTTP_STATUS): $RESPONSE_BODY"
+          echo "Failed to send NewRelic failure event (HTTP $HTTP_STATUS): $RESPONSE_BODY"
         fi
         rm -f /tmp/nr_response.txt
