@@ -24,9 +24,12 @@ type Metadata map[string]interface{}
 // YAML fields are automatically translated to JSON.
 type AgentControlDefinition map[string]interface{}
 
-// AgentDefinition represents agent-level bindings and constraints declared in agentDefinition.yml.
-// It uses a map to allow any attributes (bindings, breakingChange, etc.) to pass through without code changes.
-type AgentDefinition map[string]interface{}
+// AgentDefinition is a typed view of agentDefinition.yml used for parsing.
+// Fields are promoted flat onto AgentMetadata for JSON serialization.
+type AgentDefinition struct {
+	Bindings       []interface{} `yaml:"bindings"`
+	BreakingChange *string       `yaml:"breakingChange"`
+}
 
 // ConfigFile represents the YAML file structure containing multiple configs
 type ConfigFile struct {

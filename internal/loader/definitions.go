@@ -117,12 +117,10 @@ func ReadAgentDefinition(ctx context.Context, workspacePath string) (*models.Age
 		return nil, fmt.Errorf("failed to read agentDefinition.yml: %w", err)
 	}
 
-	var content map[string]interface{}
-	if err := yaml.Unmarshal(data, &content); err != nil {
+	var def models.AgentDefinition
+	if err := yaml.Unmarshal(data, &def); err != nil {
 		return nil, fmt.Errorf("failed to parse agentDefinition.yml: %w", err)
 	}
-
-	def := models.AgentDefinition(content)
 	return &def, nil
 }
 

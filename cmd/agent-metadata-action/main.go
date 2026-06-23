@@ -243,16 +243,8 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 		AgentControlDefinitions:  agentControl,
 	}
 	if agentDef != nil {
-		if b, ok := (*agentDef)["bindings"]; ok {
-			if bindings, ok := b.([]interface{}); ok {
-				metadata.Bindings = bindings
-			}
-		}
-		if bc, ok := (*agentDef)["breakingChange"]; ok {
-			if breakingChange, ok := bc.(string); ok {
-				metadata.BreakingChange = &breakingChange
-			}
-		}
+		metadata.Bindings = agentDef.Bindings
+		metadata.BreakingChange = agentDef.BreakingChange
 	}
 
 	printJSON(ctx, "Agent Metadata", metadata)

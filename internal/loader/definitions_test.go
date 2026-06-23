@@ -1032,13 +1032,11 @@ breakingChange: "2.0.0"`
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	assert.Equal(t, "2.0.0", (*result)["breakingChange"])
+	require.NotNil(t, result.BreakingChange)
+	assert.Equal(t, "2.0.0", *result.BreakingChange)
 
-	bindings, ok := (*result)["bindings"].([]interface{})
-	require.True(t, ok, "bindings should be a slice")
-	require.Len(t, bindings, 1)
-
-	binding := bindings[0].(map[string]interface{})
+	require.Len(t, result.Bindings, 1)
+	binding := result.Bindings[0].(map[string]interface{})
 	assert.Equal(t, "REQUIRES", binding["type"])
 	assert.Equal(t, "AGENT", binding["targetType"])
 	assert.Equal(t, "NrInfra", binding["target"])
@@ -1056,7 +1054,26 @@ func TestReadAgentDefinition_BreakingChangeOnly(t *testing.T) {
 	result, err := ReadAgentDefinition(context.Background(), tmpDir)
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, "1.5.0", (*result)["breakingChange"])
+	require.NotNil(t, result.BreakingChange)
+	assert.Equal(t, "1.5.0", *result.BreakingChange)
+	assert.Nil(t, result.Bindings)
+}
+
+func TestReadAgentDefinition_BreakingChangeUnquotedFloat(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	// Unquoted float — go-yaml coerces to string representation
+	yamlContent := `breakingChange: 2.0`
+	defFile := filepath.Join(configDir, "agentDefinition.yml")
+	require.NoError(t, os.WriteFile(defFile, []byte(yamlContent), 0644))
+
+	result, err := ReadAgentDefinition(context.Background(), tmpDir)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.BreakingChange)
+	assert.Equal(t, "2.0", *result.BreakingChange)
 }
 
 func TestReadAgentDefinition_InvalidYAML(t *testing.T) {
