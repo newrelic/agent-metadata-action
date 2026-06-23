@@ -256,7 +256,7 @@ runs:
         fi
 
         echo "::add-mask::$NR_LICENSE_KEY"
-
+        echo "BEFORE PAYLOAD"
         PAYLOAD=$(jq -nc \
           --arg agentType "$FAILURE_AGENT_TYPE" \
           --arg version "$FAILURE_VERSION" \
@@ -277,7 +277,7 @@ runs:
             job: $job,
             sha: $sha
           }')
-
+        echo "AFTER PAYLOAD"
         HTTP_STATUS=$(curl -sS -o /tmp/nr_response.txt -w "%{http_code}" \
           -X POST "https://staging-collector.newrelic.com/v1/accounts/${NR_ACCOUNT_ID}/events" \
           -H "Content-Type: application/json" \
