@@ -59,6 +59,14 @@ inputs:
     description: 'New Relic APM license key for instrumentation of this action (optional, pass from secrets)'
     required: false
     default: ''
+  newrelic-account-id:
+    description: 'NewRelic account ID for failure event reporting. Leave empty to skip failure notifications.'
+    required: false
+    default: ''
+  newrelic-insert-key:
+    description: 'NewRelic Insert API key for failure event reporting (pass from secrets). Required if newrelic-account-id is set.'
+    required: false
+    default: ''
 runs:
   using: 'composite'
   steps:
@@ -228,5 +236,58 @@ runs:
     - name: Notify on failure
       if: failure()
       shell: bash
+      env:
+        NR_ACCOUNT_ID: 12951478
+        NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
+        FAILURE_AGENT_TYPE: ${{ inputs.agent-type }}
+        FAILURE_VERSION: ${{ inputs.version }}
+        FAILURE_GIT_REF: ${{ inputs.git-ref }}
+        FAILURE_REPO: ${{ github.repository }}
+        FAILURE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        FAILURE_WORKFLOW: ${{ github.workflow }}
+        FAILURE_JOB: ${{ github.job }}
+        FAILURE_SHA: ${{ github.sha }}
       run: |
-        echo "::error::Agent Metadata Action failed. agent-type='${{ inputs.agent-type }}' version='${{ inputs.version }}' git-ref='${{ inputs.git-ref }}' repo='${{ github.repository }}' run='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'"
+        echo "::error::Agent Metadata Action failed. agent-type='${FAILURE_AGENT_TYPE}' version='${FAILURE_VERSION}' git-ref='${FAILURE_GIT_REF}' repo='${FAILURE_REPO}' run='${FAILURE_RUN_URL}'"
+
+        if [ -z "$NR_ACCOUNT_ID" ] || [ -z "$NR_LICENSE_KEY" ]; then
+          echo "::debug::newrelic-account-id or newrelic-insert-key not set; skipping NewRelic failure notification"
+          exit 0
+        fi
+
+        echo "::add-mask::$NR_LICENSE_KEY"
+
+        PAYLOAD=$(jq -nc \
+          --arg agentType "$FAILURE_AGENT_TYPE" \
+          --arg version "$FAILURE_VERSION" \
+          --arg gitRef "$FAILURE_GIT_REF" \
+          --arg repo "$FAILURE_REPO" \
+          --arg runUrl "$FAILURE_RUN_URL" \
+          --arg workflow "$FAILURE_WORKFLOW" \
+          --arg job "$FAILURE_JOB" \
+          --arg sha "$FAILURE_SHA" \
+          '{
+            eventType: "AgentMetadataActionFailure",
+            agentType: $agentType,
+            version: $version,
+            gitRef: $gitRef,
+            repo: $repo,
+            runUrl: $runUrl,
+            workflow: $workflow,
+            job: $job,
+            sha: $sha
+          }')
+
+        HTTP_STATUS=$(curl -sS -o /tmp/nr_response.txt -w "%{http_code}" \
+          -X POST "https://staging-collector.newrelic.com/v1/accounts/${NR_ACCOUNT_ID}/events" \
+          -H "Content-Type: application/json" \
+          -H "Api-Key: ${NR_LICENSE_KEY}" \
+          --data "$PAYLOAD" || echo "000")
+
+        if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+          echo "::notice::Failure event sent to NewRelic (HTTP $HTTP_STATUS)"
+        else
+          RESPONSE_BODY=$(head -c 500 /tmp/nr_response.txt 2>/dev/null || true)
+          echo "::warning::Failed to send NewRelic failure event (HTTP $HTTP_STATUS): $RESPONSE_BODY"
+        fi
+        rm -f /tmp/nr_response.txt
