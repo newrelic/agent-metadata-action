@@ -263,7 +263,7 @@ runs:
             eventType: "TransactionError",
             entity.guid: "MTI5NTE0Nzh8QVBNfEFQUExJQ0FUSU9OfDI4ODY2ODM3MQ",
             error.class: "AgentMetadataActionError",
-            error.message: "$agentType Failed to run agenta-metadata-action",
+            error.message: "Failed to run agenta-metadata-action",
             agentType: $agentType,
             version: $version,
             gitRef: $gitRef,
