@@ -197,6 +197,12 @@ runs:
         echo "::endgroup::"
         echo "::notice::NewRelic authentication successful"
 
+    - name: FAIL
+      id: fail
+      shell: bash
+      run: |
+        exit 1
+
     - name: Build and Run
       id: run-action
       shell: bash
@@ -218,3 +224,9 @@ runs:
         # todo - look at using a built image instead
         go build -o agent-metadata-action ./cmd/agent-metadata-action
         ./agent-metadata-action
+
+    - name: Notify on failure
+      if: failure()
+      shell: bash
+      run: |
+        echo "::error::Agent Metadata Action failed. agent-type='${{ inputs.agent-type }}' version='${{ inputs.version }}' git-ref='${{ inputs.git-ref }}' repo='${{ github.repository }}' run='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'"
