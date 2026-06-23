@@ -18,33 +18,31 @@ type ServiceURLs struct {
 	SigningURL     string
 }
 
-// isURLOverrideAllowed returns true when it is safe to honour a service URL override.
-// Override is allowed in two cases:
-//  1. Running inside the action's own repository (CI self-testing).
-//  2. Running outside of GitHub Actions entirely (local CLI runs).
-//
-// It is never allowed in external repositories during a real GitHub Actions run,
-// which is the scenario that could be used to redirect requests and steal tokens.
-func isURLOverrideAllowed() bool {
-	return GetRepo() == "newrelic/agent-metadata-action" || os.Getenv("GITHUB_ACTIONS") != "true"
-}
-
 // GetMetadataURL returns the metadata service URL.
-// Can be overridden with METADATA_SERVICE_URL when running locally or in the
-// action's own repository. Override is blocked for external repositories during
-// real GitHub Actions runs to prevent token theft.
+// Can be overridden with METADATA_SERVICE_URL environment variable ONLY when
+// GITHUB_REPOSITORY matches the action's own repository (for testing).
+// This prevents users from redirecting requests to steal tokens.
 func GetMetadataURL() string {
-	if url := os.Getenv("METADATA_SERVICE_URL"); url != "" && isURLOverrideAllowed() {
-		return url
+	// Only allow override in the action's own repository for testing
+	if url := os.Getenv("METADATA_SERVICE_URL"); url != "" {
+		repo := GetRepo()
+		if repo == "newrelic/agent-metadata-action" {
+			return url
+		}
+		// Silently ignore override attempts from other repositories
+		// This prevents token theft attacks
 	}
 	return MetadataURL
 }
 
-// GetSigningURL returns the OCI signing service URL.
-// Follows the same override rules as GetMetadataURL.
 func GetSigningURL() string {
-	if url := os.Getenv("SIGNING_SERVICE_URL"); url != "" && isURLOverrideAllowed() {
-		return url
+	if url := os.Getenv("SIGNING_SERVICE_URL"); url != "" {
+		repo := GetRepo()
+		if repo == "newrelic/agent-metadata-action" {
+			return url
+		}
+		// Silently ignore override attempts from other repositories
+		// This prevents token theft attacks
 	}
 	return SigningURL
 }

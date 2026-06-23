@@ -300,9 +300,9 @@ func TestValidateEnvironment(t *testing.T) {
 			setupFunc: func(t *testing.T) string {
 				return t.TempDir()
 			},
-			token:     "",
-			wantErr:   false,
-			wantToken: "",
+			token:       "",
+			wantErr:     true,
+			errContains: "NEWRELIC_TOKEN is required",
 		},
 		{
 			name: "success",
