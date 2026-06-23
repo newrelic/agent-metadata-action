@@ -261,9 +261,9 @@ runs:
           --arg sha "$FAILURE_SHA" \
           '{
             eventType: "TransactionError",
-            entity.guid: "MTI5NTE0Nzh8QVBNfEFQUExJQ0FUSU9OfDI4ODY2ODM3MQ",
-            error.class: "AgentMetadataActionError",
-            error.message: "Failed to run agenta-metadata-action",
+            entityguid: "MTI5NTE0Nzh8QVBNfEFQUExJQ0FUSU9OfDI4ODY2ODM3MQ",
+            errorclass: "AgentMetadataActionError",
+            errormessage: "Failed to run agenta-metadata-action",
             agentType: $agentType,
             version: $version,
             gitRef: $gitRef,
