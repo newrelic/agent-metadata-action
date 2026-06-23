@@ -168,12 +168,7 @@ func validateEnvironment(ctx context.Context) (workspace string, token string, e
 
 	token = config.GetToken()
 	if token == "" {
-		err := fmt.Errorf("NEWRELIC_TOKEN is required but not set")
-		logging.NoticeErrorWithCategory(ctx, err, "environment.validation", map[string]interface{}{
-			"error.operation": "validate_token",
-			"error.field":     "NEWRELIC_TOKEN",
-		})
-		return "", "", err
+		logging.Warn(ctx, "NEWRELIC_TOKEN is not set - requests will be sent without Authorization header")
 	}
 
 	logging.Notice(ctx, "Environment validated successfully")

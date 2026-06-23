@@ -99,9 +99,20 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 		}
 
 		// Set headers
-		logging.Debug(ctx, "Setting request headers...")
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+		if c.token != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+		}
+
+		// Log full request details for debugging
+		authHeader := "(none)"
+		if c.token != "" {
+			authHeader = "Bearer " + c.token[:min(8, len(c.token))] + "..."
+		}
+		logging.Debugf(ctx, "POST %s", url)
+		logging.Debugf(ctx, "  Content-Type: application/json")
+		logging.Debugf(ctx, "  Authorization: %s", authHeader)
+		logging.Debugf(ctx, "  Body: %s", string(jsonBody))
 
 		// Execute request
 		logging.Debug(ctx, "Sending HTTP request...")
