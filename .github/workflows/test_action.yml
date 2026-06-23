@@ -94,6 +94,7 @@ jobs:
           agent-type: 'myagent'
           version: 'v0.0.0'
           cache: false
+          apm-control-nr-license-key: ${{ secrets.NEW_RELIC_STAGING_LICENSE_KEY }}
 
       - name: Show mock server logs
         if: always()

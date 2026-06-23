@@ -59,14 +59,7 @@ inputs:
     description: 'New Relic APM license key for instrumentation of this action (optional, pass from secrets)'
     required: false
     default: ''
-  newrelic-account-id:
-    description: 'NewRelic account ID for failure event reporting. Leave empty to skip failure notifications.'
-    required: false
-    default: ''
-  newrelic-insert-key:
-    description: 'NewRelic Insert API key for failure event reporting (pass from secrets). Required if newrelic-account-id is set.'
-    required: false
-    default: ''
+
 runs:
   using: 'composite'
   steps:
@@ -251,7 +244,7 @@ runs:
         echo "Agent Metadata Action failed. agent-type='${FAILURE_AGENT_TYPE}' version='${FAILURE_VERSION}' git-ref='${FAILURE_GIT_REF}' repo='${FAILURE_REPO}' run='${FAILURE_RUN_URL}'"
         echo "LIJFHEOIEFHOIFHOIEFHIOEFHOIEFH"
         if [ -z "$NR_ACCOUNT_ID" ] || [ -z "$NR_LICENSE_KEY" ]; then
-          echo "newrelic-account-id or newrelic-insert-key not set; skipping NewRelic failure notification"
+          echo "newrelic-account-id or newrelic-license-key not set; skipping NewRelic failure notification"
           exit 0
         fi
 
