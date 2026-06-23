@@ -192,6 +192,7 @@ jobs:
           oci-username: ''
           oci-password: ''
           binaries: '[{"name": "test-readme", "path": "./README.md", "os": "linux", "arch": "amd64", "format": "tar+gzip"}]'
+          apm-control-nr-license-key: ${{ secrets.NEW_RELIC_STAGING_LICENSE_KEY }}
 
       - name: Verify OCI upload to local registry
         run: |
