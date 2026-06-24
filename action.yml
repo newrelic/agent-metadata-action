@@ -256,7 +256,7 @@ runs:
         \"host\": \"github-runner\",
         \"repository\": \"${{ github.repository }}\",
         \"runId\": \"${{ github.run_id }}\"
-        }])
+        }]")
         
         if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
           echo "Failure event sent to NewRelic (HTTP $HTTP_STATUS)"
