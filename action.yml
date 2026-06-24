@@ -230,7 +230,7 @@ runs:
       if: failure()
       shell: bash
       env:
-        NR_ACCOUNT_ID: 12951478
+        NR_ACCOUNT_ID: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
         NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
         FAILURE_AGENT_TYPE: ${{ inputs.agent-type }}
         FAILURE_VERSION: ${{ inputs.version }}
@@ -242,45 +242,37 @@ runs:
         FAILURE_SHA: ${{ github.sha }}
       run: |
         echo "Agent Metadata Action failed. agent-type='${FAILURE_AGENT_TYPE}' version='${FAILURE_VERSION}' git-ref='${FAILURE_GIT_REF}' repo='${FAILURE_REPO}' run='${FAILURE_RUN_URL}'"
-        echo "LIJFHEOIEFHOIFHOIEFHIOEFHOIEFH"
         if [ -z "$NR_ACCOUNT_ID" ] || [ -z "$NR_LICENSE_KEY" ]; then
           echo "newrelic-account-id or newrelic-license-key not set; skipping NewRelic failure notification"
           exit 0
         fi
 
-        # echo "::add-mask::$NR_LICENSE_KEY"
-        echo "BEFORE PAYLOAD"
-        PAYLOAD=$(jq -nc \
-          --arg agentType "$FAILURE_AGENT_TYPE" \
-          --arg version "$FAILURE_VERSION" \
-          --arg gitRef "$FAILURE_GIT_REF" \
-          --arg repo "$FAILURE_REPO" \
-          --arg runUrl "$FAILURE_RUN_URL" \
-          --arg workflow "$FAILURE_WORKFLOW" \
-          --arg job "$FAILURE_JOB" \
-          --arg sha "$FAILURE_SHA" \
-          '{
-            eventType: "TransactionError",
-            "entityGuid": "MTI5NTE0Nzh8QVBNfEFQUExJQ0FUSU9OfDI4ODY2ODM3MQ",
-            "error.class": "AgentMetadataActionError",
-            "error.message": "Failed to run agenta-metadata-action",
-            "error.expected": false,
-            agentType: $agentType,
-            version: $version,
-            gitRef: $gitRef,
-            repo: $repo,
-            runUrl: $runUrl,
-            workflow: $workflow,
-            job: $job,
-            sha: $sha
-          }')
-        echo "AFTER PAYLOAD"
+        URL="https://staging.newrelic.com/v1/accounts/${NEW_RELIC_ACCOUNT_ID}/events"
+  
+        # Define grouping fingerprint variables
+        ERROR_CLASS="GitHubWorkflowError"
+        ERROR_MESSAGE="Step run-pipeline failed with exit code ${{ steps.run-pipeline.outputs.cmd_exit_code }}"
+        TRANSACTION_NAME="WebTransaction/Action/${{ github.workflow }}/${{ github.job }}"
+      
         HTTP_STATUS=$(curl -sS -o /tmp/nr_response.txt -w "%{http_code}" \
-          -X POST "https://staging-collector.newrelic.com/v1/accounts/${NR_ACCOUNT_ID}/events" \
-          -H "Content-Type: application/json" \
-          -H "Api-Key: ${NR_LICENSE_KEY}" \
-          --data "$PAYLOAD" || echo "000")
-
+        -X POST $URL \
+        -H "Content-Type: application/json" \
+        -H "Api-Key: ${NR_LICENSE_KEY}" \
+        -d "[{
+        \"eventType\": \"TransactionError\",
+        \"appName\": \"GitHub-CI-Pipelines\",
+        \"entityGuid\": \"${{ secrets.NEW_RELIC_ENTITY_GUID }}\",
+        \"transactionName\": \"$TRANSACTION_NAME\",
+        \"error.class\": \"$ERROR_CLASS\",
+        \"error.message\": \"$ERROR_MESSAGE\",
+        \"error.group.name\": \"CI-Failure-${{ github.workflow }}\",
+        \"databaseCallCount\": 0,
+        \"duration\": 0.0,
+        \"host\": \"github-runner\",
+        \"repository\": \"${{ github.repository }}\",
+        \"runId\": \"${{ github.run_id }}\"
+        }])
+        
         if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
           echo "Failure event sent to NewRelic (HTTP $HTTP_STATUS)"
         else
