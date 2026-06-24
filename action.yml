@@ -241,10 +241,10 @@ runs:
         FAILURE_SHA: ${{ github.sha }}
       run: |
         echo "Agent Metadata Action failed. agent-type='${FAILURE_AGENT_TYPE}' version='${FAILURE_VERSION}' git-ref='${FAILURE_GIT_REF}' repo='${FAILURE_REPO}' run='${FAILURE_RUN_URL}'"
-        if [ -z "${{ secrets.NEW_RELIC_ACCOUNT_ID }}" ] || [ -z "$NR_LICENSE_KEY" ]; then
-          echo "newrelic-account-id or newrelic-license-key not set; skipping NewRelic failure notification"
-          exit 0
-        fi
+        #if [ -z "${{ secrets.NEW_RELIC_ACCOUNT_ID }}" ] || [ -z "$NR_LICENSE_KEY" ]; then
+          #echo "newrelic-account-id or newrelic-license-key not set; skipping NewRelic failure notification"
+          #exit 0
+        #fi
 
         URL="https://staging.newrelic.com/v1/accounts/${{ secrets.NEW_RELIC_ACCOUNT_ID }}/events"
   
