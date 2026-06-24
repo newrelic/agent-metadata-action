@@ -231,28 +231,13 @@ runs:
       shell: bash
       env:
         NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
-        FAILURE_AGENT_TYPE: ${{ inputs.agent-type }}
-        FAILURE_VERSION: ${{ inputs.version }}
-        FAILURE_GIT_REF: ${{ inputs.git-ref }}
-        FAILURE_REPO: ${{ github.repository }}
-        FAILURE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        FAILURE_WORKFLOW: ${{ github.workflow }}
-        FAILURE_JOB: ${{ github.job }}
-        FAILURE_SHA: ${{ github.sha }}
       run: |
-        echo "Agent Metadata Action failed. agent-type='${FAILURE_AGENT_TYPE}' version='${FAILURE_VERSION}' git-ref='${FAILURE_GIT_REF}' repo='${FAILURE_REPO}' run='${FAILURE_RUN_URL}'"
-        #if [ -z "${{ secrets.NEW_RELIC_ACCOUNT_ID }}" ] || [ -z "$NR_LICENSE_KEY" ]; then
-          #echo "newrelic-account-id or newrelic-license-key not set; skipping NewRelic failure notification"
-          #exit 0
-        #fi
-
-        URL="https://staging.newrelic.com/v1/accounts/1/events"
-  
         # Define grouping fingerprint variables
         ERROR_CLASS="GitHubWorkflowError"
         ERROR_MESSAGE="Step run-pipeline failed with exit code ${{ steps.run-pipeline.outputs.cmd_exit_code }}"
         TRANSACTION_NAME="WebTransaction/Action/${{ github.workflow }}/${{ github.job }}"
-      
+        
+        URL="https://staging.newrelic.com/v1/accounts/1/events"  
         HTTP_STATUS=$(curl -sS -o /tmp/nr_response.txt -w "%{http_code}" \
         -X POST $URL \
         -H "Content-Type: application/json" \
