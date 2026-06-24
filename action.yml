@@ -230,6 +230,7 @@ runs:
       if: failure()
       shell: bash
       env:
+        NR_ACCOUNT_ID: 12951478
         NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
       run: |
         # Define grouping fingerprint variables
@@ -237,7 +238,7 @@ runs:
         ERROR_MESSAGE="Step run-pipeline failed with exit code ${{ steps.run-pipeline.outputs.cmd_exit_code }}"
         TRANSACTION_NAME="WebTransaction/Action/${{ github.workflow }}/${{ github.job }}"
         
-        URL="https://staging.newrelic.com/v1/accounts/1/events"  
+        URL="https://staging.newrelic.com/v1/accounts/$NR_ACCOUNT_ID/events"  
         HTTP_STATUS=$(curl -sS -o /tmp/nr_response.txt -w "%{http_code}" \
         -X POST $URL \
         -H "Content-Type: application/json" \
@@ -245,7 +246,7 @@ runs:
         -d "[{
         \"eventType\": \"TransactionError\",
         \"appName\": \"GitHub-CI-Pipelines\",
-        \"entityGuid\": \"${{ secrets.NEW_RELIC_ENTITY_GUID }}\",
+        \"entityGuid\": \"MTI5NTE0Nzh8QVBNfEFQUExJQ0FUSU9OfDI4ODY2ODM3MQ\",
         \"transactionName\": \"$TRANSACTION_NAME\",
         \"error.class\": \"$ERROR_CLASS\",
         \"error.message\": \"$ERROR_MESSAGE\",
