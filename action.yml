@@ -246,7 +246,7 @@ runs:
           #exit 0
         #fi
 
-        URL="https://staging.newrelic.com/v1/accounts/${{ secrets.NEW_RELIC_ACCOUNT_ID }}/events"
+        URL="https://staging.newrelic.com/v1/accounts/1/events"
   
         # Define grouping fingerprint variables
         ERROR_CLASS="GitHubWorkflowError"
