@@ -238,7 +238,7 @@ runs:
         ERROR_MESSAGE="Step run-pipeline failed with exit code ${{ steps.run-pipeline.outputs.cmd_exit_code }}"
         TRANSACTION_NAME="WebTransaction/Action/${{ github.workflow }}/${{ github.job }}"
         
-        URL="https://staging.newrelic.com/v1/accounts/$NR_ACCOUNT_ID/events"  
+        URL="https://staging-collector.newrelic.com/v1/accounts/${NR_ACCOUNT_ID}/events" 
         HTTP_STATUS=$(curl -sS -o /tmp/nr_response.txt -w "%{http_code}" \
         -X POST $URL \
         -H "Content-Type: application/json" \
