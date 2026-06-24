@@ -198,12 +198,6 @@ runs:
         echo "::endgroup::"
         echo "::notice::NewRelic authentication successful"
 
-    - name: FAIL
-      id: fail
-      shell: bash
-      run: |
-        exit 1
-
     - name: Notify on failure
       if: failure()
       shell: bash
