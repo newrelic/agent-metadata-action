@@ -59,6 +59,7 @@ inputs:
     description: 'New Relic APM license key for instrumentation of this action (optional, pass from secrets)'
     required: false
     default: ''
+
 runs:
   using: 'composite'
   steps:
@@ -196,6 +197,46 @@ runs:
 
         echo "::endgroup::"
         echo "::notice::NewRelic authentication successful"
+
+    - name: Notify on failure
+      if: failure()
+      shell: bash
+      env:
+        NR_ACCOUNT_ID: 12951478
+        NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
+      run: |
+        # Define grouping fingerprint variables
+        ERROR_CLASS="GitHubWorkflowError"
+        ERROR_MESSAGE="Step run-pipeline failed with exit code ${{ steps.run-pipeline.outputs.cmd_exit_code }}"
+        TRANSACTION_NAME="WebTransaction/Action/${{ github.workflow }}/${{ github.job }}"
+        
+        URL="https://staging-collector.newrelic.com/v1/accounts/${NR_ACCOUNT_ID}/events" 
+        HTTP_STATUS=$(curl -sS -o /tmp/nr_response.txt -w "%{http_code}" \
+        -X POST $URL \
+        -H "Content-Type: application/json" \
+        -H "Api-Key: ${NR_LICENSE_KEY}" \
+        -d "[{
+        \"eventType\": \"TransactionError\",
+        \"appName\": \"GitHub-CI-Pipelines\",
+        \"entityGuid\": \"MTI5NTE0Nzh8QVBNfEFQUExJQ0FUSU9OfDI4ODY2ODM3MQ\",
+        \"transactionName\": \"$TRANSACTION_NAME\",
+        \"error.class\": \"$ERROR_CLASS\",
+        \"error.message\": \"$ERROR_MESSAGE\",
+        \"error.group.name\": \"CI-Failure-${{ github.workflow }}\",
+        \"databaseCallCount\": 0,
+        \"duration\": 0.0,
+        \"host\": \"github-runner\",
+        \"repository\": \"${{ github.repository }}\",
+        \"runId\": \"${{ github.run_id }}\"
+        }]")
+        
+        if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+          echo "Failure event sent to NewRelic (HTTP $HTTP_STATUS)"
+        else
+          RESPONSE_BODY=$(head -c 500 /tmp/nr_response.txt 2>/dev/null || true)
+          echo "Failed to send NewRelic failure event (HTTP $HTTP_STATUS): $RESPONSE_BODY"
+        fi
+        rm -f /tmp/nr_response.txt
 
     - name: Build and Run
       id: run-action
