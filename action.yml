@@ -230,7 +230,6 @@ runs:
       if: failure()
       shell: bash
       env:
-        NR_ACCOUNT_ID: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
         NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
         FAILURE_AGENT_TYPE: ${{ inputs.agent-type }}
         FAILURE_VERSION: ${{ inputs.version }}
@@ -247,7 +246,7 @@ runs:
           exit 0
         fi
 
-        URL="https://staging.newrelic.com/v1/accounts/${NEW_RELIC_ACCOUNT_ID}/events"
+        URL="https://staging.newrelic.com/v1/accounts/${{ secrets.NEW_RELIC_ACCOUNT_ID }}/events"
   
         # Define grouping fingerprint variables
         ERROR_CLASS="GitHubWorkflowError"
