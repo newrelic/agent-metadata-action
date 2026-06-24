@@ -198,34 +198,6 @@ runs:
         echo "::endgroup::"
         echo "::notice::NewRelic authentication successful"
 
-    - name: FAIL
-      id: fail
-      shell: bash
-      run: |
-        exit 1
-
-    - name: Build and Run
-      id: run-action
-      shell: bash
-      env:
-        INPUT_AGENT_TYPE: ${{ inputs.agent-type }}
-        INPUT_VERSION: ${{ inputs.version }}
-        INPUT_CONFIG_DIRECTORY: ${{ inputs.config-directory }}
-        INPUT_MONITORING_TYPE: ${{ inputs.monitoring-type }}
-        INPUT_DISPLAY_NAME: ${{ inputs.display-name }}
-        NEWRELIC_TOKEN: ${{ steps.newrelic-auth.outputs.token }}
-        INPUT_OCI_REGISTRY: ${{ inputs.oci-registry }}
-        INPUT_OCI_USERNAME: ${{ inputs.oci-username }}
-        INPUT_OCI_PASSWORD: ${{ inputs.oci-password }}
-        INPUT_BINARIES: ${{ inputs.binaries }}
-        APM_CONTROL_NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
-      run: |
-        set -e
-        cd ${{ github.action_path }}
-        # todo - look at using a built image instead
-        go build -o agent-metadata-action ./cmd/agent-metadata-action
-        ./agent-metadata-action
-
     - name: Notify on failure
       if: failure()
       shell: bash
@@ -265,3 +237,25 @@ runs:
           echo "Failed to send NewRelic failure event (HTTP $HTTP_STATUS): $RESPONSE_BODY"
         fi
         rm -f /tmp/nr_response.txt
+
+    - name: Build and Run
+      id: run-action
+      shell: bash
+      env:
+        INPUT_AGENT_TYPE: ${{ inputs.agent-type }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_CONFIG_DIRECTORY: ${{ inputs.config-directory }}
+        INPUT_MONITORING_TYPE: ${{ inputs.monitoring-type }}
+        INPUT_DISPLAY_NAME: ${{ inputs.display-name }}
+        NEWRELIC_TOKEN: ${{ steps.newrelic-auth.outputs.token }}
+        INPUT_OCI_REGISTRY: ${{ inputs.oci-registry }}
+        INPUT_OCI_USERNAME: ${{ inputs.oci-username }}
+        INPUT_OCI_PASSWORD: ${{ inputs.oci-password }}
+        INPUT_BINARIES: ${{ inputs.binaries }}
+        APM_CONTROL_NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
+      run: |
+        set -e
+        cd ${{ github.action_path }}
+        # todo - look at using a built image instead
+        go build -o agent-metadata-action ./cmd/agent-metadata-action
+        ./agent-metadata-action
