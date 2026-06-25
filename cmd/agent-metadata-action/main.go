@@ -227,11 +227,24 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 		logging.Noticef(ctx, "Loaded %d agent control definitions", len(agentControl))
 	}
 
+	// Load agent definition (optional)
+	agentDef, err := loader.ReadAgentDefinition(ctx, workspace)
+	if err != nil {
+		logging.Warnf(ctx, "Unable to load agent definition: %v - continuing without it", err)
+		agentDef = nil
+	} else if agentDef != nil {
+		logging.Notice(ctx, "Loaded agent definition")
+	}
+
 	// Build metadata
 	metadata := models.AgentMetadata{
 		ConfigurationDefinitions: configs,
 		Metadata:                 loader.LoadMetadataForAgents(agentVersion),
 		AgentControlDefinitions:  agentControl,
+	}
+	if agentDef != nil {
+		metadata.Bindings = agentDef.Bindings
+		metadata.BreakingChange = agentDef.BreakingChange
 	}
 
 	printJSON(ctx, "Agent Metadata", metadata)

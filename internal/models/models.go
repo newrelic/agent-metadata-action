@@ -5,6 +5,8 @@ type AgentMetadata struct {
 	ConfigurationDefinitions []ConfigurationDefinition `json:"configurationDefinitions"`
 	Metadata                 Metadata                  `json:"metadata"`
 	AgentControlDefinitions  []AgentControlDefinition  `json:"agentControlDefinitions"`
+	Bindings                 []interface{}             `json:"bindings,omitempty"`
+	BreakingChange           *string                   `json:"breakingChange,omitempty"`
 }
 
 // ConfigurationDefinition represents a configuration that can be read from YAML and sent as JSON.
@@ -21,6 +23,13 @@ type Metadata map[string]interface{}
 // It uses a map to allow any attributes to be added or removed without code changes.
 // YAML fields are automatically translated to JSON.
 type AgentControlDefinition map[string]interface{}
+
+// AgentDefinition is a typed view of agentDefinition.yml used for parsing.
+// Fields are promoted flat onto AgentMetadata for JSON serialization.
+type AgentDefinition struct {
+	Bindings       []interface{} `yaml:"bindings"`
+	BreakingChange *string       `yaml:"breakingChange"`
+}
 
 // ConfigFile represents the YAML file structure containing multiple configs
 type ConfigFile struct {
