@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout action repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -49,7 +49,7 @@ jobs:
           egress-policy: audit
 
       - name: Checkout action repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -127,7 +127,7 @@ jobs:
           egress-policy: audit
 
       - name: Checkout action repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -252,7 +252,7 @@ jobs:
           egress-policy: audit
 
       - name: Checkout action repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0  # Need full history to create proper push simulation
 
@@ -386,7 +386,7 @@ jobs:
     if: always()
     steps:
       - name: Checkout action repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Delete temporary tag
         run: |
