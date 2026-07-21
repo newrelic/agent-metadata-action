@@ -91,6 +91,63 @@ func TestLoadMetadataForAgents_DisplayName(t *testing.T) {
 	}
 }
 
+func TestParseTags(t *testing.T) {
+	tests := []struct {
+		name        string
+		tagsJSON    string
+		expectErr   bool
+		expectedLen int
+		expectedKey string
+		expectedVal string
+	}{
+		{
+			name:        "empty input returns empty map",
+			tagsJSON:    "",
+			expectErr:   false,
+			expectedLen: 0,
+		},
+		{
+			name:        "valid JSON with single tag",
+			tagsJSON:    `{"helm-version": "1.7.10"}`,
+			expectErr:   false,
+			expectedLen: 1,
+			expectedKey: "helm-version",
+			expectedVal: "1.7.10",
+		},
+		{
+			name:        "valid JSON with multiple tags",
+			tagsJSON:    `{"helm-version": "1.7.10", "cd-helm-version": "1.0.0"}`,
+			expectErr:   false,
+			expectedLen: 2,
+		},
+		{
+			name:      "invalid JSON returns error",
+			tagsJSON:  `{not valid json`,
+			expectErr: true,
+		},
+		{
+			name:      "JSON with array value returns error",
+			tagsJSON:  `{"helm-version": ["1.7.10"]}`,
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tags, err := ParseTags(tt.tagsJSON)
+			if tt.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Len(t, tags, tt.expectedLen)
+			if tt.expectedKey != "" {
+				assert.Equal(t, tt.expectedVal, tags[tt.expectedKey])
+			}
+		})
+	}
+}
+
 func TestLoadMetadata_WithMDXFiles_Success(t *testing.T) {
 	// Create a temporary workspace
 	tmpWorkspace := t.TempDir()
