@@ -14,6 +14,7 @@ import (
 	"agent-metadata-action/internal/loader"
 	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
+	"agent-metadata-action/internal/nrapp"
 	"agent-metadata-action/internal/oci"
 	"agent-metadata-action/internal/sign"
 
@@ -37,56 +38,11 @@ var ociHandleUploadsFunc = func(ctx context.Context, ociConfig *models.OCIConfig
 	return oci.HandleUploads(ctx, ociConfig, workspace, version)
 }
 
-// initNewRelic initializes the New Relic application
-// Returns nil if APM_CONTROL_NR_LICENSE_KEY is not set (silent no-op mode)
-func initNewRelic(ctx context.Context) *newrelic.Application {
-	licenseKey := config.GetNRAgentLicenseKey()
-	if licenseKey == "" {
-		logging.Warn(ctx, "Failed to init New Relic - missing license key")
-		return nil
-	}
-
-	// Hardcode staging environment
-	err := config.SetNRAgentHost()
-	if err != nil {
-		logging.Warnf(ctx, "Failed to init New Relic, missing host: %v", err)
-		return nil
-	}
-	logging.Notice(ctx, "Using New Relic staging environment")
-
-	app, err := newrelic.NewApplication(
-		newrelic.ConfigAppName("agent-metadata-action"),
-		newrelic.ConfigLicense(licenseKey),
-		newrelic.ConfigDistributedTracerEnabled(true),
-		newrelic.ConfigAppLogForwardingEnabled(true),
-		newrelic.ConfigFromEnvironment(), // This reads NEW_RELIC_HOST
-		newrelic.ConfigLabels(map[string]string{
-			"team": "APM Control Team",
-		}),
-	)
-
-	if err != nil {
-		logging.Warnf(ctx, "Failed to init New Relic: %v", err)
-		return nil
-	}
-
-	logging.Notice(ctx, "New Relic APM enabled - waiting for connection...")
-
-	// Wait for the app to connect (max 10 seconds)
-	if err := app.WaitForConnection(10 * time.Second); err != nil {
-		logging.Warnf(ctx, "New Relic connection timeout: %v - will try to send data anyway", err)
-	} else {
-		logging.Notice(ctx, "New Relic connected successfully")
-	}
-
-	return app
-}
-
 func main() {
 	// Create base context for early logging
 	ctx := context.Background()
 
-	nrApp := initNewRelic(ctx)
+	nrApp := nrapp.New(ctx)
 
 	// Run the action
 	err := run(nrApp)
