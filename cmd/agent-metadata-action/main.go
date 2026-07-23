@@ -247,6 +247,13 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 		metadata.BreakingChange = agentDef.BreakingChange
 	}
 
+	tags, err := loader.ParseTags(config.GetTags())
+	if err != nil {
+		logging.Warnf(ctx, "Unable to parse tags input: %v - continuing without tags", err)
+	} else if len(tags) > 0 {
+		metadata.Metadata["tags"] = tags
+	}
+
 	printJSON(ctx, "Agent Metadata", metadata)
 
 	ociConfig, err := oci.LoadConfig()

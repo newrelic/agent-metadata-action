@@ -43,6 +43,10 @@ inputs:
     description: 'JSON array with artifact definitions. Each artifact must specify name, path, os, arch, and format. Example: [{"name": "linux-tar", "path": "./dist/agent.tar.gz", "os": "linux", "arch": "amd64", "format": "tar+gzip"}]'
     required: false
     default: ''
+  tags:
+    description: 'JSON object of arbitrary key/value tags to store on the agent definition entity, e.g. {"helm-version": "1.7.10", "cd-helm-version": "1.0.0"}. Each value must be a string.'
+    required: false
+    default: ''
   monitoring-type:
     description: 'Monitoring type indicating which fleet this agent belongs to (APM or INFRA). Leave empty to use the service default mapping.'
     required: false
@@ -252,6 +256,7 @@ runs:
         INPUT_OCI_USERNAME: ${{ inputs.oci-username }}
         INPUT_OCI_PASSWORD: ${{ inputs.oci-password }}
         INPUT_BINARIES: ${{ inputs.binaries }}
+        INPUT_TAGS: ${{ inputs.tags }}
         APM_CONTROL_NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
       run: |
         set -e

@@ -54,6 +54,11 @@ func GetBinaries() string {
 	return os.Getenv("INPUT_BINARIES")
 }
 
+// GetTags loads the tags JSON from environment variables
+func GetTags() string {
+	return os.Getenv("INPUT_TAGS")
+}
+
 // GetNRAgentLicenseKey gets the license key to use the go agent and monitor this app
 func GetNRAgentLicenseKey() string {
 	return os.Getenv("APM_CONTROL_NR_LICENSE_KEY")

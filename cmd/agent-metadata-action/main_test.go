@@ -599,6 +599,49 @@ func TestRunAgentFlow_OCIInvalidConfig(t *testing.T) {
 	assert.Contains(t, err.Error(), "error loading OCI config")
 }
 
+func TestRunAgentFlow_TagsAppliedToMetadata(t *testing.T) {
+	projectRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	workspace := filepath.Join(projectRoot, "integration-test", "agent-flow")
+
+	t.Setenv("INPUT_TAGS", `{"helm-version": "1.7.10", "cd-helm-version": "1.0.0"}`)
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	err = runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+	require.NoError(t, err)
+
+	outputStr := getStdout()
+	assert.Contains(t, outputStr, "\"helm-version\"")
+	assert.Contains(t, outputStr, "\"cd-helm-version\"")
+	assert.Contains(t, outputStr, "1.7.10")
+	assert.Contains(t, outputStr, "1.0.0")
+}
+
+func TestRunAgentFlow_InvalidTagsJSON(t *testing.T) {
+	projectRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	workspace := filepath.Join(projectRoot, "integration-test", "agent-flow")
+
+	t.Setenv("INPUT_TAGS", "not valid json")
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// Should succeed despite invalid tags JSON
+	err = runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+	require.NoError(t, err)
+
+	outputStr := getStdout()
+	assert.Contains(t, outputStr, "::warn::Unable to parse tags input")
+	assert.Contains(t, outputStr, "continuing without tags")
+}
+
 func TestRunAgentFlow_OCIInvalidBinariesJSON(t *testing.T) {
 	projectRoot, err := filepath.Abs("../..")
 	require.NoError(t, err)

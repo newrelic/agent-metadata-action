@@ -7,6 +7,7 @@ import (
 	"agent-metadata-action/internal/models"
 	"agent-metadata-action/internal/parser"
 	"context"
+	"encoding/json"
 	"fmt"
 )
 
@@ -20,6 +21,18 @@ func LoadMetadataForAgents(version string) models.Metadata {
 		m["displayName"] = displayName
 	}
 	return m
+}
+
+// ParseTags parses the free-form tags JSON input into a flat key/value map.
+func ParseTags(tagsJSON string) (map[string]string, error) {
+	tags := map[string]string{}
+	if tagsJSON == "" {
+		return tags, nil
+	}
+	if err := json.Unmarshal([]byte(tagsJSON), &tags); err != nil {
+		return nil, fmt.Errorf("failed to parse tags JSON: %w", err)
+	}
+	return tags, nil
 }
 
 type MetadataForDocs struct {
