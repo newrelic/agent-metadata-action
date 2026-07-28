@@ -65,6 +65,14 @@ inputs:
     description: 'Human-readable display name for this agent.'
     required: false
     default: ''
+  validate-agent-type:
+    description: 'Validate the agent type definition (.fleetControl/agentControlDefinitions.yml content file) via newrelic-agent-control-cli before sending metadata. Opt-in per repo; fails the action if the definition is invalid. Requires Docker on the runner.'
+    required: false
+    default: 'false'
+  agent-control-cli-tag:
+    description: 'Tag of the newrelic/newrelic-agent-control-cli Docker image to use for validate-agent-type.'
+    required: false
+    default: 'latest'
   cache:
     description: 'Enable Go build cache'
     required: false
@@ -268,6 +276,8 @@ runs:
         INPUT_BINARIES: ${{ inputs.binaries }}
         INPUT_TAGS: ${{ inputs.tags }}
         INPUT_BINDINGS_OVERRIDE: ${{ inputs.bindings-override }}
+        INPUT_VALIDATE_AGENT_TYPE: ${{ inputs.validate-agent-type }}
+        INPUT_AGENT_CONTROL_CLI_TAG: ${{ inputs.agent-control-cli-tag }}
         APM_CONTROL_NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
       run: |
         set -e

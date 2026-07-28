@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 )
 
 // GetWorkspace loads the GH workspace path from environment variables
@@ -83,6 +84,18 @@ func GetMonitoringType() string {
 // GetDisplayName loads the display name from environment variables
 func GetDisplayName() string {
 	return os.Getenv("INPUT_DISPLAY_NAME")
+}
+
+// GetValidateAgentType reports whether agent type definitions should be validated via
+// newrelic-agent-control-cli before being sent to the instrumentation service.
+func GetValidateAgentType() bool {
+	return strings.EqualFold(os.Getenv("INPUT_VALIDATE_AGENT_TYPE"), "true")
+}
+
+// GetAgentControlCLIImageTag loads the Docker image tag for newrelic-agent-control-cli
+// from environment variables. Returns "" if not set, letting the caller fall back to a default.
+func GetAgentControlCLIImageTag() string {
+	return os.Getenv("INPUT_AGENT_CONTROL_CLI_TAG")
 }
 
 // SetNRAgentHost sets the host to use for the go agent that will be used to monitor this app

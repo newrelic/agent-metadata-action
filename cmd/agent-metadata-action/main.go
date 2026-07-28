@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"agent-metadata-action/internal/models"
 	"agent-metadata-action/internal/oci"
 	"agent-metadata-action/internal/sign"
+	"agent-metadata-action/internal/validator"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
@@ -218,9 +220,18 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	}
 	logging.Noticef(ctx, "Loaded %d configuration definitions", len(configs))
 
-	// Load agent control definitions (optional)
+	// Load agent control definitions (optional, unless agent type validation is enabled and fails)
 	agentControl, err := loader.ReadAgentControlDefinitions(ctx, workspace)
 	if err != nil {
+		var valErr *validator.ValidationError
+		if errors.As(err, &valErr) {
+			logging.NoticeErrorWithCategory(ctx, err, "agentType.validation", map[string]interface{}{
+				"error.operation": "validate_agent_type_definition",
+				"agent.type":      agentType,
+				"agent.version":   agentVersion,
+			})
+			return err
+		}
 		logging.Warnf(ctx, "Unable to load agent control definitions: %v - continuing without them", err)
 		agentControl = nil
 	} else {
