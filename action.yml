@@ -47,6 +47,16 @@ inputs:
     description: 'JSON object of arbitrary key/value tags to store on the agent definition entity, e.g. {"helm-version": "1.7.10", "cd-helm-version": "1.0.0"}. Each value must be a string.'
     required: false
     default: ''
+  bindings-override:
+    description: >
+      JSON array of binding objects to merge into the bindings loaded from agentDefinition.yml.
+      Each override binding is matched against existing bindings by (type, targetType, target) -
+      a match replaces the existing entry, no match appends. Useful for binding values that must
+      be computed at release time (e.g. a protocol version read from the repo's build metadata)
+      rather than hardcoded in agentDefinition.yml.
+      Example: [{"type":"SUPPORTS","targetType":"SPECIFICATION","target":"protocol_version","versions":["<=1.0"]}]
+    required: false
+    default: ''
   monitoring-type:
     description: 'Monitoring type indicating which fleet this agent belongs to (APM or INFRA). Leave empty to use the service default mapping.'
     required: false
@@ -257,6 +267,7 @@ runs:
         INPUT_OCI_PASSWORD: ${{ inputs.oci-password }}
         INPUT_BINARIES: ${{ inputs.binaries }}
         INPUT_TAGS: ${{ inputs.tags }}
+        INPUT_BINDINGS_OVERRIDE: ${{ inputs.bindings-override }}
         APM_CONTROL_NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
       run: |
         set -e
