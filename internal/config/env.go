@@ -59,6 +59,11 @@ func GetTags() string {
 	return os.Getenv("INPUT_TAGS")
 }
 
+// GetBindingsOverride loads the bindings override JSON from environment variables
+func GetBindingsOverride() string {
+	return os.Getenv("INPUT_BINDINGS_OVERRIDE")
+}
+
 // GetNRAgentLicenseKey gets the license key to use the go agent and monitor this app
 func GetNRAgentLicenseKey() string {
 	return os.Getenv("APM_CONTROL_NR_LICENSE_KEY")

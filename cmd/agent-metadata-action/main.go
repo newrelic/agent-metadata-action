@@ -247,6 +247,16 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 		metadata.BreakingChange = agentDef.BreakingChange
 	}
 
+	metadata.Bindings, err = loader.MergeBindingsOverride(ctx, metadata.Bindings, config.GetBindingsOverride())
+	if err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "bindings.override", map[string]interface{}{
+			"error.operation": "merge_bindings_override",
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+		})
+		return fmt.Errorf("failed to apply bindings override: %w", err)
+	}
+
 	tags, err := loader.ParseTags(config.GetTags())
 	if err != nil {
 		logging.Warnf(ctx, "Unable to parse tags input: %v - continuing without tags", err)
