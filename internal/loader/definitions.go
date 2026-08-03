@@ -4,6 +4,7 @@ import (
 	"agent-metadata-action/internal/config"
 	"agent-metadata-action/internal/logging"
 	"agent-metadata-action/internal/models"
+	"agent-metadata-action/internal/validator"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -37,12 +38,19 @@ func ReadConfigurationDefinitions(ctx context.Context, workspacePath string) ([]
 			continue
 		}
 
+		resolvedPath, err := resolveContentPath(workspacePath, schemaPath)
+		if err != nil {
+			logging.Warnf(ctx, "failed to resolve schema path %s: %v -- dropping schema field", schemaPath, err)
+			delete(definitions[i], "schema")
+			continue
+		}
+
 		// @todo at some point, we may want to do this concurrently if there are any agents with a large number of files
-		encoded, err := loadAndEncodeFile(workspacePath, schemaPath, "schema")
+		encoded, err := loadAndEncodeFile(resolvedPath)
 		if err != nil {
 			// Drop the field rather than leaving the path string in place — the server would
 			// otherwise try to base64-decode the path and reject the whole bundled request.
-			logging.Warnf(ctx, "failed to load schema at schema path %s: %v -- dropping schema field", schemaPath, err)
+			logging.Warnf(ctx, "failed to read schema file at %s: %v -- dropping schema field", resolvedPath, err)
 			delete(definitions[i], "schema")
 			continue
 		}
@@ -82,12 +90,26 @@ func ReadAgentControlDefinitions(ctx context.Context, workspacePath string) ([]m
 			continue
 		}
 
+		resolvedPath, err := resolveContentPath(workspacePath, contentPath)
+		if err != nil {
+			logging.Warnf(ctx, "failed to resolve content path %s: %v -- dropping content field", contentPath, err)
+			delete(definitions[i], "content")
+			continue
+		}
+
+		if config.GetValidateAgentType() {
+			if err := validator.ValidateAgentTypeDefinitionFunc(ctx, resolvedPath); err != nil {
+				return nil, fmt.Errorf("agent type definition validation failed for %s: %w", contentPath, err)
+			}
+			logging.Noticef(ctx, "Agent type definition at %s passed validation", contentPath)
+		}
+
 		// @todo at some point, we may want to do this concurrently if there are any agents with a large number of files
-		encoded, err := loadAndEncodeFile(workspacePath, contentPath, "content")
+		encoded, err := loadAndEncodeFile(resolvedPath)
 		if err != nil {
 			// Drop the field rather than leaving the path string in place — the server would
 			// otherwise try to base64-decode the path and reject the whole bundled request.
-			logging.Warnf(ctx, "failed to load content at path %s: %v -- dropping content field", contentPath, err)
+			logging.Warnf(ctx, "failed to read content file at %s: %v -- dropping content field", resolvedPath, err)
 			delete(definitions[i], "content")
 			continue
 		}
@@ -163,20 +185,15 @@ func readDefinitionsFile(fullPath string) ([]map[string]interface{}, error) {
 	return nil, fmt.Errorf("no array found in YAML file")
 }
 
-// loadAndEncodeFile reads a file (schema, agent control, etc.) and returns its base64-encoded content.
-// contentFieldName is the field in the definition map (e.g., "schema", "content") where the file path is found
-func loadAndEncodeFile(workspacePath string, contentPath string, filePathField string) (string, error) {
-	if contentPath == "" {
-		return "", nil
-	}
-
-	// Content paths are relative to the .fleetControl directory; the resolved path
-	// must stay within the workspace so we can't read arbitrary files on the runner.
+// resolveContentPath resolves contentPath (relative to the .fleetControl directory) to an
+// absolute path and validates that it stays within workspacePath, preventing directory
+// traversal outside the workspace.
+func resolveContentPath(workspacePath string, contentPath string) (string, error) {
 	fullPath := filepath.Join(workspacePath, config.GetRootFolderForAgentRepo(), contentPath)
 
 	resolvedPath, err := filepath.Abs(fullPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve %s path: %w", filePathField, err)
+		return "", fmt.Errorf("failed to resolve path: %w", err)
 	}
 
 	resolvedWorkspace, err := filepath.Abs(workspacePath)
@@ -185,16 +202,21 @@ func loadAndEncodeFile(workspacePath string, contentPath string, filePathField s
 	}
 
 	if !strings.HasPrefix(resolvedPath, resolvedWorkspace+string(filepath.Separator)) && resolvedPath != resolvedWorkspace {
-		return "", fmt.Errorf("invalid %s path: must be within workspace: %s", filePathField, resolvedWorkspace)
+		return "", fmt.Errorf("must be within workspace: %s", resolvedWorkspace)
 	}
 
-	data, err := os.ReadFile(fullPath)
+	return resolvedPath, nil
+}
+
+// loadAndEncodeFile reads the file at resolvedPath and returns its base64-encoded content.
+func loadAndEncodeFile(resolvedPath string) (string, error) {
+	data, err := os.ReadFile(resolvedPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read %s file at %s: %w", filePathField, fullPath, err)
+		return "", fmt.Errorf("failed to read file at %s: %w", resolvedPath, err)
 	}
 
 	if len(data) == 0 {
-		return "", fmt.Errorf("%s file at %s is empty", filePathField, fullPath)
+		return "", fmt.Errorf("file at %s is empty", resolvedPath)
 	}
 
 	encoded := base64.StdEncoding.EncodeToString(data)

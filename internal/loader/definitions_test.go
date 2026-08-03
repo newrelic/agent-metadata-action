@@ -3,8 +3,10 @@ package loader
 import (
 	"agent-metadata-action/internal/config"
 	"agent-metadata-action/internal/testutil"
+	"agent-metadata-action/internal/validator"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -226,7 +228,7 @@ func TestReadConfigurationDefinitions_SchemaLoadingWarnings(t *testing.T) {
 				// Don't create schema file
 				return "./schemas/nonexistent.json"
 			},
-			expectedWarning: "failed to load schema",
+			expectedWarning: "failed to read schema",
 		},
 		{
 			name: "empty schema file",
@@ -239,7 +241,7 @@ func TestReadConfigurationDefinitions_SchemaLoadingWarnings(t *testing.T) {
 				require.NoError(t, os.WriteFile(schemaFile, []byte(""), 0644))
 				return "./schemas/empty.json"
 			},
-			expectedWarning: "failed to load schema",
+			expectedWarning: "failed to read schema",
 		},
 	}
 
@@ -510,7 +512,7 @@ func TestReadAgentControlDefinitions_ContentLoadingWarnings(t *testing.T) {
 				// Don't create content file
 				return "./agentControl/nonexistent.yml"
 			},
-			expectedWarning: "failed to load content",
+			expectedWarning: "failed to read content",
 		},
 		{
 			name: "empty content file",
@@ -523,7 +525,7 @@ func TestReadAgentControlDefinitions_ContentLoadingWarnings(t *testing.T) {
 				require.NoError(t, os.WriteFile(contentFile, []byte(""), 0644))
 				return "./agentControl/empty.yml"
 			},
-			expectedWarning: "failed to load content",
+			expectedWarning: "failed to read content",
 		},
 		{
 			name: "content path escapes workspace",
@@ -1074,6 +1076,115 @@ func TestReadAgentDefinition_BreakingChangeUnquotedFloat(t *testing.T) {
 	require.NotNil(t, result)
 	require.NotNil(t, result.BreakingChange)
 	assert.Equal(t, "2.0", *result.BreakingChange)
+}
+
+func TestReadAgentControlDefinitions_ValidationEnabled_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	agentControlDir := filepath.Join(configDir, "agentControl")
+	require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+
+	contentData := `namespace: newrelic
+name: test-agent
+version: "1.0.0"`
+	contentFile := filepath.Join(agentControlDir, "test-control.yml")
+	require.NoError(t, os.WriteFile(contentFile, []byte(contentData), 0644))
+
+	agentControlFile := filepath.Join(configDir, config.GetAgentControlDefinitionsFilename())
+	testYAML := `agentControlDefinitions:
+    - platform: KUBERNETES
+      supportFromAgent: 1.0.0
+      supportFromAgentControl: 1.0.0
+      content: ./agentControl/test-control.yml`
+	require.NoError(t, os.WriteFile(agentControlFile, []byte(testYAML), 0644))
+
+	t.Setenv("INPUT_VALIDATE_AGENT_TYPE", "true")
+
+	var validatedPath string
+	origFunc := validator.ValidateAgentTypeDefinitionFunc
+	validator.ValidateAgentTypeDefinitionFunc = func(ctx context.Context, absFilePath string) error {
+		validatedPath = absFilePath
+		return nil
+	}
+	defer func() { validator.ValidateAgentTypeDefinitionFunc = origFunc }()
+
+	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
+	require.NoError(t, err)
+	require.Len(t, agentControls, 1)
+
+	expectedPath, err := filepath.Abs(contentFile)
+	require.NoError(t, err)
+	assert.Equal(t, expectedPath, validatedPath)
+
+	expectedEncoded := base64.StdEncoding.EncodeToString([]byte(contentData))
+	assert.Equal(t, expectedEncoded, agentControls[0]["content"])
+}
+
+func TestReadAgentControlDefinitions_ValidationEnabled_Failure(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	agentControlDir := filepath.Join(configDir, "agentControl")
+	require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+
+	contentFile := filepath.Join(agentControlDir, "broken-control.yml")
+	require.NoError(t, os.WriteFile(contentFile, []byte("namespace: newrelic"), 0644))
+
+	agentControlFile := filepath.Join(configDir, config.GetAgentControlDefinitionsFilename())
+	testYAML := `agentControlDefinitions:
+    - platform: KUBERNETES
+      supportFromAgent: 1.0.0
+      supportFromAgentControl: 1.0.0
+      content: ./agentControl/broken-control.yml`
+	require.NoError(t, os.WriteFile(agentControlFile, []byte(testYAML), 0644))
+
+	t.Setenv("INPUT_VALIDATE_AGENT_TYPE", "true")
+
+	origFunc := validator.ValidateAgentTypeDefinitionFunc
+	validator.ValidateAgentTypeDefinitionFunc = func(ctx context.Context, absFilePath string) error {
+		return &validator.ValidationError{Path: absFilePath, Output: "missing required field: deployment", Err: errors.New("exit status 65")}
+	}
+	defer func() { validator.ValidateAgentTypeDefinitionFunc = origFunc }()
+
+	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
+	require.Error(t, err)
+	assert.Nil(t, agentControls)
+
+	var valErr *validator.ValidationError
+	assert.True(t, errors.As(err, &valErr), "expected error to wrap *validator.ValidationError, got: %v", err)
+}
+
+func TestReadAgentControlDefinitions_ValidationDisabled_NotCalled(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	agentControlDir := filepath.Join(configDir, "agentControl")
+	require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+
+	contentData := `namespace: newrelic`
+	contentFile := filepath.Join(agentControlDir, "test-control.yml")
+	require.NoError(t, os.WriteFile(contentFile, []byte(contentData), 0644))
+
+	agentControlFile := filepath.Join(configDir, config.GetAgentControlDefinitionsFilename())
+	testYAML := `agentControlDefinitions:
+    - platform: KUBERNETES
+      supportFromAgent: 1.0.0
+      supportFromAgentControl: 1.0.0
+      content: ./agentControl/test-control.yml`
+	require.NoError(t, os.WriteFile(agentControlFile, []byte(testYAML), 0644))
+
+	// INPUT_VALIDATE_AGENT_TYPE intentionally left unset (defaults to disabled).
+
+	called := false
+	origFunc := validator.ValidateAgentTypeDefinitionFunc
+	validator.ValidateAgentTypeDefinitionFunc = func(ctx context.Context, absFilePath string) error {
+		called = true
+		return &validator.ValidationError{Path: absFilePath, Err: errors.New("should not be called")}
+	}
+	defer func() { validator.ValidateAgentTypeDefinitionFunc = origFunc }()
+
+	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
+	require.NoError(t, err)
+	require.Len(t, agentControls, 1)
+	assert.False(t, called, "validator should not run when INPUT_VALIDATE_AGENT_TYPE is unset")
 }
 
 func TestReadAgentDefinition_InvalidYAML(t *testing.T) {

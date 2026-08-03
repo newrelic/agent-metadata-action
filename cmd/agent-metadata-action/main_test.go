@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"agent-metadata-action/internal/loader"
 	"agent-metadata-action/internal/models"
 	"agent-metadata-action/internal/testutil"
+	"agent-metadata-action/internal/validator"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -515,6 +517,93 @@ func TestRunAgentFlow_AgentControlDefinitionsError(t *testing.T) {
 	outputStr := getStdout()
 	assert.Contains(t, outputStr, "::warn::Unable to load agent control definitions")
 	assert.Contains(t, outputStr, "continuing without them")
+}
+
+func TestRunAgentFlow_AgentTypeValidationFailure_AbortsBeforeSendMetadata(t *testing.T) {
+	workspace := t.TempDir()
+	fleetControlPath := filepath.Join(workspace, ".fleetControl")
+	agentControlDir := filepath.Join(fleetControlPath, "agentControl")
+	require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+
+	configFile := filepath.Join(fleetControlPath, "configurationDefinitions.yml")
+	configContent := `configurationDefinitions:
+  - name: test-config
+    type: string
+`
+	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
+
+	contentFile := filepath.Join(agentControlDir, "broken-control.yml")
+	require.NoError(t, os.WriteFile(contentFile, []byte("namespace: newrelic"), 0644))
+
+	agentControlFile := filepath.Join(fleetControlPath, "agentControlDefinitions.yml")
+	agentControlContent := `agentControlDefinitions:
+  - platform: KUBERNETES
+    supportFromAgent: 1.0.0
+    supportFromAgentControl: 1.0.0
+    content: ./agentControl/broken-control.yml
+`
+	require.NoError(t, os.WriteFile(agentControlFile, []byte(agentControlContent), 0644))
+
+	t.Setenv("INPUT_VALIDATE_AGENT_TYPE", "true")
+
+	origFunc := validator.ValidateAgentTypeDefinitionFunc
+	validator.ValidateAgentTypeDefinitionFunc = func(ctx context.Context, absFilePath string) error {
+		return &validator.ValidationError{Path: absFilePath, Output: "missing required field: deployment", Err: errors.New("exit status 65")}
+	}
+	defer func() { validator.ValidateAgentTypeDefinitionFunc = origFunc }()
+
+	callCount := 0
+	mockClient := &mockSelectiveFailClient{callCount: &callCount}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	err := runAgentFlow(context.Background(), mockClient, workspace, "java", "1.0.0")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "agent type definition validation failed")
+	assert.Equal(t, 0, callCount, "SendMetadata must not be called when agent type validation fails")
+
+	outputStr := getStdout()
+	assert.NotContains(t, outputStr, "::warn::Unable to load agent control definitions")
+}
+
+func TestRunAgentFlow_AgentTypeValidationSuccess(t *testing.T) {
+	workspace := t.TempDir()
+	fleetControlPath := filepath.Join(workspace, ".fleetControl")
+	agentControlDir := filepath.Join(fleetControlPath, "agentControl")
+	require.NoError(t, os.MkdirAll(agentControlDir, 0755))
+
+	configFile := filepath.Join(fleetControlPath, "configurationDefinitions.yml")
+	configContent := `configurationDefinitions:
+  - name: test-config
+    type: string
+`
+	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
+
+	contentFile := filepath.Join(agentControlDir, "good-control.yml")
+	require.NoError(t, os.WriteFile(contentFile, []byte("namespace: newrelic"), 0644))
+
+	agentControlFile := filepath.Join(fleetControlPath, "agentControlDefinitions.yml")
+	agentControlContent := `agentControlDefinitions:
+  - platform: KUBERNETES
+    supportFromAgent: 1.0.0
+    supportFromAgentControl: 1.0.0
+    content: ./agentControl/good-control.yml
+`
+	require.NoError(t, os.WriteFile(agentControlFile, []byte(agentControlContent), 0644))
+
+	t.Setenv("INPUT_VALIDATE_AGENT_TYPE", "true")
+
+	origFunc := validator.ValidateAgentTypeDefinitionFunc
+	validator.ValidateAgentTypeDefinitionFunc = func(ctx context.Context, absFilePath string) error {
+		return nil
+	}
+	defer func() { validator.ValidateAgentTypeDefinitionFunc = origFunc }()
+
+	mockClient := &mockMetadataClient{}
+
+	err := runAgentFlow(context.Background(), mockClient, workspace, "java", "1.0.0")
+	require.NoError(t, err)
 }
 
 func TestSendDocsMetadata(t *testing.T) {
