@@ -288,7 +288,7 @@ jobs:
           newrelic-auth-cli --help || echo "Mock CLI is ready"
 
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@v7.0.0
         with:
           go-version-file: 'go.mod'
           cache: false
