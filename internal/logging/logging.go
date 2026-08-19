@@ -2,6 +2,7 @@ package logging
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
@@ -99,6 +100,16 @@ func NoticeError(ctx context.Context, err error, attributes map[string]interface
 	}
 
 	txn.NoticeError(nrErr)
+}
+
+// PrintJSON marshals data to JSON and prints it with a debug annotation
+func PrintJSON(ctx context.Context, label string, data any) {
+	jsonData, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		Debugf(ctx, "Failed to marshal %s: %v", label, err)
+		return
+	}
+	Debugf(ctx, "%s: %s", label, string(jsonData))
 }
 
 // NoticeErrorWithCategory is a convenience wrapper that adds a category attribute

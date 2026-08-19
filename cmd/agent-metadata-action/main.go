@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -231,7 +230,7 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 		metadata.Metadata["tags"] = tags
 	}
 
-	printJSON(ctx, "Agent Metadata", metadata)
+	logging.PrintJSON(ctx, "Agent Metadata", metadata)
 
 	ociConfig, err := oci.LoadConfig()
 	if err != nil {
@@ -318,7 +317,7 @@ func sendDocsMetadata(ctx context.Context, client metadataClient, entry loader.M
 		Metadata: entry.AgentMetadataFromDocs,
 	}
 
-	printJSON(ctx, fmt.Sprintf("Docs Metadata (%s %s)", entry.AgentType, version), entry.AgentMetadataFromDocs)
+	logging.PrintJSON(ctx, fmt.Sprintf("Docs Metadata (%s %s)", entry.AgentType, version), entry.AgentMetadataFromDocs)
 
 	if err := client.SendMetadata(ctx, entry.AgentType, version, &metadata); err != nil {
 		return err
@@ -326,14 +325,4 @@ func sendDocsMetadata(ctx context.Context, client metadataClient, entry loader.M
 
 	logging.Noticef(ctx, "Sent metadata for %s version %s", entry.AgentType, version)
 	return nil
-}
-
-// printJSON marshals data to JSON and prints it with a debug annotation
-func printJSON(ctx context.Context, label string, data any) {
-	jsonData, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		logging.Debugf(ctx, "Failed to marshal %s: %v", label, err)
-		return
-	}
-	logging.Debugf(ctx, "%s: %s", label, string(jsonData))
 }
