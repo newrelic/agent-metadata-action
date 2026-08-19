@@ -177,5 +177,8 @@ runs:
       run: |
         set -e
         cd ${{ github.action_path }}/..
-        go build -o promote-release-channel ./cmd/promote-release-channel
-        ./promote-release-channel
+        # Output name deliberately differs from the ./promote-release-channel/ action
+        # directory at repo root - `go build -o promote-release-channel` would silently
+        # write the binary *inside* that existing directory instead of erroring.
+        go build -o promote-release-channel-bin ./cmd/promote-release-channel
+        ./promote-release-channel-bin

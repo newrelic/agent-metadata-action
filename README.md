@@ -199,8 +199,9 @@ Then run it from the Actions tab: **Actions → Promote Release Channel → Run 
 # Build the binary
 go build -o agent-metadata-action ./cmd/agent-metadata-action
 
-# Build the release channel promotion binary
-go build -o promote-release-channel ./cmd/promote-release-channel
+# Build the release channel promotion binary (named -bin to avoid colliding
+# with the ./promote-release-channel/ action directory at repo root)
+go build -o promote-release-channel-bin ./cmd/promote-release-channel
 ```
 
 ## Testing
