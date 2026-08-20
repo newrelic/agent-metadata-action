@@ -85,19 +85,13 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    # Kept first so it always fires, regardless of what happens downstream.
-    - name: Deprecation notice
-      shell: bash
-      run: |
-        echo "::warning::newrelic/agent-metadata-action@v1 (root path) is deprecated. Please migrate to newrelic/agent-metadata-action/send-metadata@v1 - same inputs, same behavior. The root action will be removed in a future release."
-
     # Set up Go first so the failure reporter can build for any later step's failure.
     - name: Setup Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version-file: '${{ github.action_path }}/go.mod'
+        go-version-file: '${{ github.action_path }}/../go.mod'
         cache: ${{ inputs.cache }}
-        cache-dependency-path: '${{ github.action_path }}/go.sum'
+        cache-dependency-path: '${{ github.action_path }}/../go.sum'
 
     - name: Determine checkout ref
       id: checkout-ref
@@ -128,9 +122,9 @@ runs:
     - name: Setup Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version-file: '${{ github.action_path }}/go.mod'
+        go-version-file: '${{ github.action_path }}/../go.mod'
         cache: ${{ inputs.cache }}
-        cache-dependency-path: '${{ github.action_path }}/go.sum'
+        cache-dependency-path: '${{ github.action_path }}/../go.sum'
 
     - name: Install NewRelic Auth CLI
       shell: bash
@@ -241,7 +235,7 @@ runs:
       env:
         APM_CONTROL_NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
       run: |
-        cd ${{ github.action_path }}
+        cd ${{ github.action_path }}/..
         if ! go build -o notify-failure ./cmd/notify-failure; then
           echo "::warning::Could not build failure reporter; skipping New Relic failure report"
           exit 0
@@ -269,7 +263,7 @@ runs:
         APM_CONTROL_NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
       run: |
         set -e
-        cd ${{ github.action_path }}
+        cd ${{ github.action_path }}/..
         # todo - look at using a built image instead
         go build -o agent-metadata-action ./cmd/agent-metadata-action
         ./agent-metadata-action

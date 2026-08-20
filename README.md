@@ -2,13 +2,19 @@
 
 # Agent Metadata Action
 
-A GitHub Action that reads agent configuration metadata from the calling repository. There are 2 scearios to use this action:
-1. An agent release - This action parses the `.fleetControl/configurationDefinitions.yml` file and makes the configuration data, metadata, and binaries available in New Relic.
-2. A docs update for an agent release - This action parses the frontmatter of the docs mdx files and makes the metadata available in New Relic.
+This repository hosts two standalone GitHub Actions used by New Relic agent repos:
 
-This repository also hosts a second, standalone action - `promote-release-channel` - for
-promoting an already-published version onto a release channel. See
-[Promoting a Version to a Release Channel](#promoting-a-version-to-a-release-channel).
+- **`send-metadata`** - reads agent configuration metadata from the calling repository and sends it to New Relic. There are 2 scenarios to use this action:
+  1. An agent release - This action parses the `.fleetControl/configurationDefinitions.yml` file and makes the configuration data, metadata, and binaries available in New Relic.
+  2. A docs update for an agent release - This action parses the frontmatter of the docs mdx files and makes the metadata available in New Relic.
+- **`promote-release-channel`** - promotes an already-published version onto a release
+  channel. See [Promoting a Version to a Release Channel](#promoting-a-version-to-a-release-channel).
+
+> **Deprecated:** the action at the repository root (`newrelic/agent-metadata-action@v1`,
+> no path) is deprecated in favor of `newrelic/agent-metadata-action/send-metadata@v1` -
+> identical inputs and behavior, just a clearer path now that this repo hosts multiple
+> actions. The root action logs a warning on every run and will be removed in a future
+> release.
 
 ## Installation
 
@@ -16,7 +22,7 @@ Add this action to your workflow:
 
 ```yaml
 - name: Read agent metadata
-  uses: newrelic/agent-metadata-action@v1
+  uses: newrelic/agent-metadata-action/send-metadata@v1
 ```
 
 ## Usage
@@ -45,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Read agent metadata
-        uses: newrelic/agent-metadata-action@v1
+        uses: newrelic/agent-metadata-action/send-metadata@v1
         with:
           newrelic-client-id: ${{ secrets.OAUTH_CLIENT_ID }}
           newrelic-private-key: ${{ secrets.OAUTH_CLIENT_SECRET }}
@@ -78,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Read agent metadata
-        uses: newrelic/agent-metadata-action@v1
+        uses: newrelic/agent-metadata-action/send-metadata@v1
         with:
           newrelic-client-id: ${{ secrets.OAUTH_CLIENT_ID }}
           newrelic-private-key: ${{ secrets.OAUTH_CLIENT_SECRET }}
