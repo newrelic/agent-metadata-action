@@ -211,3 +211,47 @@ func TestNoticeErrorWithCategory_WithNilError(t *testing.T) {
 	// No assertions needed - just verify no panic
 	t.Log("NoticeErrorWithCategory with nil error should be no-op")
 }
+
+func TestPrintJSON(t *testing.T) {
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	ctx := context.Background()
+	PrintJSON(ctx, "Test Label", map[string]string{"key": "value"})
+
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	output := buf.String()
+
+	if !strings.Contains(output, "::debug::Test Label:") {
+		t.Errorf("expected output to contain label, got %q", output)
+	}
+	if !strings.Contains(output, `"key": "value"`) {
+		t.Errorf("expected output to contain marshaled JSON, got %q", output)
+	}
+}
+
+func TestPrintJSON_MarshalError(t *testing.T) {
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	ctx := context.Background()
+	// Channels cannot be marshaled to JSON
+	PrintJSON(ctx, "Bad Label", map[string]interface{}{"unmarshalable": make(chan int)})
+
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	output := buf.String()
+
+	if !strings.Contains(output, "Failed to marshal Bad Label") {
+		t.Errorf("expected output to contain marshal failure, got %q", output)
+	}
+}

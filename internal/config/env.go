@@ -98,6 +98,28 @@ func GetAgentControlCLIImageTag() string {
 	return os.Getenv("INPUT_AGENT_CONTROL_CLI_TAG")
 }
 
+// GetChannel loads the release channel to promote to from environment variables.
+func GetChannel() string {
+	return os.Getenv("INPUT_CHANNEL")
+}
+
+// GetPlatform loads the target platform for a release channel promotion from environment variables.
+func GetPlatform() string {
+	return os.Getenv("INPUT_PLATFORM")
+}
+
+// GetOperatingSystem loads the target operating system for a release channel promotion
+// from environment variables.
+func GetOperatingSystem() string {
+	return os.Getenv("INPUT_OPERATING_SYSTEM")
+}
+
+// GetNote loads the optional audit-trail note for a release channel promotion from
+// environment variables.
+func GetNote() string {
+	return os.Getenv("INPUT_NOTE")
+}
+
 // SetNRAgentHost sets the host to use for the go agent that will be used to monitor this app
 func SetNRAgentHost() error {
 	err := os.Setenv("NEW_RELIC_HOST", "staging-collector.newrelic.com")

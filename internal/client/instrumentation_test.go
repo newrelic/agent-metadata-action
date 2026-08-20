@@ -434,6 +434,256 @@ func TestSendMetadata_MarshalError(t *testing.T) {
 	assert.Contains(t, outputStr, "Failed to marshal metadata")
 }
 
+func TestPromoteToReleaseChannel_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/v1/agents/NRJavaAgent/versions/1.2.3/release-channel", r.URL.Path)
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+
+		var req models.SetReleaseChannelRequest
+		err = json.Unmarshal(body, &req)
+		require.NoError(t, err)
+		assert.Equal(t, "HOST", req.Platform)
+		assert.Equal(t, "LINUX", req.OperatingSystem)
+		assert.Equal(t, "REGULAR", req.Channel)
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"agentType":"NRJavaAgent","platform":"HOST","operatingSystem":"LINUX","channel":"REGULAR","currentVersion":"1.2.3","previousVersion":"1.2.2","promotedAt":"2026-08-19T00:00:00Z","promotedBy":"test-principal"}`))
+	}))
+	defer server.Close()
+
+	client := NewInstrumentationClient(server.URL, "test-token")
+
+	req := &models.SetReleaseChannelRequest{Platform: "HOST", OperatingSystem: "LINUX", Channel: "REGULAR"}
+
+	getStdout, getStderr := testutil.CaptureOutput(t)
+
+	// method under test
+	promotion, err := client.PromoteToReleaseChannel(context.Background(), "NRJavaAgent", "1.2.3", req)
+
+	outputStr := getStdout()
+	stderrStr := getStderr()
+
+	require.NoError(t, err)
+	require.NotNil(t, promotion)
+	assert.Equal(t, "NRJavaAgent", promotion.AgentType)
+	assert.Equal(t, "1.2.3", promotion.CurrentVersion)
+	require.NotNil(t, promotion.PreviousVersion)
+	assert.Equal(t, "1.2.2", *promotion.PreviousVersion)
+	assert.Contains(t, outputStr, "Promoting version to release channel")
+	assert.Contains(t, outputStr, "HTTP status code: 200")
+	assert.Contains(t, outputStr, "Version successfully promoted to release channel")
+	assert.NotContains(t, stderrStr, "::error::")
+}
+
+func TestPromoteToReleaseChannel_NoPreviousVersion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"agentType":"NRJavaAgent","platform":"HOST","operatingSystem":"LINUX","channel":"REGULAR","currentVersion":"1.2.3","promotedAt":"2026-08-19T00:00:00Z","promotedBy":"test-principal"}`))
+	}))
+	defer server.Close()
+
+	client := NewInstrumentationClient(server.URL, "test-token")
+	req := &models.SetReleaseChannelRequest{Platform: "HOST", OperatingSystem: "LINUX", Channel: "REGULAR"}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// method under test
+	promotion, err := client.PromoteToReleaseChannel(context.Background(), "NRJavaAgent", "1.2.3", req)
+
+	_ = getStdout()
+
+	require.NoError(t, err)
+	require.NotNil(t, promotion)
+	assert.Nil(t, promotion.PreviousVersion)
+}
+
+func TestPromoteToReleaseChannel_ValidationErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		request       *models.SetReleaseChannelRequest
+		agentType     string
+		agentVersion  string
+		expectedInErr string
+		expectedInLog string
+	}{
+		{
+			name:          "nil request",
+			request:       nil,
+			agentType:     "NRJavaAgent",
+			agentVersion:  "1.2.3",
+			expectedInErr: "release channel request is required",
+			expectedInLog: "Release channel request is required but was nil",
+		},
+		{
+			name:          "empty agent type",
+			request:       &models.SetReleaseChannelRequest{Platform: "HOST", OperatingSystem: "LINUX", Channel: "REGULAR"},
+			agentType:     "",
+			agentVersion:  "1.2.3",
+			expectedInErr: "agent type is required",
+			expectedInLog: "Agent type is required but was empty",
+		},
+		{
+			name:          "empty agent version",
+			request:       &models.SetReleaseChannelRequest{Platform: "HOST", OperatingSystem: "LINUX", Channel: "REGULAR"},
+			agentType:     "NRJavaAgent",
+			agentVersion:  "",
+			expectedInErr: "agent version is required",
+			expectedInLog: "Agent version is required but was empty",
+		},
+		{
+			name:          "invalid request",
+			request:       &models.SetReleaseChannelRequest{Platform: "BAREMETAL", Channel: "REGULAR"},
+			agentType:     "NRJavaAgent",
+			agentVersion:  "1.2.3",
+			expectedInErr: "invalid platform",
+			expectedInLog: "Release channel request is invalid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := NewInstrumentationClient("https://api.example.com", "token")
+			getStdout, _ := testutil.CaptureOutput(t)
+
+			// method under test
+			promotion, err := client.PromoteToReleaseChannel(context.Background(), tt.agentType, tt.agentVersion, tt.request)
+
+			outputStr := getStdout()
+
+			require.Error(t, err)
+			assert.Nil(t, promotion)
+			assert.Contains(t, err.Error(), tt.expectedInErr)
+			assert.Contains(t, outputStr, tt.expectedInLog)
+		})
+	}
+}
+
+func TestPromoteToReleaseChannel_HTTPErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		statusCode    int
+		responseBody  string
+		expectedInErr string
+		expectedInLog string
+	}{
+		{
+			name:          "internal server error",
+			statusCode:    http.StatusInternalServerError,
+			responseBody:  `{"error": "Internal server error"}`,
+			expectedInErr: "release channel promotion failed with status 500",
+			expectedInLog: "HTTP status code: 500",
+		},
+		{
+			name:          "bad request",
+			statusCode:    http.StatusBadRequest,
+			responseBody:  `{"error": "Invalid request"}`,
+			expectedInErr: "release channel promotion failed with status 400",
+			expectedInLog: "Release channel promotion failed with status 400",
+		},
+		{
+			name:          "not found",
+			statusCode:    http.StatusNotFound,
+			responseBody:  `{"error": "Version not found"}`,
+			expectedInErr: "release channel promotion failed with status 404",
+			expectedInLog: "HTTP status code: 404",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.statusCode)
+				w.Write([]byte(tt.responseBody))
+			}))
+			defer server.Close()
+
+			client := NewInstrumentationClient(server.URL, "test-token")
+			req := &models.SetReleaseChannelRequest{Platform: "HOST", OperatingSystem: "LINUX", Channel: "REGULAR"}
+
+			getStdout, _ := testutil.CaptureOutput(t)
+
+			// method under test
+			promotion, err := client.PromoteToReleaseChannel(context.Background(), "NRJavaAgent", "1.2.3", req)
+
+			outputStr := getStdout()
+
+			require.Error(t, err)
+			assert.Nil(t, promotion)
+			assert.Contains(t, err.Error(), tt.expectedInErr)
+			assert.Contains(t, outputStr, tt.expectedInLog)
+		})
+	}
+}
+
+func TestPromoteToReleaseChannel_NetworkError(t *testing.T) {
+	client := NewInstrumentationClient("http://127.0.0.1:1", "token")
+	req := &models.SetReleaseChannelRequest{Platform: "HOST", OperatingSystem: "LINUX", Channel: "REGULAR"}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// method under test
+	promotion, err := client.PromoteToReleaseChannel(context.Background(), "NRJavaAgent", "1.2.3", req)
+
+	outputStr := getStdout()
+
+	require.Error(t, err)
+	assert.Nil(t, promotion)
+	assert.Contains(t, err.Error(), "failed to promote release channel")
+	assert.Contains(t, outputStr, "HTTP request failed")
+}
+
+func TestPromoteToReleaseChannel_ResponseBodyReadError(t *testing.T) {
+	client := &InstrumentationClient{
+		baseURL: "https://api.example.com",
+		token:   "test-token",
+		httpClient: &http.Client{
+			Transport: &errorTransport{},
+		},
+	}
+
+	req := &models.SetReleaseChannelRequest{Platform: "HOST", OperatingSystem: "LINUX", Channel: "REGULAR"}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// method under test
+	promotion, err := client.PromoteToReleaseChannel(context.Background(), "NRJavaAgent", "1.2.3", req)
+
+	outputStr := getStdout()
+
+	require.Error(t, err)
+	assert.Nil(t, promotion)
+	assert.Contains(t, err.Error(), "failed to read response")
+	assert.Contains(t, outputStr, "Failed to read response body")
+}
+
+func TestPromoteToReleaseChannel_MalformedResponseBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`not valid json`))
+	}))
+	defer server.Close()
+
+	client := NewInstrumentationClient(server.URL, "test-token")
+	req := &models.SetReleaseChannelRequest{Platform: "HOST", OperatingSystem: "LINUX", Channel: "REGULAR"}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// method under test
+	promotion, err := client.PromoteToReleaseChannel(context.Background(), "NRJavaAgent", "1.2.3", req)
+
+	outputStr := getStdout()
+
+	require.Error(t, err)
+	assert.Nil(t, promotion)
+	assert.Contains(t, err.Error(), "failed to parse release channel promotion response")
+	assert.Contains(t, outputStr, "Failed to parse response body")
+}
+
 func TestSendMetadata_ResponseBodyReadError(t *testing.T) {
 	// Create test server with custom response that fails to read
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

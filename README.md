@@ -2,9 +2,19 @@
 
 # Agent Metadata Action
 
-A GitHub Action that reads agent configuration metadata from the calling repository. There are 2 scearios to use this action:
-1. An agent release - This action parses the `.fleetControl/configurationDefinitions.yml` file and makes the configuration data, metadata, and binaries available in New Relic.
-2. A docs update for an agent release - This action parses the frontmatter of the docs mdx files and makes the metadata available in New Relic.
+This repository hosts two standalone GitHub Actions used by New Relic agent repos:
+
+- **`send-metadata`** - reads agent configuration metadata from the calling repository and sends it to New Relic. There are 2 scenarios to use this action:
+  1. An agent release - This action parses the `.fleetControl/configurationDefinitions.yml` file and makes the configuration data, metadata, and binaries available in New Relic.
+  2. A docs update for an agent release - This action parses the frontmatter of the docs mdx files and makes the metadata available in New Relic.
+- **`promote-release-channel`** - promotes an already-published version onto a release
+  channel. See [Promoting a Version to a Release Channel](#promoting-a-version-to-a-release-channel).
+
+> **Deprecated:** the action at the repository root (`newrelic/agent-metadata-action@v1`,
+> no path) is deprecated in favor of `newrelic/agent-metadata-action/send-metadata@v1` -
+> identical inputs and behavior, just a clearer path now that this repo hosts multiple
+> actions. The root action logs a warning on every run and will be removed in a future
+> release.
 
 ## Installation
 
@@ -12,7 +22,7 @@ Add this action to your workflow:
 
 ```yaml
 - name: Read agent metadata
-  uses: newrelic/agent-metadata-action@v1
+  uses: newrelic/agent-metadata-action/send-metadata@v1
 ```
 
 ## Usage
@@ -41,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Read agent metadata
-        uses: newrelic/agent-metadata-action@v1
+        uses: newrelic/agent-metadata-action/send-metadata@v1
         with:
           newrelic-client-id: ${{ secrets.OAUTH_CLIENT_ID }}
           newrelic-private-key: ${{ secrets.OAUTH_CLIENT_SECRET }}
@@ -74,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Read agent metadata
-        uses: newrelic/agent-metadata-action@v1
+        uses: newrelic/agent-metadata-action/send-metadata@v1
         with:
           newrelic-client-id: ${{ secrets.OAUTH_CLIENT_ID }}
           newrelic-private-key: ${{ secrets.OAUTH_CLIENT_SECRET }}
@@ -131,11 +141,73 @@ Each entry in the `binaries` array must include:
 - `format`: Archive format - supported values: `tar`, `tar+gzip`, `zip`
 ```
 
+## Promoting a Version to a Release Channel
+
+A separate action, `newrelic/agent-metadata-action/promote-release-channel`, promotes an
+already-published agent version onto a release channel (currently only `REGULAR` is
+defined). It's intentionally separate from the main action: it doesn't check out your
+repository or touch `.fleetControl` - it's a one-shot call to instrumentation-metadata,
+typically triggered manually.
+
+Add a `workflow_dispatch` workflow like this to your repository (`agent-type` is fixed
+per repo, same as the release workflow above):
+
+```yaml
+name: Promote Release Channel
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Agent version to promote (e.g. 1.2.3) - must already be published to instrumentation-metadata'
+        required: true
+      channel:
+        description: 'Release channel to promote to'
+        required: true
+        type: choice
+        options:
+          - REGULAR
+      platform:
+        description: 'Target platform'
+        required: true
+        type: choice
+        options:
+          - HOST
+          - KUBERNETESCLUSTER
+      operating-system:
+        description: 'Target operating system (required when platform is HOST)'
+        required: false
+        type: choice
+        options:
+          - LINUX
+          - WINDOWS
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: newrelic/agent-metadata-action/promote-release-channel@v1
+        with:
+          newrelic-client-id: ${{ secrets.OAUTH_CLIENT_ID }}
+          newrelic-private-key: ${{ secrets.OAUTH_CLIENT_SECRET }}
+          agent-type: NRDotNetAgent # Fixed per repo, same as the release workflow
+          version: ${{ inputs.version }}
+          channel: ${{ inputs.channel }}
+          platform: ${{ inputs.platform }}
+          operating-system: ${{ inputs.operating-system }}
+```
+
+Then run it from the Actions tab: **Actions → Promote Release Channel → Run workflow**.
+
 ## Building
 
 ```bash
 # Build the binary
 go build -o agent-metadata-action ./cmd/agent-metadata-action
+
+# Build the release channel promotion binary (named -bin to avoid colliding
+# with the ./promote-release-channel/ action directory at repo root)
+go build -o promote-release-channel-bin ./cmd/promote-release-channel
 ```
 
 ## Testing
