@@ -91,185 +91,31 @@ runs:
       run: |
         echo "::warning::newrelic/agent-metadata-action@v1 (root path) is deprecated. Please migrate to newrelic/agent-metadata-action/send-metadata@v1 - same inputs, same behavior. The root action will be removed in a future release."
 
-    # Set up Go first so the failure reporter can build for any later step's failure.
-    - name: Setup Go
-      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+    # Delegates to the send-metadata subdirectory action so the root keeps working
+    # without duplicating its steps. Pinned to a commit SHA rather than a tag: no
+    # tag yet exists containing send-metadata/, and a SHA lets us pin to it
+    # immediately without waiting for a release. This intentionally freezes the
+    # root action's behavior at this commit - it's deprecated and won't otherwise
+    # track future send-metadata changes unless this pin is bumped deliberately.
+    - name: Delegate to send-metadata
+      uses: newrelic/agent-metadata-action/send-metadata@cf20d3d6b787802b405abb5174956308ae93c0fb
       with:
-        go-version-file: '${{ github.action_path }}/go.mod'
-        cache: ${{ inputs.cache }}
-        cache-dependency-path: '${{ github.action_path }}/go.sum'
-
-    - name: Determine checkout ref
-      id: checkout-ref
-      shell: bash
-      run: |
-        GIT_REF="${{ inputs.git-ref }}"
-        VERSION="${{ inputs.version }}"
-
-        # If git-ref is explicitly provided, use it
-        if [ -n "$GIT_REF" ]; then
-          echo "ref=$GIT_REF" >> $GITHUB_OUTPUT
-          echo "Using git-ref: $GIT_REF"
-        # If git-ref not provided, fall back to version for backwards compatibility
-        elif [ -n "$VERSION" ]; then
-          echo "ref=$VERSION" >> $GITHUB_OUTPUT
-          echo "Using version for checkout (backwards compatibility): $VERSION"
-        # If both empty, use default (checkout triggering commit for docs flow)
-        else
-          echo "ref=" >> $GITHUB_OUTPUT
-          echo "No ref specified, using triggering commit"
-        fi
-
-    - name: Checkout repository
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      with:
-        ref: ${{ steps.checkout-ref.outputs.ref }}
+        newrelic-client-id: ${{ inputs.newrelic-client-id }}
+        newrelic-private-key: ${{ inputs.newrelic-private-key }}
+        agent-type: ${{ inputs.agent-type }}
+        version: ${{ inputs.version }}
+        git-ref: ${{ inputs.git-ref }}
+        config-directory: ${{ inputs.config-directory }}
         fetch-depth: ${{ inputs.fetch-depth }}
-    - name: Setup Go
-      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-      with:
-        go-version-file: '${{ github.action_path }}/go.mod'
+        oci-registry: ${{ inputs.oci-registry }}
+        oci-username: ${{ inputs.oci-username }}
+        oci-password: ${{ inputs.oci-password }}
+        binaries: ${{ inputs.binaries }}
+        tags: ${{ inputs.tags }}
+        bindings-override: ${{ inputs.bindings-override }}
+        monitoring-type: ${{ inputs.monitoring-type }}
+        display-name: ${{ inputs.display-name }}
+        validate-agent-type: ${{ inputs.validate-agent-type }}
+        agent-control-cli-tag: ${{ inputs.agent-control-cli-tag }}
         cache: ${{ inputs.cache }}
-        cache-dependency-path: '${{ github.action_path }}/go.sum'
-
-    - name: Install NewRelic Auth CLI
-      shell: bash
-      run: |
-        # Only skip installation if explicitly testing with a mock CLI
-        if [ "$MOCK_NEWRELIC_AUTH_CLI" = "true" ]; then
-          if command -v newrelic-auth-cli &> /dev/null; then
-            echo "::notice::Using mock newrelic-auth-cli from PATH (testing mode)"
-            echo "::debug::Mock CLI at: $(which newrelic-auth-cli)"
-            exit 0
-          else
-            echo "::error::MOCK_NEWRELIC_AUTH_CLI is true but newrelic-auth-cli not found in PATH"
-            exit 1
-          fi
-        fi
-
-        echo "::group::Installing newrelic-auth-cli"
-        echo "Downloading newrelic-auth-cli"
-        curl -L "https://github.com/newrelic/newrelic-auth-rs/releases/download/0.1.3/newrelic-auth-cli_amd64.tar.gz" -o newrelic-auth-cli.tar.gz
-        tar -xzf newrelic-auth-cli.tar.gz
-        chmod +x newrelic-auth-cli
-        mkdir -p "$HOME/.local/bin"
-        mv newrelic-auth-cli "$HOME/.local/bin/"
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-        echo "::endgroup::"
-
-    - name: Authenticate with NewRelic
-      id: newrelic-auth
-      shell: bash
-      run: |
-        set -e  # Exit on any error
-        echo "::group::Authenticating with NewRelic"
-
-        # Mask sensitive inputs in logs (must be done before any logging)
-        echo "::debug::Masking sensitive credentials..."
-        echo "::add-mask::${{ inputs.newrelic-client-id }}"
-        echo "::add-mask::${{ inputs.newrelic-private-key }}"
-
-        # Write private key to temporary file
-        echo "::debug::Creating temporary file for private key..."
-        TEMP_KEY_FILE=$(mktemp)
-        echo "::debug::Temporary key file: $TEMP_KEY_FILE"
-
-        echo "${{ inputs.newrelic-private-key }}" | base64 -d > "$TEMP_KEY_FILE"
-        chmod 600 "$TEMP_KEY_FILE"
-        echo "::debug::Private key written to temp file with secure permissions (600)"
-
-        # Verify file was created
-        if [ ! -f "$TEMP_KEY_FILE" ]; then
-          echo "::error::Failed to create temporary key file"
-          exit 1
-        fi
-        echo "::debug::Temp file verified (size: $(wc -c < "$TEMP_KEY_FILE") bytes)"
-
-        # Authenticate and capture token
-        echo "::debug::Calling newrelic-auth-cli..."
-        echo "::debug::Environment: US"
-        echo "::debug::Output format: JSON"
-
-        if ! AUTH_OUTPUT=$(newrelic-auth-cli authenticate \
-          --client-id "${{ inputs.newrelic-client-id }}" \
-          --environment US \
-          --output-token-format JSON \
-          --private-key-path "$TEMP_KEY_FILE" 2>&1); then
-          echo "::error::Authentication failed"
-          rm -f "$TEMP_KEY_FILE"
-          exit 1
-        fi
-
-        echo "::debug::Authentication CLI call completed"
-
-        # Extract token from JSON output
-        echo "::debug::Parsing JSON response..."
-        if ! TOKEN=$(echo "$AUTH_OUTPUT" | jq -r '.access_token' 2>&1); then
-          echo "::error::Failed to parse token from response"
-          rm -f "$TEMP_KEY_FILE"
-          exit 1
-        fi
-
-        # Validate token was extracted
-        if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-          echo "::error::Token extraction failed - empty or null token"
-          rm -f "$TEMP_KEY_FILE"
-          exit 1
-        fi
-
-        # Clean up temp file
-        echo "::debug::Cleaning up temporary key file..."
-        rm -f "$TEMP_KEY_FILE"
-        echo "::debug::Temporary file removed"
-
-        # Mask token in logs for security (CRITICAL - must be done before using token)
-        echo "::debug::Masking authentication token..."
-        echo "::add-mask::$TOKEN"
-        echo "::debug::Token masked successfully"
-
-        # Set token as output for next step
-        echo "token=$TOKEN" >> $GITHUB_OUTPUT
-        echo "::debug::Token set as step output"
-
-        echo "::endgroup::"
-        echo "::notice::NewRelic authentication successful"
-
-    # Kept ahead of "Build and Run" so the binary's own error reporting doesn't double up.
-    - name: Report failure to New Relic
-      if: failure()
-      shell: bash
-      env:
-        APM_CONTROL_NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
-      run: |
-        cd ${{ github.action_path }}
-        if ! go build -o notify-failure ./cmd/notify-failure; then
-          echo "::warning::Could not build failure reporter; skipping New Relic failure report"
-          exit 0
-        fi
-        ./notify-failure
-
-    - name: Build and Run
-      id: run-action
-      shell: bash
-      env:
-        INPUT_AGENT_TYPE: ${{ inputs.agent-type }}
-        INPUT_VERSION: ${{ inputs.version }}
-        INPUT_CONFIG_DIRECTORY: ${{ inputs.config-directory }}
-        INPUT_MONITORING_TYPE: ${{ inputs.monitoring-type }}
-        INPUT_DISPLAY_NAME: ${{ inputs.display-name }}
-        NEWRELIC_TOKEN: ${{ steps.newrelic-auth.outputs.token }}
-        INPUT_OCI_REGISTRY: ${{ inputs.oci-registry }}
-        INPUT_OCI_USERNAME: ${{ inputs.oci-username }}
-        INPUT_OCI_PASSWORD: ${{ inputs.oci-password }}
-        INPUT_BINARIES: ${{ inputs.binaries }}
-        INPUT_TAGS: ${{ inputs.tags }}
-        INPUT_BINDINGS_OVERRIDE: ${{ inputs.bindings-override }}
-        INPUT_VALIDATE_AGENT_TYPE: ${{ inputs.validate-agent-type }}
-        INPUT_AGENT_CONTROL_CLI_TAG: ${{ inputs.agent-control-cli-tag }}
-        APM_CONTROL_NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
-      run: |
-        set -e
-        cd ${{ github.action_path }}
-        # todo - look at using a built image instead
-        go build -o agent-metadata-action ./cmd/agent-metadata-action
-        ./agent-metadata-action
+        apm-control-nr-license-key: ${{ inputs.apm-control-nr-license-key }}
