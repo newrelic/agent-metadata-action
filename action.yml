@@ -78,7 +78,11 @@ inputs:
     required: false
     default: 'true'
   apm-control-nr-license-key:
-    description: 'New Relic APM license key for instrumentation of this action (optional, pass from secrets)'
+    description: 'Deprecated: use newrelic-license-key instead.'
+    required: false
+    default: ''
+  newrelic-license-key:
+    description: 'New Relic APM license key for instrumentation of this action (optional, pass from secrets). Get this key from the team that owns this action'
     required: false
     default: ''
 
@@ -233,7 +237,7 @@ runs:
       if: failure()
       shell: bash
       env:
-        APM_CONTROL_NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
+        NEWRELIC_LICENSE_KEY: ${{ inputs.newrelic-license-key || inputs.apm-control-nr-license-key }}
       run: |
         cd ${{ github.action_path }}
         if ! go build -o notify-failure ./cmd/notify-failure; then
@@ -260,7 +264,7 @@ runs:
         INPUT_BINDINGS_OVERRIDE: ${{ inputs.bindings-override }}
         INPUT_VALIDATE_AGENT_TYPE: ${{ inputs.validate-agent-type }}
         INPUT_AGENT_CONTROL_CLI_TAG: ${{ inputs.agent-control-cli-tag }}
-        APM_CONTROL_NR_LICENSE_KEY: ${{ inputs.apm-control-nr-license-key }}
+        NEWRELIC_LICENSE_KEY: ${{ inputs.newrelic-license-key || inputs.apm-control-nr-license-key }}
       run: |
         set -e
         cd ${{ github.action_path }}
