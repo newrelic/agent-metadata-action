@@ -67,7 +67,7 @@ func GetBindingsOverride() string {
 
 // GetNRAgentLicenseKey gets the license key to use the go agent and monitor this app
 func GetNRAgentLicenseKey() string {
-	return os.Getenv("APM_CONTROL_NR_LICENSE_KEY")
+	return os.Getenv("NEWRELIC_LICENSE_KEY")
 }
 
 // GetConfigDirectory loads the config directory from environment variables
