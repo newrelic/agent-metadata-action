@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"agent-metadata-action/internal/logging"
@@ -56,8 +57,8 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 	logging.Debugf(ctx, "Agent version: %s", agentVersion)
 
 	// Construct URL
-	url := fmt.Sprintf("%s/v1/agents/%s/versions/%s", c.baseURL, agentType, agentVersion)
-	logging.Debugf(ctx, "Target URL: %s", url)
+	targetURL := fmt.Sprintf("%s/v1/agents/%s/versions/%s", c.baseURL, url.PathEscape(agentType), url.PathEscape(agentVersion))
+	logging.Debugf(ctx, "Target URL: %s", targetURL)
 	logging.Debugf(ctx, "Base URL: %s", c.baseURL)
 
 	// Marshal metadata to JSON
@@ -86,11 +87,11 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 	err = retry.Do(ctx, retryConfig, func() error {
 		// Create HTTP request (must be recreated for each retry)
 		logging.Debug(ctx, "Creating HTTP POST request...")
-		req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+		req, err := http.NewRequestWithContext(ctx, "POST", targetURL, bytes.NewBuffer(jsonBody))
 		if err != nil {
 			logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
 				"error.operation": "create_http_request",
-				"http.url":        url,
+				"http.url":        targetURL,
 				"agent.type":      agentType,
 				"agent.version":   agentVersion,
 			})
@@ -112,7 +113,7 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 		if err != nil {
 			logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
 				"error.operation": "execute_http_request",
-				"http.url":        url,
+				"http.url":        targetURL,
 				"http.duration":   duration.String(),
 				"agent.type":      agentType,
 				"agent.version":   agentVersion,
@@ -146,7 +147,7 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 			logging.NoticeErrorWithCategory(ctx, err, "metadata.send", map[string]interface{}{
 				"error.operation":    "http_non_2xx_response",
 				"http.status_code":   resp.StatusCode,
-				"http.url":           url,
+				"http.url":           targetURL,
 				"http.response_body": responsePreview,
 				"agent.type":         agentType,
 				"agent.version":      agentVersion,
@@ -206,8 +207,8 @@ func (c *InstrumentationClient) PromoteToReleaseChannel(ctx context.Context, age
 	logging.Debugf(ctx, "Agent type: %s", agentType)
 	logging.Debugf(ctx, "Agent version: %s", agentVersion)
 
-	url := fmt.Sprintf("%s/v1/agents/%s/versions/%s/release-channel", c.baseURL, agentType, agentVersion)
-	logging.Debugf(ctx, "Target URL: %s", url)
+	targetURL := fmt.Sprintf("%s/v1/agents/%s/versions/%s/release-channel", c.baseURL, url.PathEscape(agentType), url.PathEscape(agentVersion))
+	logging.Debugf(ctx, "Target URL: %s", targetURL)
 	logging.Debugf(ctx, "Base URL: %s", c.baseURL)
 
 	logging.Debug(ctx, "Marshaling release channel request to JSON...")
@@ -233,11 +234,11 @@ func (c *InstrumentationClient) PromoteToReleaseChannel(ctx context.Context, age
 
 	err = retry.Do(ctx, retryConfig, func() error {
 		logging.Debug(ctx, "Creating HTTP POST request...")
-		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", targetURL, bytes.NewBuffer(jsonBody))
 		if err != nil {
 			logging.NoticeErrorWithCategory(ctx, err, "releasechannel.promote", map[string]interface{}{
 				"error.operation": "create_http_request",
-				"http.url":        url,
+				"http.url":        targetURL,
 				"agent.type":      agentType,
 				"agent.version":   agentVersion,
 			})
@@ -257,7 +258,7 @@ func (c *InstrumentationClient) PromoteToReleaseChannel(ctx context.Context, age
 		if err != nil {
 			logging.NoticeErrorWithCategory(ctx, err, "releasechannel.promote", map[string]interface{}{
 				"error.operation": "execute_http_request",
-				"http.url":        url,
+				"http.url":        targetURL,
 				"http.duration":   duration.String(),
 				"agent.type":      agentType,
 				"agent.version":   agentVersion,
@@ -288,7 +289,7 @@ func (c *InstrumentationClient) PromoteToReleaseChannel(ctx context.Context, age
 			logging.NoticeErrorWithCategory(ctx, err, "releasechannel.promote", map[string]interface{}{
 				"error.operation":    "http_non_2xx_response",
 				"http.status_code":   resp.StatusCode,
-				"http.url":           url,
+				"http.url":           targetURL,
 				"http.response_body": responsePreview,
 				"agent.type":         agentType,
 				"agent.version":      agentVersion,
