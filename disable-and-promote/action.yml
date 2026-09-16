@@ -1,0 +1,120 @@
+name: 'Disable Agent Version And Promote Replacement'
+description: 'Incident-response shortcut: promotes a known-good agent version onto a release channel, then disables a faulty version. Runs in that order so the channel is never left pointing at nothing.'
+inputs:
+  newrelic-client-id:
+    description: 'NewRelic client ID (pass from secrets)'
+    required: true
+  newrelic-private-key:
+    description: 'NewRelic private key content (pass from secrets)'
+    required: true
+  agent-type:
+    description: 'The type of agent eg. NRDotNetAgent'
+    required: true
+  promote-version:
+    description: 'Known-good agent version to promote (e.g. 1.2.3). Must already be published to instrumentation-metadata.'
+    required: true
+  channel:
+    description: 'Release channel to promote promote-version to. Currently only REGULAR is defined.'
+    required: true
+  platform:
+    description: 'Target platform to promote promote-version on. One of: HOST, KUBERNETESCLUSTER. disable-agent has no platform/operating-system concept - it disables disable-version everywhere - so when platform is HOST, promote-version is promoted for both LINUX and WINDOWS to keep the channel consistent across operating systems; when platform is KUBERNETESCLUSTER, promote-version is promoted once with no operating system.'
+    required: true
+  note:
+    description: 'Optional note describing why this promotion was made (audit trail only, not persisted).'
+    required: false
+    default: ''
+  disable-version:
+    description: 'Faulty agent version to disable (e.g. 1.2.2). Disabled only after promote-version is successfully promoted.'
+    required: true
+  cache:
+    description: 'Enable Go build cache'
+    required: false
+    default: 'true'
+  newrelic-license-key:
+    description: 'New Relic APM license key for instrumentation of this action (optional, pass from secrets). Get this key from the team that owns this action'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    # Self-repository references below resolve to these sub-actions at the exact
+    # commit this action is running at, so they always match whatever ref/SHA the
+    # caller pinned - no separate ref to go stale.
+
+    # Validates and case-normalizes platform once, so every later step's `if:`
+    # can do an exact string match against a known-good value.
+    - name: Determine platform
+      id: platform
+      shell: bash
+      run: |
+        PLATFORM="$(echo "${{ inputs.platform }}" | tr '[:lower:]' '[:upper:]')"
+        case "$PLATFORM" in
+          HOST|KUBERNETESCLUSTER) ;;
+          *)
+            echo "::error::Invalid platform '${{ inputs.platform }}': must be 'HOST' or 'KUBERNETESCLUSTER'"
+            exit 1
+            ;;
+        esac
+        echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
+
+    # Runs first so the release channel is repointed to a known-good version
+    # before the faulty one is disabled - the channel is never left pointing
+    # at a disabled (or nonexistent) version. A custom `if:` replaces the
+    # default success()-only gating, so `success() &&` is added back explicitly
+    # to keep these steps from running after an earlier failure.
+    - name: Promote to release channel (HOST / LINUX)
+      if: success() && steps.platform.outputs.platform == 'HOST'
+      uses: $/promote-release-channel
+      with:
+        newrelic-client-id: ${{ inputs.newrelic-client-id }}
+        newrelic-private-key: ${{ inputs.newrelic-private-key }}
+        agent-type: ${{ inputs.agent-type }}
+        version: ${{ inputs.promote-version }}
+        channel: ${{ inputs.channel }}
+        platform: HOST
+        operating-system: LINUX
+        note: ${{ inputs.note }}
+        cache: ${{ inputs.cache }}
+        newrelic-license-key: ${{ inputs.newrelic-license-key }}
+
+    - name: Promote to release channel (HOST / WINDOWS)
+      if: success() && steps.platform.outputs.platform == 'HOST'
+      uses: $/promote-release-channel
+      with:
+        newrelic-client-id: ${{ inputs.newrelic-client-id }}
+        newrelic-private-key: ${{ inputs.newrelic-private-key }}
+        agent-type: ${{ inputs.agent-type }}
+        version: ${{ inputs.promote-version }}
+        channel: ${{ inputs.channel }}
+        platform: HOST
+        operating-system: WINDOWS
+        note: ${{ inputs.note }}
+        cache: ${{ inputs.cache }}
+        newrelic-license-key: ${{ inputs.newrelic-license-key }}
+
+    - name: Promote to release channel (KUBERNETESCLUSTER)
+      if: success() && steps.platform.outputs.platform == 'KUBERNETESCLUSTER'
+      uses: $/promote-release-channel
+      with:
+        newrelic-client-id: ${{ inputs.newrelic-client-id }}
+        newrelic-private-key: ${{ inputs.newrelic-private-key }}
+        agent-type: ${{ inputs.agent-type }}
+        version: ${{ inputs.promote-version }}
+        channel: ${{ inputs.channel }}
+        platform: KUBERNETESCLUSTER
+        note: ${{ inputs.note }}
+        cache: ${{ inputs.cache }}
+        newrelic-license-key: ${{ inputs.newrelic-license-key }}
+
+    # Only reached if every promotion above (one or two steps, depending on
+    # platform) succeeded.
+    - name: Disable faulty version
+      uses: $/disable-agent
+      with:
+        newrelic-client-id: ${{ inputs.newrelic-client-id }}
+        newrelic-private-key: ${{ inputs.newrelic-private-key }}
+        agent-type: ${{ inputs.agent-type }}
+        version: ${{ inputs.disable-version }}
+        cache: ${{ inputs.cache }}
+        newrelic-license-key: ${{ inputs.newrelic-license-key }}

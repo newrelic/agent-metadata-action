@@ -319,3 +319,133 @@ func (c *InstrumentationClient) PromoteToReleaseChannel(ctx context.Context, age
 	logging.Notice(ctx, "Version successfully promoted to release channel")
 	return &promotion, nil
 }
+
+// DisableAgentVersion disables a published agent version so it is no longer returned
+// to consumers. The version remains registered and cannot be re-published.
+// POST /v1/agents/{agentType}/versions/{agentVersion}
+func (c *InstrumentationClient) DisableAgentVersion(ctx context.Context, agentType string, agentVersion string) error {
+	logging.Log(ctx, "group", "Disabling agent version")
+	defer logging.Log(ctx, "endgroup", "")
+
+	logging.Debug(ctx, "Validating inputs...")
+	if agentType == "" {
+		logging.Error(ctx, "Agent type is required but was empty")
+		return fmt.Errorf("agent type is required")
+	}
+	if agentVersion == "" {
+		logging.Error(ctx, "Agent version is required but was empty")
+		return fmt.Errorf("agent version is required")
+	}
+	logging.Debugf(ctx, "Agent type: %s", agentType)
+	logging.Debugf(ctx, "Agent version: %s", agentVersion)
+
+	url := fmt.Sprintf("%s/v1/agents/%s/versions/%s", c.baseURL, agentType, agentVersion)
+	logging.Debugf(ctx, "Target URL: %s", url)
+	logging.Debugf(ctx, "Base URL: %s", c.baseURL)
+
+	logging.Debug(ctx, "Marshaling disable request to JSON...")
+	disableReq := &models.DisableAgentRequest{Metadata: models.DisableAgentMetadata{Enabled: false}}
+	jsonBody, err := json.Marshal(disableReq)
+	if err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "disableagent.disable", map[string]interface{}{
+			"error.operation": "marshal_disable_agent_request",
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+		})
+		logging.Errorf(ctx, "Failed to marshal disable request: %v", err)
+		return retry.NewNonRetryableError(fmt.Errorf("failed to marshal disable request: %w", err))
+	}
+	logging.Debugf(ctx, "JSON payload size: %d bytes", len(jsonBody))
+
+	retryConfig := retry.Config{
+		MaxAttempts: 3,
+		BaseDelay:   2 * time.Second,
+		Operation:   "Disable agent version",
+	}
+
+	err = retry.Do(ctx, retryConfig, func() error {
+		logging.Debug(ctx, "Creating HTTP POST request...")
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+		if err != nil {
+			logging.NoticeErrorWithCategory(ctx, err, "disableagent.disable", map[string]interface{}{
+				"error.operation": "create_http_request",
+				"http.url":        url,
+				"agent.type":      agentType,
+				"agent.version":   agentVersion,
+			})
+			logging.Errorf(ctx, "Failed to create request: %v", err)
+			return retry.NewNonRetryableError(fmt.Errorf("failed to create request: %w", err))
+		}
+
+		logging.Debug(ctx, "Setting request headers...")
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+
+		logging.Debug(ctx, "Sending HTTP request...")
+		startTime := time.Now()
+		resp, err := c.httpClient.Do(httpReq)
+		duration := time.Since(startTime)
+
+		if err != nil {
+			logging.NoticeErrorWithCategory(ctx, err, "disableagent.disable", map[string]interface{}{
+				"error.operation": "execute_http_request",
+				"http.url":        url,
+				"http.duration":   duration.String(),
+				"agent.type":      agentType,
+				"agent.version":   agentVersion,
+			})
+			logging.Errorf(ctx, "HTTP request failed after %s: %v", duration, err)
+			return fmt.Errorf("failed to disable agent version: %w", err)
+		}
+		defer resp.Body.Close()
+
+		logging.Debugf(ctx, "Response received in %s", duration)
+		logging.Debugf(ctx, "HTTP status code: %d %s", resp.StatusCode, resp.Status)
+
+		logging.Debug(ctx, "Reading response body...")
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			logging.Errorf(ctx, "Failed to read response body: %v", err)
+			return fmt.Errorf("failed to read response: %w", err)
+		}
+		logging.Debugf(ctx, "Response body size: %d bytes", len(body))
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			responsePreview := string(body)
+			if len(responsePreview) > 500 {
+				responsePreview = responsePreview[:500] + "... (truncated)"
+			}
+
+			err := fmt.Errorf("disable agent version failed with status %d: %s", resp.StatusCode, string(body))
+			logging.NoticeErrorWithCategory(ctx, err, "disableagent.disable", map[string]interface{}{
+				"error.operation":    "http_non_2xx_response",
+				"http.status_code":   resp.StatusCode,
+				"http.url":           url,
+				"http.response_body": responsePreview,
+				"agent.type":         agentType,
+				"agent.version":      agentVersion,
+			})
+			logging.Errorf(ctx, "Disable agent version failed with status %d", resp.StatusCode)
+			logging.Debugf(ctx, "Error response body: %s", responsePreview)
+
+			isRetryable := resp.StatusCode >= 500 || resp.StatusCode == 408 || resp.StatusCode == 429
+			if !isRetryable {
+				return retry.NewNonRetryableError(err)
+			}
+			return err
+		}
+
+		if len(body) > 0 {
+			logging.Debugf(ctx, "Success response: %s", string(body))
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	logging.Notice(ctx, "Agent version successfully disabled")
+	return nil
+}

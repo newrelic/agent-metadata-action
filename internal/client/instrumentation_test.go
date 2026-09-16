@@ -684,6 +684,174 @@ func TestPromoteToReleaseChannel_MalformedResponseBody(t *testing.T) {
 	assert.Contains(t, outputStr, "Failed to parse response body")
 }
 
+func TestDisableAgentVersion_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/v1/agents/NRJavaAgent/versions/1.2.3", r.URL.Path)
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+
+		var req models.DisableAgentRequest
+		err = json.Unmarshal(body, &req)
+		require.NoError(t, err)
+		assert.False(t, req.Metadata.Enabled)
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := NewInstrumentationClient(server.URL, "test-token")
+
+	getStdout, getStderr := testutil.CaptureOutput(t)
+
+	// method under test
+	err := client.DisableAgentVersion(context.Background(), "NRJavaAgent", "1.2.3")
+
+	outputStr := getStdout()
+	stderrStr := getStderr()
+
+	require.NoError(t, err)
+	assert.Contains(t, outputStr, "Disabling agent version")
+	assert.Contains(t, outputStr, "HTTP status code: 200")
+	assert.Contains(t, outputStr, "Agent version successfully disabled")
+	assert.NotContains(t, stderrStr, "::error::")
+}
+
+func TestDisableAgentVersion_ValidationErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		agentType     string
+		agentVersion  string
+		expectedInErr string
+		expectedInLog string
+	}{
+		{
+			name:          "empty agent type",
+			agentType:     "",
+			agentVersion:  "1.2.3",
+			expectedInErr: "agent type is required",
+			expectedInLog: "Agent type is required but was empty",
+		},
+		{
+			name:          "empty agent version",
+			agentType:     "NRJavaAgent",
+			agentVersion:  "",
+			expectedInErr: "agent version is required",
+			expectedInLog: "Agent version is required but was empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := NewInstrumentationClient("https://api.example.com", "token")
+			getStdout, _ := testutil.CaptureOutput(t)
+
+			// method under test
+			err := client.DisableAgentVersion(context.Background(), tt.agentType, tt.agentVersion)
+
+			outputStr := getStdout()
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.expectedInErr)
+			assert.Contains(t, outputStr, tt.expectedInLog)
+		})
+	}
+}
+
+func TestDisableAgentVersion_HTTPErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		statusCode    int
+		responseBody  string
+		expectedInErr string
+		expectedInLog string
+	}{
+		{
+			name:          "internal server error",
+			statusCode:    http.StatusInternalServerError,
+			responseBody:  `{"error": "Internal server error"}`,
+			expectedInErr: "disable agent version failed with status 500",
+			expectedInLog: "HTTP status code: 500",
+		},
+		{
+			name:          "bad request",
+			statusCode:    http.StatusBadRequest,
+			responseBody:  `{"error": "Invalid request"}`,
+			expectedInErr: "disable agent version failed with status 400",
+			expectedInLog: "Disable agent version failed with status 400",
+		},
+		{
+			name:          "not found",
+			statusCode:    http.StatusNotFound,
+			responseBody:  `{"error": "Version not found"}`,
+			expectedInErr: "disable agent version failed with status 404",
+			expectedInLog: "HTTP status code: 404",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.statusCode)
+				w.Write([]byte(tt.responseBody))
+			}))
+			defer server.Close()
+
+			client := NewInstrumentationClient(server.URL, "test-token")
+
+			getStdout, _ := testutil.CaptureOutput(t)
+
+			// method under test
+			err := client.DisableAgentVersion(context.Background(), "NRJavaAgent", "1.2.3")
+
+			outputStr := getStdout()
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.expectedInErr)
+			assert.Contains(t, outputStr, tt.expectedInLog)
+		})
+	}
+}
+
+func TestDisableAgentVersion_NetworkError(t *testing.T) {
+	client := NewInstrumentationClient("http://127.0.0.1:1", "token")
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// method under test
+	err := client.DisableAgentVersion(context.Background(), "NRJavaAgent", "1.2.3")
+
+	outputStr := getStdout()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to disable agent version")
+	assert.Contains(t, outputStr, "HTTP request failed")
+}
+
+func TestDisableAgentVersion_ResponseBodyReadError(t *testing.T) {
+	client := &InstrumentationClient{
+		baseURL: "https://api.example.com",
+		token:   "test-token",
+		httpClient: &http.Client{
+			Transport: &errorTransport{},
+		},
+	}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	// method under test
+	err := client.DisableAgentVersion(context.Background(), "NRJavaAgent", "1.2.3")
+
+	outputStr := getStdout()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read response")
+	assert.Contains(t, outputStr, "Failed to read response body")
+}
+
 func TestSendMetadata_ResponseBodyReadError(t *testing.T) {
 	// Create test server with custom response that fails to read
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

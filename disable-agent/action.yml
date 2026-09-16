@@ -1,5 +1,5 @@
-name: 'Promote Agent Version To Release Channel'
-description: 'Calls the New Relic instrumentation service to promote an already-published agent version onto a release channel (e.g. REGULAR).'
+name: 'Disable Agent Version'
+description: 'Calls the New Relic instrumentation service to disable (soft-delete) an already-published agent version so it is no longer returned to consumers.'
 inputs:
   newrelic-client-id:
     description: 'NewRelic client ID (pass from secrets)'
@@ -11,30 +11,12 @@ inputs:
     description: 'The type of agent eg. NRDotNetAgent'
     required: true
   version:
-    description: 'Agent version to promote (e.g. 1.2.3). Must already be published to instrumentation-metadata - this is not a git ref and no checkout occurs.'
+    description: 'Agent version to disable (e.g. 1.2.3). Must already be published to instrumentation-metadata - this is not a git ref and no checkout occurs.'
     required: true
-  channel:
-    description: 'Release channel to promote the version to. Currently only REGULAR is defined.'
-    required: true
-  platform:
-    description: 'Target platform for the promotion. One of: HOST, KUBERNETESCLUSTER'
-    required: true
-  operating-system:
-    description: 'Target operating system for the promotion. Required when platform is HOST. One of: LINUX, WINDOWS'
-    required: false
-    default: ''
-  note:
-    description: 'Optional note describing why this promotion was made (audit trail only, not persisted).'
-    required: false
-    default: ''
   cache:
     description: 'Enable Go build cache'
     required: false
     default: 'true'
-  apm-control-nr-license-key:
-    description: 'Deprecated: use newrelic-license-key instead.'
-    required: false
-    default: ''
   newrelic-license-key:
     description: 'New Relic APM license key for instrumentation of this action (optional, pass from secrets). Get this key from the team that owns this action'
     required: false
@@ -65,7 +47,7 @@ runs:
       if: failure()
       shell: bash
       env:
-        NEWRELIC_LICENSE_KEY: ${{ inputs.newrelic-license-key || inputs.apm-control-nr-license-key }}
+        NEWRELIC_LICENSE_KEY: ${{ inputs.newrelic-license-key }}
       run: |
         cd ${{ github.action_path }}/..
         if ! go build -o notify-failure ./cmd/notify-failure; then
@@ -80,17 +62,13 @@ runs:
       env:
         INPUT_AGENT_TYPE: ${{ inputs.agent-type }}
         INPUT_VERSION: ${{ inputs.version }}
-        INPUT_CHANNEL: ${{ inputs.channel }}
-        INPUT_PLATFORM: ${{ inputs.platform }}
-        INPUT_OPERATING_SYSTEM: ${{ inputs.operating-system }}
-        INPUT_NOTE: ${{ inputs.note }}
         NEWRELIC_TOKEN: ${{ steps.newrelic-auth.outputs.token }}
-        NEWRELIC_LICENSE_KEY: ${{ inputs.newrelic-license-key || inputs.apm-control-nr-license-key }}
+        NEWRELIC_LICENSE_KEY: ${{ inputs.newrelic-license-key }}
       run: |
         set -e
         cd ${{ github.action_path }}/..
-        # Output name deliberately differs from the ./promote-release-channel/ action
-        # directory at repo root - `go build -o promote-release-channel` would silently
+        # Output name deliberately differs from the ./disable-agent/ action
+        # directory at repo root - `go build -o disable-agent` would silently
         # write the binary *inside* that existing directory instead of erroring.
-        go build -o promote-release-channel-bin ./cmd/promote-release-channel
-        ./promote-release-channel-bin
+        go build -o disable-agent-bin ./cmd/disable-agent
+        ./disable-agent-bin
