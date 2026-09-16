@@ -179,3 +179,143 @@ func (c *InstrumentationClient) SendMetadata(ctx context.Context, agentType stri
 	logging.Notice(ctx, "Metadata successfully submitted to instrumentation service")
 	return nil
 }
+
+// PromoteToReleaseChannel promotes an agent version onto a release channel
+// POST /v1/agents/{agentType}/versions/{agentVersion}/release-channel
+func (c *InstrumentationClient) PromoteToReleaseChannel(ctx context.Context, agentType string, agentVersion string, req *models.SetReleaseChannelRequest) (*models.ReleaseChannelPromotion, error) {
+	logging.Log(ctx, "group", "Promoting version to release channel")
+	defer logging.Log(ctx, "endgroup", "")
+
+	logging.Debug(ctx, "Validating inputs...")
+	if req == nil {
+		logging.Error(ctx, "Release channel request is required but was nil")
+		return nil, fmt.Errorf("release channel request is required")
+	}
+	if agentType == "" {
+		logging.Error(ctx, "Agent type is required but was empty")
+		return nil, fmt.Errorf("agent type is required")
+	}
+	if agentVersion == "" {
+		logging.Error(ctx, "Agent version is required but was empty")
+		return nil, fmt.Errorf("agent version is required")
+	}
+	if err := req.Validate(); err != nil {
+		logging.Errorf(ctx, "Release channel request is invalid: %v", err)
+		return nil, err
+	}
+	logging.Debugf(ctx, "Agent type: %s", agentType)
+	logging.Debugf(ctx, "Agent version: %s", agentVersion)
+
+	url := fmt.Sprintf("%s/v1/agents/%s/versions/%s/release-channel", c.baseURL, agentType, agentVersion)
+	logging.Debugf(ctx, "Target URL: %s", url)
+	logging.Debugf(ctx, "Base URL: %s", c.baseURL)
+
+	logging.Debug(ctx, "Marshaling release channel request to JSON...")
+	jsonBody, err := json.Marshal(req)
+	if err != nil {
+		logging.NoticeErrorWithCategory(ctx, err, "releasechannel.promote", map[string]interface{}{
+			"error.operation": "marshal_release_channel_request",
+			"agent.type":      agentType,
+			"agent.version":   agentVersion,
+		})
+		logging.Errorf(ctx, "Failed to marshal release channel request: %v", err)
+		return nil, retry.NewNonRetryableError(fmt.Errorf("failed to marshal release channel request: %w", err))
+	}
+	logging.Debugf(ctx, "JSON payload size: %d bytes", len(jsonBody))
+
+	retryConfig := retry.Config{
+		MaxAttempts: 3,
+		BaseDelay:   2 * time.Second,
+		Operation:   "Release channel promotion",
+	}
+
+	var promotion models.ReleaseChannelPromotion
+
+	err = retry.Do(ctx, retryConfig, func() error {
+		logging.Debug(ctx, "Creating HTTP POST request...")
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+		if err != nil {
+			logging.NoticeErrorWithCategory(ctx, err, "releasechannel.promote", map[string]interface{}{
+				"error.operation": "create_http_request",
+				"http.url":        url,
+				"agent.type":      agentType,
+				"agent.version":   agentVersion,
+			})
+			logging.Errorf(ctx, "Failed to create request: %v", err)
+			return retry.NewNonRetryableError(fmt.Errorf("failed to create request: %w", err))
+		}
+
+		logging.Debug(ctx, "Setting request headers...")
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+
+		logging.Debug(ctx, "Sending HTTP request...")
+		startTime := time.Now()
+		resp, err := c.httpClient.Do(httpReq)
+		duration := time.Since(startTime)
+
+		if err != nil {
+			logging.NoticeErrorWithCategory(ctx, err, "releasechannel.promote", map[string]interface{}{
+				"error.operation": "execute_http_request",
+				"http.url":        url,
+				"http.duration":   duration.String(),
+				"agent.type":      agentType,
+				"agent.version":   agentVersion,
+			})
+			logging.Errorf(ctx, "HTTP request failed after %s: %v", duration, err)
+			return fmt.Errorf("failed to promote release channel: %w", err)
+		}
+		defer resp.Body.Close()
+
+		logging.Debugf(ctx, "Response received in %s", duration)
+		logging.Debugf(ctx, "HTTP status code: %d %s", resp.StatusCode, resp.Status)
+
+		logging.Debug(ctx, "Reading response body...")
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			logging.Errorf(ctx, "Failed to read response body: %v", err)
+			return fmt.Errorf("failed to read response: %w", err)
+		}
+		logging.Debugf(ctx, "Response body size: %d bytes", len(body))
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			responsePreview := string(body)
+			if len(responsePreview) > 500 {
+				responsePreview = responsePreview[:500] + "... (truncated)"
+			}
+
+			err := fmt.Errorf("release channel promotion failed with status %d: %s", resp.StatusCode, string(body))
+			logging.NoticeErrorWithCategory(ctx, err, "releasechannel.promote", map[string]interface{}{
+				"error.operation":    "http_non_2xx_response",
+				"http.status_code":   resp.StatusCode,
+				"http.url":           url,
+				"http.response_body": responsePreview,
+				"agent.type":         agentType,
+				"agent.version":      agentVersion,
+			})
+			logging.Errorf(ctx, "Release channel promotion failed with status %d", resp.StatusCode)
+			logging.Debugf(ctx, "Error response body: %s", responsePreview)
+
+			isRetryable := resp.StatusCode >= 500 || resp.StatusCode == 408 || resp.StatusCode == 429
+			if !isRetryable {
+				return retry.NewNonRetryableError(err)
+			}
+			return err
+		}
+
+		if err := json.Unmarshal(body, &promotion); err != nil {
+			logging.Errorf(ctx, "Failed to parse response body: %v", err)
+			return retry.NewNonRetryableError(fmt.Errorf("failed to parse release channel promotion response: %w", err))
+		}
+
+		logging.Debugf(ctx, "Success response: %s", string(body))
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	logging.Notice(ctx, "Version successfully promoted to release channel")
+	return &promotion, nil
+}

@@ -2,8 +2,13 @@
 .fleetControl/
 !integration-test/agent-flow/.fleetControl/
 
-# Build output
-agent-metadata-action
+# Build output (anchored to repo root so these don't also match
+# cmd/agent-metadata-action/ and cmd/notify-failure/, which share names
+# with the built binaries; promote-release-channel-bin is deliberately
+# named differently from the ./promote-release-channel/ action directory)
+/agent-metadata-action
+/promote-release-channel-bin
+/notify-failure
 
 # Go coverage
 coverage.out
