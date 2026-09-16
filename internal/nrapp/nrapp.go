@@ -18,7 +18,7 @@ import (
 const AppName = "agent-metadata-action"
 
 // New creates the New Relic application used to monitor this action.
-// Returns nil if APM_CONTROL_NR_LICENSE_KEY is not set (silent no-op mode).
+// Returns nil if NEWRELIC_LICENSE_KEY is not set (silent no-op mode).
 func New(ctx context.Context) *newrelic.Application {
 	licenseKey := config.GetNRAgentLicenseKey()
 	if licenseKey == "" {
@@ -40,7 +40,7 @@ func New(ctx context.Context) *newrelic.Application {
 		newrelic.ConfigAppLogForwardingEnabled(true),
 		newrelic.ConfigFromEnvironment(), // This reads NEW_RELIC_HOST
 		newrelic.ConfigLabels(map[string]string{
-			"team": "APM Control Team",
+			"team": "Fleet Management",
 		}),
 	)
 	if err != nil {

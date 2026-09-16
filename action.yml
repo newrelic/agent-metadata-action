@@ -78,7 +78,11 @@ inputs:
     required: false
     default: 'true'
   apm-control-nr-license-key:
-    description: 'New Relic APM license key for instrumentation of this action (optional, pass from secrets)'
+    description: 'Deprecated: use newrelic-license-key instead.'
+    required: false
+    default: ''
+  newrelic-license-key:
+    description: 'New Relic APM license key for instrumentation of this action (optional, pass from secrets). Get this key from the team that owns this action'
     required: false
     default: ''
 
@@ -115,3 +119,4 @@ runs:
         agent-control-cli-tag: ${{ inputs.agent-control-cli-tag }}
         cache: ${{ inputs.cache }}
         apm-control-nr-license-key: ${{ inputs.apm-control-nr-license-key }}
+        newrelic-license-key: ${{ inputs.newrelic-license-key }}
