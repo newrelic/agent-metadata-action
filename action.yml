@@ -95,10 +95,11 @@ runs:
       run: |
         echo "::warning::newrelic/agent-metadata-action@v1 (root path) is deprecated. Please migrate to newrelic/agent-metadata-action/send-metadata@v1 - same inputs, same behavior. The root action will be removed in a future release."
 
-    # SHA-pinned (no tag yet contains send-metadata/). Deliberately frozen here -
-    # bump the SHA manually if root callers need a later send-metadata fix.
+    # Self-repository reference: resolves to send-metadata at the exact commit
+    # this root action is running at, so it always matches whatever ref/SHA
+    # the caller pinned - no separate ref to go stale.
     - name: Delegate to send-metadata
-      uses: newrelic/agent-metadata-action/send-metadata@cf20d3d6b787802b405abb5174956308ae93c0fb
+      uses: $/send-metadata
       with:
         newrelic-client-id: ${{ inputs.newrelic-client-id }}
         newrelic-private-key: ${{ inputs.newrelic-private-key }}
