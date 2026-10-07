@@ -15,9 +15,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ReadConfigurationDefinitions reads and parses the configurationDefinitions file
-func ReadConfigurationDefinitions(ctx context.Context, workspacePath string) ([]models.ConfigurationDefinition, error) {
-	fullPath := filepath.Join(workspacePath, config.GetConfigurationDefinitionsFilepath())
+// ReadConfigurationDefinitions reads and parses the configuration definitions file.
+// configDir is the already-resolved control directory (e.g. ".fleetControl" or
+// ".nrcontrol"); within it, both the camelCase and kebab-case filenames are supported,
+// camelCase taking precedence when both exist.
+func ReadConfigurationDefinitions(ctx context.Context, workspacePath, configDir string) ([]models.ConfigurationDefinition, error) {
+	rootDir := filepath.Join(workspacePath, configDir)
+	filename := config.ResolveFilenameInDir(rootDir, config.GetConfigurationDefinitionsFilename(), config.GetConfigurationDefinitionsFilenameFallback())
+	fullPath := filepath.Join(rootDir, filename)
 
 	definitions, err := readDefinitionsFile(fullPath)
 	if err != nil {
@@ -38,7 +43,7 @@ func ReadConfigurationDefinitions(ctx context.Context, workspacePath string) ([]
 			continue
 		}
 
-		resolvedPath, err := resolveContentPath(workspacePath, schemaPath)
+		resolvedPath, err := resolveContentPath(workspacePath, configDir, schemaPath)
 		if err != nil {
 			logging.Warnf(ctx, "failed to resolve schema path %s: %v -- dropping schema field", schemaPath, err)
 			delete(definitions[i], "schema")
@@ -66,9 +71,14 @@ func ReadConfigurationDefinitions(ctx context.Context, workspacePath string) ([]
 	return result, nil
 }
 
-// ReadAgentControlDefinitions reads and parses the agentControlDefinitions file
-func ReadAgentControlDefinitions(ctx context.Context, workspacePath string) ([]models.AgentControlDefinition, error) {
-	fullPath := filepath.Join(workspacePath, config.GetAgentControlDefinitionsFilepath())
+// ReadAgentControlDefinitions reads and parses the agent control definitions file.
+// configDir is the already-resolved control directory (e.g. ".fleetControl" or
+// ".nrcontrol"); within it, both the camelCase and kebab-case filenames are supported,
+// camelCase taking precedence when both exist.
+func ReadAgentControlDefinitions(ctx context.Context, workspacePath, configDir string) ([]models.AgentControlDefinition, error) {
+	rootDir := filepath.Join(workspacePath, configDir)
+	filename := config.ResolveFilenameInDir(rootDir, config.GetAgentControlDefinitionsFilename(), config.GetAgentControlDefinitionsFilenameFallback())
+	fullPath := filepath.Join(rootDir, filename)
 
 	definitions, err := readDefinitionsFile(fullPath)
 	if err != nil {
@@ -90,7 +100,7 @@ func ReadAgentControlDefinitions(ctx context.Context, workspacePath string) ([]m
 			continue
 		}
 
-		resolvedPath, err := resolveContentPath(workspacePath, contentPath)
+		resolvedPath, err := resolveContentPath(workspacePath, configDir, contentPath)
 		if err != nil {
 			logging.Warnf(ctx, "failed to resolve content path %s: %v -- dropping content field", contentPath, err)
 			delete(definitions[i], "content")
@@ -125,23 +135,27 @@ func ReadAgentControlDefinitions(ctx context.Context, workspacePath string) ([]m
 	return result, nil
 }
 
-// ReadAgentDefinition reads the optional agentDefinition.yml file.
-// Returns nil, nil if the file does not exist (the file is optional).
-func ReadAgentDefinition(ctx context.Context, workspacePath string) (*models.AgentDefinition, error) {
-	fullPath := filepath.Join(workspacePath, config.GetAgentDefinitionFilepath())
+// ReadAgentDefinition reads the optional agent definition file. configDir is the
+// already-resolved control directory; both the camelCase (agentDefinition.yml) and
+// kebab-case (agent-definition.yml) filenames are supported, camelCase taking precedence
+// when both exist. Returns nil, nil if neither file exists (the file is optional).
+func ReadAgentDefinition(ctx context.Context, workspacePath, configDir string) (*models.AgentDefinition, error) {
+	rootDir := filepath.Join(workspacePath, configDir)
+	filename := config.ResolveFilenameInDir(rootDir, config.GetAgentDefinitionFilename(), config.GetAgentDefinitionFilenameFallback())
+	fullPath := filepath.Join(rootDir, filename)
 
 	data, err := os.ReadFile(fullPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			logging.Debug(ctx, "agentDefinition.yml not found - skipping")
+			logging.Debugf(ctx, "%s not found - skipping", filename)
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to read agentDefinition.yml: %w", err)
+		return nil, fmt.Errorf("failed to read %s: %w", filename, err)
 	}
 
 	var def models.AgentDefinition
 	if err := yaml.Unmarshal(data, &def); err != nil {
-		return nil, fmt.Errorf("failed to parse agentDefinition.yml: %w", err)
+		return nil, fmt.Errorf("failed to parse %s: %w", filename, err)
 	}
 	return &def, nil
 }
@@ -185,11 +199,11 @@ func readDefinitionsFile(fullPath string) ([]map[string]interface{}, error) {
 	return nil, fmt.Errorf("no array found in YAML file")
 }
 
-// resolveContentPath resolves contentPath (relative to the .fleetControl directory) to an
-// absolute path and validates that it stays within workspacePath, preventing directory
-// traversal outside the workspace.
-func resolveContentPath(workspacePath string, contentPath string) (string, error) {
-	fullPath := filepath.Join(workspacePath, config.GetRootFolderForAgentRepo(), contentPath)
+// resolveContentPath resolves contentPath (relative to the resolved control directory,
+// configDir) to an absolute path and validates that it stays within workspacePath,
+// preventing directory traversal outside the workspace.
+func resolveContentPath(workspacePath, configDir, contentPath string) (string, error) {
+	fullPath := filepath.Join(workspacePath, configDir, contentPath)
 
 	resolvedPath, err := filepath.Abs(fullPath)
 	if err != nil {

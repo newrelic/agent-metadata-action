@@ -606,6 +606,98 @@ func TestRunAgentFlow_AgentTypeValidationSuccess(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestRunAgentFlow_NrControlFallback_Success(t *testing.T) {
+	workspace := t.TempDir()
+	nrControlPath := filepath.Join(workspace, ".nrcontrol")
+	require.NoError(t, os.MkdirAll(nrControlPath, 0755))
+
+	configFile := filepath.Join(nrControlPath, "configurationDefinitions.yml")
+	configContent := `configurationDefinitions:
+  - name: test-config
+    type: string
+`
+	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	err := runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+	assert.NoError(t, err)
+}
+
+func TestRunAgentFlow_PrefersFleetControlOverNrControl(t *testing.T) {
+	workspace := t.TempDir()
+
+	fleetControlPath := filepath.Join(workspace, ".fleetControl")
+	require.NoError(t, os.MkdirAll(fleetControlPath, 0755))
+	fleetConfigContent := `configurationDefinitions:
+  - name: fleetcontrol-value
+    type: string
+`
+	require.NoError(t, os.WriteFile(filepath.Join(fleetControlPath, "configurationDefinitions.yml"), []byte(fleetConfigContent), 0644))
+
+	nrControlPath := filepath.Join(workspace, ".nrcontrol")
+	require.NoError(t, os.MkdirAll(nrControlPath, 0755))
+	nrConfigContent := `configurationDefinitions:
+  - name: nrcontrol-value
+    type: string
+`
+	require.NoError(t, os.WriteFile(filepath.Join(nrControlPath, "configurationDefinitions.yml"), []byte(nrConfigContent), 0644))
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	getStdout, _ := testutil.CaptureOutput(t)
+
+	err := runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+	assert.NoError(t, err)
+
+	outputStr := getStdout()
+	assert.Contains(t, outputStr, "fleetcontrol-value")
+	assert.NotContains(t, outputStr, "nrcontrol-value")
+}
+
+func TestRunAgentFlow_KebabCaseFilenames_Success(t *testing.T) {
+	workspace := t.TempDir()
+	fleetControlPath := filepath.Join(workspace, ".fleetControl")
+	require.NoError(t, os.MkdirAll(fleetControlPath, 0755))
+
+	configContent := `configurationDefinitions:
+  - name: test-config
+    type: string
+`
+	require.NoError(t, os.WriteFile(filepath.Join(fleetControlPath, "configuration-definitions.yml"), []byte(configContent), 0644))
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	err := runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+	assert.NoError(t, err)
+}
+
+func TestRunAgentFlow_ExplicitOverride_DisablesFallback(t *testing.T) {
+	workspace := t.TempDir()
+
+	// Only .nrcontrol exists - no .fleetControl at all.
+	nrControlPath := filepath.Join(workspace, ".nrcontrol")
+	require.NoError(t, os.MkdirAll(nrControlPath, 0755))
+	configContent := `configurationDefinitions:
+  - name: test-config
+    type: string
+`
+	require.NoError(t, os.WriteFile(filepath.Join(nrControlPath, "configurationDefinitions.yml"), []byte(configContent), 0644))
+
+	// Explicitly set the override to ".fleetControl" - should not fall back to .nrcontrol.
+	t.Setenv("INPUT_CONFIG_DIRECTORY", ".fleetControl")
+
+	ctx := context.Background()
+	mockClient := &mockMetadataClient{}
+
+	err := runAgentFlow(ctx, mockClient, workspace, "java", "1.0.0")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "config directory does not exist: .fleetControl")
+}
+
 func TestSendDocsMetadata(t *testing.T) {
 	tests := []struct {
 		name    string

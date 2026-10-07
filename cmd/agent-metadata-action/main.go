@@ -137,33 +137,41 @@ func validateEnvironment(ctx context.Context) (workspace string, token string, e
 	return workspace, token, nil
 }
 
-func validateConfigDirectory(ctx context.Context, workspace string) error {
-	configDir := config.GetRootFolderForAgentRepo()
+// validateConfigDirectory resolves and validates the control directory for this run. If
+// the config-directory input is explicitly set, it is used as-is with no fallback.
+// Otherwise it checks ".fleetControl" then ".nrcontrol" and returns the first one that
+// exists. The resolved directory is returned so callers only resolve it once per run.
+func validateConfigDirectory(ctx context.Context, workspace string) (string, error) {
+	resolvedDir := config.ResolveRootFolderForAgentRepo(workspace)
 
-	fullPath := filepath.Join(workspace, configDir)
+	fullPath := filepath.Join(workspace, resolvedDir)
 	resolvedPath, err := filepath.Abs(fullPath)
 	if err != nil {
-		return fmt.Errorf("failed to resolve config directory path: %w", err)
+		return "", fmt.Errorf("failed to resolve config directory path: %w", err)
 	}
 
 	if _, err := os.Stat(resolvedPath); err != nil {
-		return fmt.Errorf("config directory does not exist: %s", configDir)
+		if config.GetConfigDirectory() == "" {
+			return "", fmt.Errorf("config directory does not exist: tried %s", strings.Join(config.CandidateRootFoldersForAgentRepo(), ", "))
+		}
+		return "", fmt.Errorf("config directory does not exist: %s", resolvedDir)
 	}
 
-	logging.Debugf(ctx, "Using config directory: %s", configDir)
-	return nil
+	logging.Debugf(ctx, "Using config directory: %s", resolvedDir)
+	return resolvedDir, nil
 }
 
 // runAgentFlow handles the agent repository workflow
 func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentType, agentVersion string) error {
 	logging.Debugf(ctx, "Running agent repository flow for %s version %s", agentType, agentVersion)
 
-	if err := validateConfigDirectory(ctx, workspace); err != nil {
+	resolvedConfigDir, err := validateConfigDirectory(ctx, workspace)
+	if err != nil {
 		return fmt.Errorf("config directory validation failed: %w", err)
 	}
 
 	// Load configuration definitions (required)
-	configs, err := loader.ReadConfigurationDefinitions(ctx, workspace)
+	configs, err := loader.ReadConfigurationDefinitions(ctx, workspace, resolvedConfigDir)
 	if err != nil {
 		logging.NoticeErrorWithCategory(ctx, err, "configuration.load", map[string]interface{}{
 			"error.operation": "load_configuration_definitions",
@@ -176,7 +184,7 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	logging.Noticef(ctx, "Loaded %d configuration definitions", len(configs))
 
 	// Load agent control definitions (optional, unless agent type validation is enabled and fails)
-	agentControl, err := loader.ReadAgentControlDefinitions(ctx, workspace)
+	agentControl, err := loader.ReadAgentControlDefinitions(ctx, workspace, resolvedConfigDir)
 	if err != nil {
 		var valErr *validator.ValidationError
 		if errors.As(err, &valErr) {
@@ -194,7 +202,7 @@ func runAgentFlow(ctx context.Context, client metadataClient, workspace, agentTy
 	}
 
 	// Load agent definition (optional)
-	agentDef, err := loader.ReadAgentDefinition(ctx, workspace)
+	agentDef, err := loader.ReadAgentDefinition(ctx, workspace, resolvedConfigDir)
 	if err != nil {
 		logging.Warnf(ctx, "Unable to load agent definition: %v - continuing without it", err)
 		agentDef = nil

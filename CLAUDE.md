@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a GitHub Action written in Go that reads agent configuration metadata from a repository and sends it to a NewRelic instrumentation service. The action automatically checks out the calling repository at a specified version tag (for agent repos) or at the PR commit (for docs repos), then reads configuration from `.fleetControl/configurationDefinitions.yml` and/or metadata from changed MDX files. The action supports two workflows:
+This is a GitHub Action written in Go that reads agent configuration metadata from a repository and sends it to a NewRelic instrumentation service. The action automatically checks out the calling repository at a specified version tag (for agent repos) or at the PR commit (for docs repos), then reads configuration from a control directory (`.fleetControl` by default, falling back to `.nrcontrol`) and/or metadata from changed MDX files. The action supports two workflows:
 
-1. **Agent Repository Workflow**: When both `agent-type` and `version` inputs are provided, reads configuration definitions and agent control files from `.fleetControl` directory, sends to instrumentation service, and optionally uploads binary artifacts to an OCI registry
+1. **Agent Repository Workflow**: When both `agent-type` and `version` inputs are provided, reads configuration definitions and agent control files from the resolved control directory, sends to instrumentation service, and optionally uploads binary artifacts to an OCI registry
 2. **Documentation Workflow**: When `agent-type` or `version` are not provided, reads metadata from changed MDX files in PR context and sends each entry separately to instrumentation service
 
 Both workflows authenticate with NewRelic and send data to the instrumentation service via HTTP POST requests. The agent workflow can also upload binary artifacts (tar.gz, zip) to OCI-compatible registries like Docker Hub, GitHub Container Registry, or local registries.
@@ -108,7 +108,7 @@ export GITHUB_WORKSPACE=/path/to/repo
     - If both `INPUT_AGENT_TYPE` and `INPUT_VERSION` are set → agent flow
     - Otherwise → docs flow
 - `runAgentFlow()`: Agent repository workflow
-  - Validates `.fleetControl` directory exists
+  - Resolves and validates the control directory via `validateConfigDirectory()`, which calls `config.ResolveRootFolderForAgentRepo()` (`.fleetControl` by default, falling back to `.nrcontrol`, or an explicit `config-directory` override with no fallback) — resolved once and threaded into the loader calls below
   - Loads configuration definitions via `loader.ReadConfigurationDefinitions()`
   - Loads agent control definitions via `loader.ReadAgentControlDefinitions()` (optional, warns on error)
   - Creates metadata structure with version
@@ -146,8 +146,13 @@ export GITHUB_WORKSPACE=/path/to/repo
    - `GetToken()`: Reads `NEWRELIC_TOKEN`
 
 2. **dirs.go**: Directory path configuration
-   - `GetRootFolderForAgentRepo()`: Returns `.fleetControl`
-   - `GetConfigurationDefinitionsFilepath()`: Returns `.fleetControl/configurationDefinitions.yml`
+   - `GetRootFolderForAgentRepo()`: Returns the explicit `config-directory` override, or `.fleetControl` if unset (pure, no I/O)
+   - `CandidateRootFoldersForAgentRepo()`: Returns `[".fleetControl", ".nrcontrol"]`, in preference order
+   - `ResolveRootFolderForAgentRepo(workspacePath)`: Resolves the control directory for a run — returns the explicit override as-is if set, otherwise checks each candidate on disk and returns the first that exists (defaults to `.fleetControl` if neither exists)
+   - `ResolveFilenameInDir(dir, primary, fallback)`: Returns whichever of a camelCase/kebab-case filename pair exists in `dir`, preferring the camelCase (primary) name
+   - `GetConfigurationDefinitionsFilename()` / `GetConfigurationDefinitionsFilenameFallback()`: `configurationDefinitions.yml` / `configuration-definitions.yml`
+   - `GetAgentControlDefinitionsFilename()` / `GetAgentControlDefinitionsFilenameFallback()`: `agentControlDefinitions.yml` / `agent-control-definitions.yml`
+   - `GetAgentDefinitionFilename()` / `GetAgentDefinitionFilenameFallback()`: `agentDefinition.yml` / `agent-definition.yml`
    - `GetAgentControlFolderForAgentRepo()`: Returns `.fleetControl/agentControl`
 
 3. **urls.go**: Service URL configuration
@@ -156,23 +161,27 @@ export GITHUB_WORKSPACE=/path/to/repo
 **internal/loader**: Data loading and encoding
 
 1. **definitions.go**: Configuration and agent control definitions loader
+   - All of `ReadConfigurationDefinitions()`, `ReadAgentControlDefinitions()`, and `ReadAgentDefinition()` take a `configDir` parameter — the control directory already resolved once per run by `main.go`'s `validateConfigDirectory()` via `config.ResolveRootFolderForAgentRepo()` (either `.fleetControl`, `.nrcontrol`, or an explicit override)
    - `ReadConfigurationDefinitions()`: Reads and validates configuration YAML
-     - Parses `.fleetControl/configurationDefinitions.yml`
+     - Resolves the filename within `configDir` via `config.ResolveFilenameInDir()` (camelCase `configurationDefinitions.yml` preferred, falls back to kebab-case `configuration-definitions.yml`)
      - Validates array is not empty
-     - For each config, loads and base64-encodes schema file (if provided)
+     - For each config, loads and base64-encodes schema file (if provided), resolved relative to the same `configDir`
      - Warns and continues if schema path is invalid or file is missing
    - `ReadAgentControlDefinitions()`: Reads and validates agent control YAML
-     - Parses `.fleetControl/agentControlDefinitions.yml`
+     - Resolves the filename within `configDir` (camelCase `agentControlDefinitions.yml` preferred, falls back to kebab-case `agent-control-definitions.yml`)
      - Validates array is not empty
-     - For each definition, loads and base64-encodes content file (if provided)
+     - For each definition, loads and base64-encodes content file (if provided), resolved relative to the same `configDir`
      - Warns and continues if content path is invalid or file is missing
+   - `ReadAgentDefinition()`: Reads the optional agent definition file
+     - Resolves the filename within `configDir` (camelCase `agentDefinition.yml` preferred, falls back to kebab-case `agent-definition.yml`)
+     - Returns `nil, nil` if neither filename exists (the file is optional)
    - `readDefinitionsFile()`: Generic YAML array reader
      - Finds first array in YAML file at top level
      - Validates array items are maps
      - Returns error if array is empty or not found
+   - `resolveContentPath(workspacePath, configDir, contentPath)`: Resolves a relative `schema`/`content` path against the same resolved `configDir` the definitions file was read from, and validates the result stays within `workspacePath`
    - `loadAndEncodeFile()`: Reads files and base64-encodes them
      - Validates paths to prevent directory traversal attacks (rejects `..`)
-     - Ensures resolved paths stay within `.fleetControl` directory
      - Returns error for empty files
      - Used for both schema and content files
 
@@ -295,13 +304,13 @@ export GITHUB_WORKSPACE=/path/to/repo
    - `NEWRELIC_TOKEN` must be set (for service authentication)
 2. `run()` reads `INPUT_AGENT_TYPE` and `INPUT_VERSION` from environment
 3. Both are present → calls `runAgentFlow()`
-4. `runAgentFlow()` validates `.fleetControl` directory exists in workspace
+4. `runAgentFlow()` resolves and validates the control directory via `validateConfigDirectory()`: checks `.fleetControl` then `.nrcontrol` in the workspace (or uses the explicit `config-directory` override as-is, with no fallback), returning the resolved directory for reuse by every loader call below
 5. `loader.ReadConfigurationDefinitions()` loads configuration definitions:
-   - Reads `{workspace}/.fleetControl/configurationDefinitions.yml`
+   - Reads `configurationDefinitions.yml` (or its kebab-case fallback `configuration-definitions.yml`) from the resolved control directory
    - Parses YAML into array of configuration maps
    - Validates array is not empty
    - For each config with a schema path:
-     - Validates schema path (no `..`, must stay within `.fleetControl`)
+     - Validates schema path (no `..`, must stay within the workspace)
      - Reads schema file and validates JSON format
      - Base64-encodes content and replaces path with encoded content
      - Warns and continues if schema loading fails
@@ -436,10 +445,12 @@ export GITHUB_WORKSPACE=/path/to/repo
 - Action automatically checks out repository via `actions/checkout@v4`:
   - Agent flow: Checks out specified version tag
   - Docs flow: Checks out PR commit
-- Target file paths are hardcoded:
-  - `.fleetControl/configurationDefinitions.yml`
-  - `.fleetControl/agentControlDefinitions.yml`
-- Schema and content files are read from `.fleetControl/` (typically in `schemas/` or `agentControl/` subdirectories)
+- Target filenames are fixed, but the control directory and each filename's casing are resolved dynamically (see `internal/config/dirs.go`):
+  - Control directory: `.fleetControl` (default) or `.nrcontrol` (fallback), or an explicit `config-directory` override
+  - `configurationDefinitions.yml` / `configuration-definitions.yml`
+  - `agentControlDefinitions.yml` / `agent-control-definitions.yml`
+  - `agentDefinition.yml` / `agent-definition.yml` (optional)
+- Schema and content files are read relative to the resolved control directory (typically in `schemas/` or `agentControl/` subdirectories)
 - MDX files are detected via GitHub API in PR context and parsed for frontmatter metadata
 - Binary artifacts are read from workspace-relative paths specified in `binaries` input (e.g., `./dist/agent.tar.gz`)
 
@@ -461,11 +472,11 @@ export GITHUB_WORKSPACE=/path/to/repo
 
 ### Security
 - **Directory traversal protection**:
-  - Schema and content paths in `.fleetControl` cannot contain `..`
+  - Schema and content paths in the resolved control directory cannot contain `..`
   - Binary artifact paths cannot contain `..`
   - Resolved absolute paths must stay within designated directories
 - **Path validation**:
-  - `.fleetControl` files must stay within `.fleetControl` directory
+  - Control directory files must stay within the resolved control directory
   - Binary artifacts must stay within `GITHUB_WORKSPACE` directory
   - Files must exist, be readable, and not be empty
   - Directories are rejected (must be files)
@@ -481,8 +492,8 @@ export GITHUB_WORKSPACE=/path/to/repo
   - `NEWRELIC_TOKEN` must be set (obtained via authentication step)
 - **Required for agent flow only**:
   - Both `INPUT_AGENT_TYPE` and `INPUT_VERSION` must be set
-  - `.fleetControl` directory must exist
-  - `configurationDefinitions.yml` must contain non-empty array
+  - A control directory must exist: `.fleetControl` or `.nrcontrol` (or the explicit `config-directory` override)
+  - The configuration definitions file (camelCase or kebab-case name) must contain non-empty array
 - **Required for docs flow only**:
   - MDX files must have `version` and `subject` fields in frontmatter
 - **OCI upload validation** (optional, agent flow only):
@@ -508,9 +519,9 @@ export GITHUB_WORKSPACE=/path/to/repo
 - JSON validation performed on schema content
 
 ### Agent Control Handling
-- Reads from single file: `.fleetControl/agentControlDefinitions.yml`
+- Reads from a single file in the resolved control directory: `agentControlDefinitions.yml` or `agent-control-definitions.yml`
 - Contains array of agent control definitions
-- Each definition references a content file path (relative to `.fleetControl`)
+- Each definition references a content file path (relative to the resolved control directory)
 - Content files are read and base64-encoded separately
 - **Optional**: Warnings issued if files missing or fail to load, but action continues
 - Empty content files are rejected

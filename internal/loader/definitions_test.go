@@ -44,7 +44,7 @@ func TestReadConfigurationDefinitions_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test reading the config
-	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.NoError(t, err)
 	assert.Len(t, configs, 1)
 	assert.Equal(t, "linux", configs[0]["platform"])
@@ -91,7 +91,7 @@ func TestReadAgentControlDefinitions_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test reading the agent control definitions
-	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
+	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.NoError(t, err)
 	assert.Len(t, agentControls, 1)
 	assert.Equal(t, "KUBERNETES", agentControls[0]["platform"])
@@ -153,7 +153,7 @@ func TestReadConfigurationDefinitions_ErrorCases(t *testing.T) {
 			tt.setupFunc(t, tmpDir)
 
 			// method under test
-			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
+			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 
 			require.Error(t, err)
 			assert.Nil(t, configs)
@@ -207,7 +207,7 @@ func TestReadAgentControlDefinitions_ErrorCases(t *testing.T) {
 			tt.setupFunc(t, tmpDir)
 
 			// method under test
-			agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
+			agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 
 			require.Error(t, err)
 			assert.Nil(t, agentControls)
@@ -268,7 +268,7 @@ func TestReadConfigurationDefinitions_SchemaLoadingWarnings(t *testing.T) {
 			getStdout, _ := testutil.CaptureOutput(t)
 
 			// method under test - should not fail if schema can't be loaded
-			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
+			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 
 			outputStr := getStdout()
 
@@ -329,7 +329,7 @@ func TestReadConfigurationDefinitions_MultipleConfigs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test reading the configs
-	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.NoError(t, err)
 	assert.Len(t, configs, 3)
 
@@ -370,7 +370,7 @@ func TestReadConfigurationDefinitions_ValidationIntegration(t *testing.T) {
 	err = os.WriteFile(configFile, []byte(yamlContent), 0644)
 	require.NoError(t, err)
 
-	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.NoError(t, err)
 	assert.Len(t, configs, 1)
 	// Schema is nil when not provided
@@ -420,7 +420,7 @@ func TestReadConfigurationDefinitions_DirectoryTraversal(t *testing.T) {
 			getStdout, _ := testutil.CaptureOutput(t)
 
 			// Test reading the config - should not fail if schema can't be loaded
-			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
+			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 
 			outputStr := getStdout()
 
@@ -446,7 +446,7 @@ func TestReadConfigurationDefinitions_EmptyArray(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test reading the config - should error
-	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	assert.Error(t, err)
 	assert.Nil(t, configs)
 	assert.Contains(t, err.Error(), "configurationDefinitions cannot be empty")
@@ -470,7 +470,7 @@ func TestReadDefinitionsFile_ItemNotMap(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test reading the config - should error
-	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.Error(t, err)
 	assert.Nil(t, configs)
 	assert.Contains(t, err.Error(), "is not a map")
@@ -493,7 +493,7 @@ description: This file has no arrays`
 	require.NoError(t, err)
 
 	// Test reading the config - should error with "no array found"
-	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.Error(t, err)
 	assert.Nil(t, configs)
 	assert.Contains(t, err.Error(), "no array found in YAML file")
@@ -557,7 +557,7 @@ func TestReadAgentControlDefinitions_ContentLoadingWarnings(t *testing.T) {
 			getStdout, _ := testutil.CaptureOutput(t)
 
 			// method under test - should not fail if content can't be loaded
-			agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
+			agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 
 			outputStr := getStdout()
 
@@ -612,7 +612,7 @@ func TestReadAgentControlDefinitions_MultipleDefinitions(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test reading the agent control definitions
-	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
+	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.NoError(t, err)
 	assert.Len(t, agentControls, 3)
 
@@ -709,7 +709,7 @@ func TestReadConfigurationDefinitions_InvalidFieldTypes(t *testing.T) {
 			getStdout, _ := testutil.CaptureOutput(t)
 
 			// method under test
-			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
+			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 
 			outputStr := getStdout()
 
@@ -793,7 +793,7 @@ func TestReadAgentControlDefinitions_InvalidFieldTypes(t *testing.T) {
 			getStdout, _ := testutil.CaptureOutput(t)
 
 			// method under test
-			agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
+			agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 
 			outputStr := getStdout()
 
@@ -850,7 +850,7 @@ func TestLoadAndEncodeFile_PathValidation(t *testing.T) {
 			require.NoError(t, os.WriteFile(configFile, []byte(testYAML), 0644))
 
 			// method under test
-			configs, err := ReadConfigurationDefinitions(context.Background(), workspace)
+			configs, err := ReadConfigurationDefinitions(context.Background(), workspace, config.GetRootFolderForAgentRepo())
 
 			outputStr := getStdout()
 
@@ -887,7 +887,7 @@ func TestLoadAndEncodeFile_OutsideFleetControl(t *testing.T) {
     schema: ../src/Configuration.xsd`
 	require.NoError(t, os.WriteFile(configFile, []byte(testYAML), 0644))
 
-	configs, err := ReadConfigurationDefinitions(context.Background(), workspace)
+	configs, err := ReadConfigurationDefinitions(context.Background(), workspace, config.GetRootFolderForAgentRepo())
 	require.NoError(t, err)
 	require.Len(t, configs, 1)
 
@@ -947,7 +947,7 @@ func TestReadConfigurationDefinitions_DropsBrokenSchemaField(t *testing.T) {
 			configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
 			require.NoError(t, os.WriteFile(configFile, []byte(tt.yamlContent), 0644))
 
-			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir)
+			configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 			require.NoError(t, err)
 			require.Len(t, configs, 1)
 
@@ -993,7 +993,7 @@ func TestReadAgentControlDefinitions_DropsBrokenContentField(t *testing.T) {
 			agentControlFile := filepath.Join(configDir, config.GetAgentControlDefinitionsFilename())
 			require.NoError(t, os.WriteFile(agentControlFile, []byte(tt.yamlContent), 0644))
 
-			defs, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
+			defs, err := ReadAgentControlDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 			require.NoError(t, err)
 			require.Len(t, defs, 1)
 
@@ -1010,7 +1010,7 @@ func TestReadAgentDefinition_FileNotFound(t *testing.T) {
 	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
 	require.NoError(t, os.MkdirAll(configDir, 0755))
 
-	result, err := ReadAgentDefinition(context.Background(), tmpDir)
+	result, err := ReadAgentDefinition(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -1030,7 +1030,7 @@ breakingChange: "2.0.0"`
 	defFile := filepath.Join(configDir, "agentDefinition.yml")
 	require.NoError(t, os.WriteFile(defFile, []byte(yamlContent), 0644))
 
-	result, err := ReadAgentDefinition(context.Background(), tmpDir)
+	result, err := ReadAgentDefinition(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -1053,7 +1053,7 @@ func TestReadAgentDefinition_BreakingChangeOnly(t *testing.T) {
 	defFile := filepath.Join(configDir, "agentDefinition.yml")
 	require.NoError(t, os.WriteFile(defFile, []byte(yamlContent), 0644))
 
-	result, err := ReadAgentDefinition(context.Background(), tmpDir)
+	result, err := ReadAgentDefinition(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.NotNil(t, result.BreakingChange)
@@ -1071,7 +1071,7 @@ func TestReadAgentDefinition_BreakingChangeUnquotedFloat(t *testing.T) {
 	defFile := filepath.Join(configDir, "agentDefinition.yml")
 	require.NoError(t, os.WriteFile(defFile, []byte(yamlContent), 0644))
 
-	result, err := ReadAgentDefinition(context.Background(), tmpDir)
+	result, err := ReadAgentDefinition(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.NotNil(t, result.BreakingChange)
@@ -1108,7 +1108,7 @@ version: "1.0.0"`
 	}
 	defer func() { validator.ValidateAgentTypeDefinitionFunc = origFunc }()
 
-	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
+	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.NoError(t, err)
 	require.Len(t, agentControls, 1)
 
@@ -1145,7 +1145,7 @@ func TestReadAgentControlDefinitions_ValidationEnabled_Failure(t *testing.T) {
 	}
 	defer func() { validator.ValidateAgentTypeDefinitionFunc = origFunc }()
 
-	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
+	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.Error(t, err)
 	assert.Nil(t, agentControls)
 
@@ -1181,7 +1181,7 @@ func TestReadAgentControlDefinitions_ValidationDisabled_NotCalled(t *testing.T) 
 	}
 	defer func() { validator.ValidateAgentTypeDefinitionFunc = origFunc }()
 
-	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir)
+	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.NoError(t, err)
 	require.Len(t, agentControls, 1)
 	assert.False(t, called, "validator should not run when INPUT_VALIDATE_AGENT_TYPE is unset")
@@ -1195,8 +1195,179 @@ func TestReadAgentDefinition_InvalidYAML(t *testing.T) {
 	defFile := filepath.Join(configDir, "agentDefinition.yml")
 	require.NoError(t, os.WriteFile(defFile, []byte(":\tinvalid: yaml: ["), 0644))
 
-	result, err := ReadAgentDefinition(context.Background(), tmpDir)
+	result, err := ReadAgentDefinition(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "failed to parse agentDefinition.yml")
+}
+
+func TestReadConfigurationDefinitions_NrControlDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".nrcontrol")
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	testYAML := `configurationDefinitions:
+  - platform: linux
+    description: nrcontrol config`
+	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
+	require.NoError(t, os.WriteFile(configFile, []byte(testYAML), 0644))
+
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, ".nrcontrol")
+	require.NoError(t, err)
+	require.Len(t, configs, 1)
+	assert.Equal(t, "nrcontrol config", configs[0]["description"])
+}
+
+func TestReadConfigurationDefinitions_KebabCaseFilename(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	testYAML := `configurationDefinitions:
+  - platform: linux
+    description: kebab config`
+	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilenameFallback())
+	require.NoError(t, os.WriteFile(configFile, []byte(testYAML), 0644))
+
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, err)
+	require.Len(t, configs, 1)
+	assert.Equal(t, "kebab config", configs[0]["description"])
+}
+
+func TestReadConfigurationDefinitions_CamelCasePrecedence(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	camelYAML := `configurationDefinitions:
+  - platform: linux
+    description: camel-wins`
+	kebabYAML := `configurationDefinitions:
+  - platform: linux
+    description: kebab-loses`
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, config.GetConfigurationDefinitionsFilename()), []byte(camelYAML), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, config.GetConfigurationDefinitionsFilenameFallback()), []byte(kebabYAML), 0644))
+
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, err)
+	require.Len(t, configs, 1)
+	assert.Equal(t, "camel-wins", configs[0]["description"])
+}
+
+func TestReadConfigurationDefinitions_NrControlResolvesSchemaRelativeToSameDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".nrcontrol")
+	schemasDir := filepath.Join(configDir, "schemas")
+	require.NoError(t, os.MkdirAll(schemasDir, 0755))
+
+	schemaContent := `{"type": "object"}`
+	require.NoError(t, os.WriteFile(filepath.Join(schemasDir, "foo.json"), []byte(schemaContent), 0644))
+
+	testYAML := `configurationDefinitions:
+  - platform: linux
+    schema: ./schemas/foo.json`
+	configFile := filepath.Join(configDir, config.GetConfigurationDefinitionsFilename())
+	require.NoError(t, os.WriteFile(configFile, []byte(testYAML), 0644))
+
+	configs, err := ReadConfigurationDefinitions(context.Background(), tmpDir, ".nrcontrol")
+	require.NoError(t, err)
+	require.Len(t, configs, 1)
+	expectedEncoded := base64.StdEncoding.EncodeToString([]byte(schemaContent))
+	assert.Equal(t, expectedEncoded, configs[0]["schema"])
+}
+
+func TestReadAgentControlDefinitions_NrControlDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".nrcontrol")
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	testYAML := `agentControlDefinitions:
+    - platform: KUBERNETES`
+	agentControlFile := filepath.Join(configDir, config.GetAgentControlDefinitionsFilename())
+	require.NoError(t, os.WriteFile(agentControlFile, []byte(testYAML), 0644))
+
+	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir, ".nrcontrol")
+	require.NoError(t, err)
+	require.Len(t, agentControls, 1)
+	assert.Equal(t, "KUBERNETES", agentControls[0]["platform"])
+}
+
+func TestReadAgentControlDefinitions_KebabCaseFilename(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	testYAML := `agentControlDefinitions:
+    - platform: KUBERNETES`
+	agentControlFile := filepath.Join(configDir, config.GetAgentControlDefinitionsFilenameFallback())
+	require.NoError(t, os.WriteFile(agentControlFile, []byte(testYAML), 0644))
+
+	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, err)
+	require.Len(t, agentControls, 1)
+	assert.Equal(t, "KUBERNETES", agentControls[0]["platform"])
+}
+
+func TestReadAgentControlDefinitions_CamelCasePrecedence(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	camelYAML := `agentControlDefinitions:
+    - platform: camel-wins`
+	kebabYAML := `agentControlDefinitions:
+    - platform: kebab-loses`
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, config.GetAgentControlDefinitionsFilename()), []byte(camelYAML), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, config.GetAgentControlDefinitionsFilenameFallback()), []byte(kebabYAML), 0644))
+
+	agentControls, err := ReadAgentControlDefinitions(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, err)
+	require.Len(t, agentControls, 1)
+	assert.Equal(t, "camel-wins", agentControls[0]["platform"])
+}
+
+func TestReadAgentDefinition_NrControlDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".nrcontrol")
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	yamlContent := `breakingChange: "1.0.0"`
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, config.GetAgentDefinitionFilename()), []byte(yamlContent), 0644))
+
+	result, err := ReadAgentDefinition(context.Background(), tmpDir, ".nrcontrol")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.BreakingChange)
+	assert.Equal(t, "1.0.0", *result.BreakingChange)
+}
+
+func TestReadAgentDefinition_KebabCaseFilename(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	yamlContent := `breakingChange: "1.1.0"`
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, config.GetAgentDefinitionFilenameFallback()), []byte(yamlContent), 0644))
+
+	result, err := ReadAgentDefinition(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.BreakingChange)
+	assert.Equal(t, "1.1.0", *result.BreakingChange)
+}
+
+func TestReadAgentDefinition_CamelCasePrecedence(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, config.GetAgentDefinitionFilename()), []byte(`breakingChange: "2.0.0"`), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, config.GetAgentDefinitionFilenameFallback()), []byte(`breakingChange: "3.0.0"`), 0644))
+
+	result, err := ReadAgentDefinition(context.Background(), tmpDir, config.GetRootFolderForAgentRepo())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.BreakingChange)
+	assert.Equal(t, "2.0.0", *result.BreakingChange)
 }

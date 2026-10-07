@@ -20,9 +20,9 @@ inputs:
     required: false
     default: ''
   config-directory:
-    description: 'Directory containing agent configuration files (relative to repository root, default: .fleetControl)'
+    description: 'Directory containing agent configuration files (relative to repository root). If left unset, checks .fleetControl first, then .nrcontrol. Set explicitly to use a different directory (disables auto-detection).'
     required: false
-    default: '.fleetControl'
+    default: ''
   fetch-depth:
     description: 'Number of commits to fetch (> 1 may be required for docs flow)'
     required: false
