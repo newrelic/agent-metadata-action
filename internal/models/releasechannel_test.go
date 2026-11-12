@@ -73,7 +73,23 @@ func TestSetReleaseChannelRequest_Validate(t *testing.T) {
 			name:        "invalid channel",
 			request:     SetReleaseChannelRequest{Platform: "HOST", OperatingSystem: "LINUX", Channel: "BETA"},
 			wantErr:     true,
-			errContains: "invalid channel",
+			errContains: "must be one of EXPERIMENTAL, RAPID, REGULAR, STABLE, EXTENDED",
+		},
+		{
+			name:    "valid channel EXPERIMENTAL",
+			request: SetReleaseChannelRequest{Platform: "HOST", OperatingSystem: "LINUX", Channel: "EXPERIMENTAL"},
+		},
+		{
+			name:    "valid channel RAPID lowercase",
+			request: SetReleaseChannelRequest{Platform: "HOST", OperatingSystem: "LINUX", Channel: "rapid"},
+		},
+		{
+			name:    "valid channel STABLE",
+			request: SetReleaseChannelRequest{Platform: "HOST", OperatingSystem: "LINUX", Channel: "STABLE"},
+		},
+		{
+			name:    "valid channel EXTENDED",
+			request: SetReleaseChannelRequest{Platform: "HOST", OperatingSystem: "LINUX", Channel: "EXTENDED"},
 		},
 	}
 

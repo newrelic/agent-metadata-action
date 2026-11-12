@@ -1,5 +1,5 @@
 name: 'Promote Agent Version To Release Channel'
-description: 'Calls the New Relic instrumentation service to promote an already-published agent version onto a release channel (e.g. REGULAR).'
+description: 'Calls the New Relic instrumentation service to promote an already-published agent version onto a release channel (e.g. REGULAR, STABLE).'
 inputs:
   newrelic-client-id:
     description: 'NewRelic client ID (pass from secrets)'
@@ -14,7 +14,7 @@ inputs:
     description: 'Agent version to promote (e.g. 1.2.3). Must already be published to instrumentation-metadata - this is not a git ref and no checkout occurs.'
     required: true
   channel:
-    description: 'Release channel to promote the version to. Currently only REGULAR is defined.'
+    description: 'Release channel to promote the version to. One of EXPERIMENTAL, RAPID, REGULAR, STABLE, EXTENDED.'
     required: true
   platform:
     description: 'Target platform for the promotion. One of: HOST, KUBERNETESCLUSTER'
