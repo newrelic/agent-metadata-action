@@ -14,7 +14,7 @@ inputs:
     description: 'Known-good agent version to promote (e.g. 1.2.3). Must already be published to instrumentation-metadata.'
     required: true
   channel:
-    description: 'Release channel to promote promote-version to. Currently only REGULAR is defined.'
+    description: 'Release channel to promote promote-version to. One of EXPERIMENTAL, RAPID, REGULAR, STABLE, EXTENDED.'
     required: true
   platform:
     description: 'Target platform to promote promote-version on. One of: HOST, KUBERNETESCLUSTER. disable-agent has no platform/operating-system concept - it disables disable-version everywhere - so when platform is HOST, promote-version is promoted for both LINUX and WINDOWS to keep the channel consistent across operating systems; when platform is KUBERNETESCLUSTER, promote-version is promoted once with no operating system.'

@@ -2,8 +2,12 @@ package models
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
+
+// validChannels lists the release channels accepted by the instrumentation service.
+var validChannels = []string{"EXPERIMENTAL", "RAPID", "REGULAR", "STABLE", "EXTENDED"}
 
 // SetReleaseChannelRequest represents a request to promote an agent version to a release channel.
 type SetReleaseChannelRequest struct {
@@ -36,9 +40,8 @@ func (r *SetReleaseChannelRequest) Validate() error {
 	if r.Channel == "" {
 		return fmt.Errorf("channel is required")
 	}
-	// REGULAR is the only channel defined at MVP; extend this check as new channels ship.
-	if !strings.EqualFold(r.Channel, "REGULAR") {
-		return fmt.Errorf("invalid channel '%s': must be 'REGULAR'", r.Channel)
+	if !slices.ContainsFunc(validChannels, func(c string) bool { return strings.EqualFold(r.Channel, c) }) {
+		return fmt.Errorf("invalid channel '%s': must be one of %s", r.Channel, strings.Join(validChannels, ", "))
 	}
 
 	return nil
